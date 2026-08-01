@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, canApproveLeave } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -69,7 +70,12 @@ export default async function LeavePage() {
                   <tr key={leave.id} className="hover:bg-gray-50">
                     {session.role !== "EMPLOYEE" && (
                       <td className="px-4 py-3 font-medium text-gray-900">
-                        {fullName(leave.employee.firstName, leave.employee.lastName)}
+                        <Link
+                          href={`/employees/${leave.employee.id}/leave`}
+                          className="hover:text-[#7B61FF] transition-colors"
+                        >
+                          {fullName(leave.employee.firstName, leave.employee.lastName)}
+                        </Link>
                       </td>
                     )}
                     <td className="px-4 py-3 capitalize text-gray-600">

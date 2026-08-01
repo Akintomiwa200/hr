@@ -195,7 +195,7 @@ export function HrDashboard({
       : [];
 
   return (
-    <div className="max-w-6xl mx-auto w-full">
+    <div className="w-full">
       <GreetingHeader name={userName} dateRange={data.dateRange} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
@@ -337,7 +337,7 @@ export function ManagerDashboard({
   data: Awaited<ReturnType<typeof import("@/lib/dashboard-data").getManagerDashboardData>>;
 }) {
   return (
-    <div className="max-w-6xl mx-auto w-full">
+    <div className="w-full">
       <GreetingHeader name={userName} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -424,7 +424,7 @@ export function EmployeeDashboard({
   const empType = data.employee ? resolveEmploymentType(data.employee) : "FULL_TIME";
 
   return (
-    <div className="max-w-6xl mx-auto w-full">
+    <div className="w-full">
       <GreetingHeader name={userName} />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">

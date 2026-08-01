@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -83,7 +84,12 @@ export default async function PayrollPage() {
                   <tr key={record.id} className="hover:bg-gray-50">
                     {session.role !== "EMPLOYEE" && (
                       <td className="px-4 py-3 font-medium text-gray-900">
-                        {fullName(record.employee.firstName, record.employee.lastName)}
+                        <Link
+                          href={`/employees/${record.employee.id}/payroll`}
+                          className="hover:text-[#7B61FF] transition-colors"
+                        >
+                          {fullName(record.employee.firstName, record.employee.lastName)}
+                        </Link>
                       </td>
                     )}
                     <td className="px-4 py-3 text-gray-600">

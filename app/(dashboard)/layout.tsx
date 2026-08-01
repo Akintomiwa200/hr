@@ -28,7 +28,7 @@ export default async function DashboardLayout({
             lastName={lastName}
             teamCount={Math.max(employeeCount - 3, 0)}
           />
-          <main className="px-8 pb-8">{children}</main>
+          <main className="px-8 pb-8 max-w-6xl mx-auto w-full">{children}</main>
         </div>
       </div>
     </RealtimeProvider>

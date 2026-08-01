@@ -1,10 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { Role } from "@prisma/client";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { notifyEmployeeChange } from "@/lib/employees/mutations";
+
+export async function GET(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const search = request.nextUrl.searchParams.get("search") ?? "";
+  const status = request.nextUrl.searchParams.get("status");
+  const role = request.nextUrl.searchParams.get("role");
+
+  const employees = await prisma.employee.findMany({
+    where: {
+      ...(status && status !== "ALL" ? { status } : {}),
+      ...(role && role !== "ALL"
+        ? { user: { role: role as "ADMIN" | "MANAGER" | "EMPLOYEE" } }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { firstName: { contains: search } },
+              { lastName: { contains: search } },
+              { email: { contains: search } },
+              { employeeCode: { contains: search } },
+            ],
+          }
+        : {}),
+    },
+    include: {
+      department: true,
+      manager: { select: { id: true, firstName: true, lastName: true } },
+      user: { select: { role: true } },
+    },
+    orderBy: { firstName: "asc" },
+  });
+
+  return NextResponse.json(employees);
+}
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -17,12 +54,15 @@ export async function POST(request: NextRequest) {
     firstName,
     lastName,
     email,
+    phone,
+    address,
     jobTitle,
     departmentId,
     managerId,
     employmentType = "FULL_TIME",
     role = "EMPLOYEE",
     salary = 0,
+    status = "ACTIVE",
   } = body;
 
   const resolvedJobTitle =
@@ -54,20 +94,28 @@ export async function POST(request: NextRequest) {
           firstName,
           lastName,
           email,
+          phone: phone || null,
+          address: address || null,
           jobTitle: resolvedJobTitle,
           departmentId,
           managerId: managerId || null,
           hireDate: new Date(),
           salary: Number(salary) || 0,
+          status,
         },
       },
     },
-    include: { employee: true },
+    include: {
+      employee: {
+        include: {
+          department: true,
+          user: { select: { role: true } },
+        },
+      },
+    },
   });
 
-  broadcastEvent("employee_updated", { id: user.employee!.id, action: "created" });
-  revalidatePath("/employees");
-  revalidatePath("/dashboard");
+  notifyEmployeeChange(user.employee!.id, "created");
 
-  return NextResponse.json({ success: true, employeeId: user.employee!.id });
+  return NextResponse.json({ success: true, employee: user.employee });
 }
