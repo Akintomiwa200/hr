@@ -1,22 +1,30 @@
 import { prisma } from "@/lib/prisma";
 import type { SessionUser } from "@/lib/auth";
+import {
+  canManageEmployees,
+  canViewTeamScope,
+  isCompanyAdmin,
+  isHrRole,
+  isSuperAdmin,
+  normalizeRole,
+} from "@/lib/roles";
 
 export async function canManageEmployee(
   session: SessionUser,
-  employeeId?: string
+  _employeeId?: string
 ): Promise<boolean> {
-  if (session.role === "ADMIN" || session.role === "MANAGER") return true;
-  return false;
+  return canManageEmployees(session.role);
 }
 
 export async function canViewEmployee(
   session: SessionUser,
   employeeId: string
 ): Promise<boolean> {
-  if (session.role === "ADMIN") return true;
+  const role = normalizeRole(session.role);
+  if (isSuperAdmin(role) || isCompanyAdmin(role) || isHrRole(role)) return true;
   if (session.employeeId === employeeId) return true;
 
-  if (session.role === "MANAGER" && session.employeeId) {
+  if (canViewTeamScope(role) && session.employeeId) {
     const report = await prisma.employee.findFirst({
       where: { id: employeeId, managerId: session.employeeId },
       select: { id: true },

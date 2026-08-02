@@ -73,6 +73,8 @@ export async function getHrDashboardData(rangeInput?: DashboardRangeKey | string
     recentHires,
     thisMonthRate,
     lastMonthRate,
+    attendanceDevices,
+    deviceUsageToday,
   ] = await Promise.all([
     prisma.employee.findMany({
       include: { department: true, user: { select: { role: true } } },
@@ -116,6 +118,15 @@ export async function getHrDashboardData(rangeInput?: DashboardRangeKey | string
     }),
     getAttendanceRateForRange(rangeStart, rangeEnd),
     getAttendanceRateForRange(previousPeriod.start, previousPeriod.end),
+    prisma.attendanceDevice.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.attendance.groupBy({
+      by: ["deviceId"],
+      _count: { deviceId: true },
+      where: { date: { gte: today }, deviceId: { not: null } },
+    }),
   ]);
 
   const activeEmployees = employees.filter((e) => e.status === "ACTIVE");
@@ -138,7 +149,20 @@ export async function getHrDashboardData(rangeInput?: DashboardRangeKey | string
     todayAttendanceByStatus.find((s) => s.status === "REMOTE")?._count.status ?? 0;
   const todayLate =
     todayAttendanceByStatus.find((s) => s.status === "LATE")?._count.status ?? 0;
-  const todayDevicesTotal = todayPresent + todayRemote + todayLate;
+  const deviceColors = ["bg-[#7B61FF]", "bg-amber-400", "bg-teal-400", "bg-blue-400", "bg-violet-300"];
+  const usageByDeviceId = new Map(
+    deviceUsageToday.map((row) => [row.deviceId, row._count.deviceId])
+  );
+  const deviceBreakdown = attendanceDevices.map((device, index) => ({
+    id: device.id,
+    label: device.name,
+    value: usageByDeviceId.get(device.id) ?? 0,
+    color: deviceColors[index % deviceColors.length],
+    online: device.lastSeenAt
+      ? Date.now() - new Date(device.lastSeenAt).getTime() < 5 * 60 * 1000
+      : false,
+  }));
+  const todayDevicesTotal = deviceBreakdown.reduce((sum, item) => sum + item.value, 0);
 
   const attendanceTrend = thisMonthRate - lastMonthRate;
 
@@ -217,6 +241,7 @@ export async function getHrDashboardData(rangeInput?: DashboardRangeKey | string
       present: todayPresent,
       remote: todayRemote,
       late: todayLate,
+      devices: deviceBreakdown,
     },
     performanceReviews,
     avgPerformance,
@@ -341,3 +366,25 @@ export async function getEmployeeDashboardData(
     },
   };
 }
+
+export async function getSuperAdminDashboardData() {
+  const [companies, totalUsers, totalEmployees, activeCompanies] = await Promise.all([
+    prisma.company.findMany({
+      include: { _count: { select: { users: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.user.count({ where: { role: { not: "SUPER_ADMIN" } } }),
+    prisma.employee.count(),
+    prisma.company.count({ where: { isActive: true } }),
+  ]);
+
+  return {
+    companies,
+    totalUsers,
+    totalEmployees,
+    activeCompanies,
+  };
+}
+
+export const getCompanyAdminDashboardData = getHrDashboardData;
+export const getSupervisorDashboardData = getManagerDashboardData;

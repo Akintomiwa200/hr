@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getSession, canManageEmployees } from "@/lib/auth";
+import { PEOPLE_ADMIN_ROLES } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { NewEmployeeForm } from "./new-employee-form";
@@ -14,7 +15,7 @@ export default async function NewEmployeePage() {
   const [departments, managers] = await Promise.all([
     prisma.department.findMany({ orderBy: { name: "asc" } }),
     prisma.employee.findMany({
-      where: { user: { role: { in: ["ADMIN", "MANAGER"] } } },
+      where: { user: { role: { in: PEOPLE_ADMIN_ROLES } } },
       orderBy: { firstName: "asc" },
     }),
   ]);

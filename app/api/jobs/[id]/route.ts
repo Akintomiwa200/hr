@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastEvent } from "@/lib/events";
 import { isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
+import { canManageRecruitment } from "@/lib/roles";
 
 export async function GET(
   _request: NextRequest,
@@ -76,7 +77,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await requireSession();
-  if (!session || session.role !== "ADMIN") return unauthorized();
+  if (!session || !canManageRecruitment(session.role)) return unauthorized();
 
   const { id } = await params;
   const existing = await prisma.job.findUnique({ where: { id } });

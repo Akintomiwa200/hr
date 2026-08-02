@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { canManageRecruitment, RECRUITMENT_ROLES } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card, statusBadge } from "@/components/ui";
 import { CalendarLink } from "@/components/holidays/calendar-link";
@@ -38,12 +39,12 @@ export default async function CandidateDetailPage({
   if (!application) notFound();
 
   const interviewers = await prisma.employee.findMany({
-    where: { user: { role: { in: ["ADMIN", "MANAGER"] } } },
+    where: { user: { role: { in: RECRUITMENT_ROLES } } },
     select: { id: true, firstName: true, lastName: true },
     orderBy: { firstName: "asc" },
   });
 
-  const canManage = session.role === "ADMIN" || session.role === "MANAGER";
+  const canManage = canManageRecruitment(session.role);
   const nextInterview = application.interviews.find((i) => i.status === "SCHEDULED");
 
   return (

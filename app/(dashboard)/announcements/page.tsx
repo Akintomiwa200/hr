@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { canManageOrgContent } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { AnnouncementsModule } from "@/components/announcements/announcements-module";
@@ -22,7 +23,7 @@ export default async function AnnouncementsPage() {
       />
       <AnnouncementsModule
         announcements={announcements}
-        canManage={session.role === "ADMIN"}
+        canManage={canManageOrgContent(session.role)}
       />
     </div>
   );

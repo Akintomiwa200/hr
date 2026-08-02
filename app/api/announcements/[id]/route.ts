@@ -3,13 +3,14 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastEvent } from "@/lib/events";
 import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
+import { canManageOrgContent } from "@/lib/roles";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await requireSession();
-  if (!session || session.role !== "ADMIN") return unauthorized();
+  if (!session || !canManageOrgContent(session.role)) return unauthorized();
 
   const { id } = await params;
   const { title, content, priority } = await request.json();
@@ -36,7 +37,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await requireSession();
-  if (!session || session.role !== "ADMIN") return unauthorized();
+  if (!session || !canManageOrgContent(session.role)) return unauthorized();
 
   const { id } = await params;
   const existing = await prisma.announcement.findUnique({ where: { id } });

@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastEvent } from "@/lib/events";
 import { notFound, requireSession, unauthorized } from "@/lib/api-auth";
+import { canManageOrgContent } from "@/lib/roles";
 import { isHolidayDbEnabled } from "@/lib/holidays-data";
 
 export async function PATCH(
@@ -10,7 +11,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await requireSession();
-  if (!session || session.role !== "ADMIN") return unauthorized();
+  if (!session || !canManageOrgContent(session.role)) return unauthorized();
 
   if (!isHolidayDbEnabled()) {
     return NextResponse.json(
@@ -44,7 +45,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await requireSession();
-  if (!session || session.role !== "ADMIN") return unauthorized();
+  if (!session || !canManageOrgContent(session.role)) return unauthorized();
 
   if (!isHolidayDbEnabled()) {
     return NextResponse.json(

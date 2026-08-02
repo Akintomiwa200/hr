@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Download, FileText, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
 
 type DocumentRow = {
@@ -35,23 +36,24 @@ export function DocumentsModule({
   const [deleteDoc, setDeleteDoc] = useState<DocumentRow | null>(null);
   const [form, setForm] = useState({ title: "", category: "Policy", fileUrl: "", employeeId: "" });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const save = async () => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch("/api/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to upload");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to upload document"));
+        return;
+      }
+      notify.success("Document uploaded successfully");
       setCreateOpen(false);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to upload");
+    } catch {
+      notify.error("Failed to upload document");
     } finally {
       setLoading(false);
     }
@@ -62,9 +64,15 @@ export function DocumentsModule({
     setLoading(true);
     try {
       const res = await fetch(`/api/documents/${deleteDoc.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to delete document"));
+        return;
+      }
+      notify.success("Document deleted successfully");
       setDeleteDoc(null);
       router.refresh();
+    } catch {
+      notify.error("Failed to delete document");
     } finally {
       setLoading(false);
     }
@@ -126,7 +134,6 @@ export function DocumentsModule({
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title="Upload Document">
         <div className="space-y-4">
-          {error && <p className="text-sm text-red-600">{error}</p>}
           <input className={inputClass} placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <input className={inputClass} placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
           <input className={inputClass} placeholder="File URL" value={form.fileUrl} onChange={(e) => setForm({ ...form, fileUrl: e.target.value })} />

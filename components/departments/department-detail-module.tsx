@@ -17,6 +17,7 @@ import { Avatar, EmptyState, StatCard, statusBadge } from "@/components/ui";
 import { OrgChartLegend, OrgChartTree } from "@/components/departments/org-chart-tree";
 import { useAutoHideScrollbar } from "@/hooks/use-auto-hide-scrollbar";
 import type { OrgChartNode } from "@/lib/org-chart-data";
+import { PEOPLE_ADMIN_ROLES } from "@/lib/roles";
 import { cn, fullName } from "@/lib/utils";
 
 type Member = {
@@ -38,8 +39,10 @@ type Job = {
 };
 
 function roleBadgeClass(role: string) {
-  if (role === "ADMIN") return "bg-violet-100 text-violet-700";
+  if (role === "COMPANY_ADMIN") return "bg-violet-100 text-violet-700";
+  if (role === "HR") return "bg-fuchsia-100 text-fuchsia-700";
   if (role === "MANAGER") return "bg-sky-100 text-sky-700";
+  if (role === "SUPERVISOR") return "bg-amber-100 text-amber-700";
   return "bg-gray-100 text-gray-600";
 }
 
@@ -50,6 +53,12 @@ export function DepartmentDetailModule({
   members,
   jobs,
   orgTree,
+  backHref = "/departments",
+  backLabel = "Back to organization",
+  showOrgChartLink = true,
+  orgChartHref,
+  hierarchyTitle = "Department hierarchy",
+  isMyTeam = false,
 }: {
   departmentId: string;
   name: string;
@@ -57,6 +66,12 @@ export function DepartmentDetailModule({
   members: Member[];
   jobs: Job[];
   orgTree: OrgChartNode[];
+  backHref?: string;
+  backLabel?: string;
+  showOrgChartLink?: boolean;
+  orgChartHref?: string;
+  hierarchyTitle?: string;
+  isMyTeam?: boolean;
 }) {
   const [memberSearch, setMemberSearch] = useState("");
   const [jobSearch, setJobSearch] = useState("");
@@ -64,7 +79,7 @@ export function DepartmentDetailModule({
   const jobsScroll = useAutoHideScrollbar();
 
   const managerCount = useMemo(
-    () => members.filter((m) => m.role === "MANAGER" || m.role === "ADMIN").length,
+    () => members.filter((m) => PEOPLE_ADMIN_ROLES.includes(m.role as (typeof PEOPLE_ADMIN_ROLES)[number])).length,
     [members]
   );
 
@@ -98,11 +113,11 @@ export function DepartmentDetailModule({
   return (
     <div className="space-y-6">
       <Link
-        href="/departments"
+        href={backHref}
         className="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
-        Back to organization
+        {backLabel}
       </Link>
 
       <div className="rounded-2xl border border-gray-100 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
@@ -114,19 +129,31 @@ export function DepartmentDetailModule({
                 <Building2 className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">{name}</h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-xl font-bold text-gray-900">{name}</h1>
+                  {isMyTeam && (
+                    <span className="inline-flex px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-[11px] font-semibold">
+                      Your team
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-gray-500 mt-1 max-w-xl">
-                  {description ?? "Department overview, team members, and reporting structure"}
+                  {description ??
+                    (backHref === "/teams"
+                      ? "Team members, reporting lines, and open roles"
+                      : "Department overview, team members, and reporting structure")}
                 </p>
               </div>
             </div>
-            <Link
-              href={`/departments?dept=${departmentId}`}
-              className="inline-flex items-center gap-2 px-3 py-2 text-[13px] font-medium rounded-lg border border-brand-200 text-brand-700 bg-brand-50/50 hover:bg-brand-50 transition-colors shrink-0"
-            >
-              <Network className="w-4 h-4" />
-              Full org chart
-            </Link>
+            {showOrgChartLink && (
+              <Link
+                href={orgChartHref ?? `/departments?dept=${departmentId}`}
+                className="inline-flex items-center gap-2 px-3 py-2 text-[13px] font-medium rounded-lg border border-brand-200 text-brand-700 bg-brand-50/50 hover:bg-brand-50 transition-colors shrink-0"
+              >
+                <Network className="w-4 h-4" />
+                Full org chart
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -140,7 +167,7 @@ export function DepartmentDetailModule({
       <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-brand-50/40 via-white to-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Department hierarchy</h2>
+            <h2 className="text-base font-semibold text-gray-900">{hierarchyTitle}</h2>
             <p className="text-xs text-gray-500 mt-0.5">
               Reporting lines within {name} · click a person for their profile
             </p>

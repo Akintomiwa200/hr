@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastEvent } from "@/lib/events";
 import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
+import { canManageOrgContent } from "@/lib/roles";
 import { isHolidayDbEnabled } from "@/lib/holidays-data";
 
 export async function GET() {
@@ -22,7 +23,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const session = await requireSession();
-  if (!session || session.role !== "ADMIN") return unauthorized();
+  if (!session || !canManageOrgContent(session.role)) return unauthorized();
 
   if (!isHolidayDbEnabled()) {
     return NextResponse.json(

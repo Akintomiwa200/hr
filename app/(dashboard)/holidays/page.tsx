@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { canManageOrgContent } from "@/lib/roles";
 import { getCalendarData } from "@/lib/calendar-data";
 import { isHolidayDbEnabled } from "@/lib/holidays-data";
 import { CalendarModule } from "@/components/holidays/calendar-module";
@@ -35,7 +36,7 @@ export default async function HolidaysPage({
         payrollRecords={data.payrollRecords}
         attendanceRows={data.attendanceRows}
         employees={data.employees}
-        canManage={session.role === "ADMIN" && isHolidayDbEnabled()}
+        canManage={canManageOrgContent(session.role) && isHolidayDbEnabled()}
         showEmployeeColumn={session.role !== "EMPLOYEE"}
         initialDate={date}
       />

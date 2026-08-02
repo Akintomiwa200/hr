@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Link2, Unlink } from "lucide-react";
 import { Button } from "@/components/ui";
+import { notify, readApiError } from "@/lib/toast";
 
 export function GoogleCalendarConnect() {
   const router = useRouter();
@@ -23,10 +24,15 @@ export function GoogleCalendarConnect() {
 
   const disconnect = async () => {
     setLoading(true);
-    await fetch("/api/google/status", { method: "DELETE" });
+    const res = await fetch("/api/google/status", { method: "DELETE" });
+    if (!res.ok) {
+      notify.error(await readApiError(res, "Failed to disconnect Google Calendar"));
+    } else {
+      notify.success("Google Calendar disconnected");
+    }
     router.refresh();
-    const res = await fetch("/api/google/status");
-    setStatus(await res.json());
+    const statusRes = await fetch("/api/google/status");
+    setStatus(await statusRes.json());
     setLoading(false);
   };
 

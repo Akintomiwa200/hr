@@ -14,7 +14,7 @@ const footerLinks = {
     { label: "Features", href: "/features" },
     { label: "Pricing", href: "/pricing" },
     { label: "Integrations", href: "/integrations" },
-    { label: "API", href: "/developers" },
+    { label: "API", href: "/api" },
     { label: "Changelog", href: "/changelog" },
   ],
   Company: [
@@ -26,7 +26,7 @@ const footerLinks = {
   ],
   Resources: [
     { label: "Help Center", href: "/help" },
-    { label: "Documentation", href: "/documentation" },
+    { label: "Documentation", href: "/api" },
     { label: "Community", href: "/community" },
     { label: "Status", href: "/status" },
     { label: "Security", href: "/security" },

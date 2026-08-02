@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession, canManageEmployees } from "@/lib/auth";
+import { PEOPLE_ADMIN_ROLES } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { HelpLink } from "@/components/help/help-link";
@@ -20,7 +21,7 @@ export default async function EmployeesPage() {
     }),
     prisma.department.findMany({ orderBy: { name: "asc" } }),
     prisma.employee.findMany({
-      where: { user: { role: { in: ["ADMIN", "MANAGER"] } } },
+      where: { user: { role: { in: PEOPLE_ADMIN_ROLES } } },
       select: { id: true, firstName: true, lastName: true },
       orderBy: { firstName: "asc" },
     }),

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Mail, Send } from "lucide-react";
 import { Button, Card } from "@/components/ui";
+import { notify } from "@/lib/toast";
 
 const inputClass =
   "w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500";
@@ -20,7 +21,6 @@ const topics = [
 export function HelpContactForm({ userEmail, userName }: { userEmail: string; userName: string }) {
   const [topic, setTopic] = useState(topics[0]);
   const [message, setMessage] = useState("");
-  const [sent, setSent] = useState(false);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +29,7 @@ export function HelpContactForm({ userEmail, userName }: { userEmail: string; us
       `Name: ${userName}\nEmail: ${userEmail}\nTopic: ${topic}\n\n${message}`
     );
     window.location.href = `mailto:support@smarthr.com?subject=${subject}&body=${body}`;
-    setSent(true);
+    notify.success("Opening your email client to send the message");
   };
 
   return (
@@ -49,16 +49,7 @@ export function HelpContactForm({ userEmail, userName }: { userEmail: string; us
             Describe your issue and we&apos;ll open your email client with a pre-filled message.
           </p>
 
-          {sent ? (
-            <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm text-emerald-800">
-              Your email client should have opened. If it didn&apos;t, write to{" "}
-              <a href="mailto:support@smarthr.com" className="font-medium underline">
-                support@smarthr.com
-              </a>
-              .
-            </div>
-          ) : (
-            <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={submit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-medium text-gray-500">Your name</label>
@@ -98,7 +89,6 @@ export function HelpContactForm({ userEmail, userName }: { userEmail: string; us
                 Send message
               </Button>
             </form>
-          )}
         </Card>
 
         <div className="space-y-4">

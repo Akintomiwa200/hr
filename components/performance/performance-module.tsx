@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { Button, Card, EmptyState, statusBadge } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
 
 type Review = {
@@ -48,7 +49,6 @@ export function PerformanceModule({
     status: "DRAFT",
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const openCreate = () => {
     setForm({
@@ -78,7 +78,6 @@ export function PerformanceModule({
 
   const save = async (mode: "create" | "edit") => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(
         mode === "create" ? "/api/performance" : `/api/performance/${editReview!.id}`,
@@ -88,13 +87,16 @@ export function PerformanceModule({
           body: JSON.stringify(form),
         }
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to save");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to save review"));
+        return;
+      }
+      notify.success(mode === "create" ? "Performance review created" : "Performance review updated");
       setCreateOpen(false);
       setEditReview(null);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save");
+    } catch {
+      notify.error("Failed to save review");
     } finally {
       setLoading(false);
     }
@@ -105,9 +107,15 @@ export function PerformanceModule({
     setLoading(true);
     try {
       const res = await fetch(`/api/performance/${deleteReview.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to delete review"));
+        return;
+      }
+      notify.success("Performance review deleted");
       setDeleteReview(null);
       router.refresh();
+    } catch {
+      notify.error("Failed to delete review");
     } finally {
       setLoading(false);
     }
@@ -115,7 +123,6 @@ export function PerformanceModule({
 
   const formFields = (
     <div className="space-y-4">
-      {error && <p className="text-sm text-red-600">{error}</p>}
       {createOpen && (
         <select className={inputClass} value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })}>
           {employees.map((e) => (

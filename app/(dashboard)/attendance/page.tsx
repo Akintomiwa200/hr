@@ -1,12 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { canManageDevices } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
-import { PageHeader, Card, statusBadge, EmptyState } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
-import { formatDate, fullName } from "@/lib/utils";
-import { Clock } from "lucide-react";
-import { CheckInButton } from "./check-in-button";
+import { AttendanceModule } from "@/components/attendance/attendance-module";
 
 export default async function AttendancePage() {
   const session = await getSession();
@@ -20,7 +18,11 @@ export default async function AttendancePage() {
       ? { employeeId: session.employeeId }
       : {};
 
-  const [records, todayRecord] = await Promise.all([
+  const isEmployee = session.role === "EMPLOYEE";
+  const showDevicePanel = canManageDevices(session.role);
+  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+
+  const [records, todayRecord, presentTodayCount] = await Promise.all([
     prisma.attendance.findMany({
       where: whereClause,
       include: { employee: true },
@@ -37,13 +39,15 @@ export default async function AttendancePage() {
           },
         })
       : null,
+    session.role !== "EMPLOYEE"
+      ? prisma.attendance.count({
+          where: {
+            date: today,
+            status: { in: ["PRESENT", "REMOTE", "LATE", "HALF_DAY"] },
+          },
+        })
+      : Promise.resolve(undefined),
   ]);
-
-  const presentToday = records.filter(
-    (r) =>
-      new Date(r.date).toDateString() === today.toDateString() &&
-      ["PRESENT", "REMOTE", "LATE"].includes(r.status)
-  ).length;
 
   return (
     <div>
@@ -51,80 +55,19 @@ export default async function AttendancePage() {
         title="Attendance"
         description={
           session.role === "EMPLOYEE"
-            ? "Track your daily attendance"
-            : "Monitor team attendance records"
+            ? "Check in, check out, and view your attendance history"
+            : "Monitor daily attendance across the organization"
         }
-        action={
-          <div className="flex flex-wrap items-center gap-4">
-            <ModulePageActions helpSlug="attendance" helpLabel="Attendance guide" />
-            {session.role === "EMPLOYEE" && (
-              <CheckInButton todayRecord={todayRecord} />
-            )}
-          </div>
-        }
+        action={<ModulePageActions helpSlug="attendance" helpLabel="Attendance guide" />}
       />
-
-      {session.role !== "EMPLOYEE" && (
-        <div className="mb-6 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-          <p className="text-sm text-indigo-700">
-            <span className="font-semibold">{presentToday}</span> employees checked in today
-          </p>
-        </div>
-      )}
-
-      <Card>
-        {records.length === 0 ? (
-          <EmptyState
-            icon={Clock}
-            title="No attendance records"
-            description="Attendance records will appear here once employees check in."
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  {session.role !== "EMPLOYEE" && (
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Employee</th>
-                  )}
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Check In</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Check Out</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {records.map((record) => (
-                  <tr key={record.id} className="hover:bg-gray-50">
-                    {session.role !== "EMPLOYEE" && (
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        <Link
-                          href={`/employees/${record.employee.id}/attendance`}
-                          className="hover:text-[#7B61FF] transition-colors"
-                        >
-                          {fullName(record.employee.firstName, record.employee.lastName)}
-                        </Link>
-                      </td>
-                    )}
-                    <td className="px-4 py-3 text-gray-600">{formatDate(record.date)}</td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {record.checkIn
-                        ? new Date(record.checkIn).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {record.checkOut
-                        ? new Date(record.checkOut).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3">{statusBadge(record.status)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+      <AttendanceModule
+        records={records}
+        todayRecord={todayRecord}
+        isEmployee={isEmployee}
+        presentTodayCount={presentTodayCount}
+        appUrl={appUrl}
+        showDevicePanel={showDevicePanel}
+      />
     </div>
   );
 }

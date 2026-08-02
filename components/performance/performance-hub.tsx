@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { Avatar, Button, Card, EmptyState, StatCard, statusBadge } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { ORG_ROLES, roleLabel } from "@/lib/roles";
+import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
 
 const inputClass =
@@ -174,7 +176,6 @@ export function PerformanceHub({
   const [kpiOpen, setKpiOpen] = useState(false);
   const [cycleOpen, setCycleOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const [kpiForm, setKpiForm] = useState({
     title: "",
@@ -210,19 +211,21 @@ export function PerformanceHub({
 
   const createKpi = async () => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch("/api/performance/kpis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(kpiForm),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to create KPI"));
+        return;
+      }
+      notify.success("KPI created successfully");
       setKpiOpen(false);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed");
+    } catch {
+      notify.error("Failed to create KPI");
     } finally {
       setLoading(false);
     }
@@ -230,19 +233,21 @@ export function PerformanceHub({
 
   const createCycle = async () => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch("/api/performance/cycles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(cycleForm),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to create review cycle"));
+        return;
+      }
+      notify.success("Review cycle created successfully");
       setCycleOpen(false);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed");
+    } catch {
+      notify.error("Failed to create review cycle");
     } finally {
       setLoading(false);
     }
@@ -250,12 +255,17 @@ export function PerformanceHub({
 
   const activateCycle = async (id: string) => {
     setLoading(true);
-    await fetch(`/api/performance/cycles/${id}`, {
+    const res = await fetch(`/api/performance/cycles/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "activate" }),
     });
-    router.refresh();
+    if (!res.ok) {
+      notify.error(await readApiError(res, "Failed to activate cycle"));
+    } else {
+      notify.success("Review cycle activated");
+      router.refresh();
+    }
     setLoading(false);
   };
 
@@ -660,7 +670,6 @@ export function PerformanceHub({
 
       {/* Create KPI dialog */}
       <Dialog open={kpiOpen} onClose={() => setKpiOpen(false)} title="Create KPI" size="lg">
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
         <div className="space-y-4">
           <div>
             <label className={labelClass}>Title</label>
@@ -699,9 +708,11 @@ export function PerformanceHub({
               <label className={labelClass}>Role (optional)</label>
               <select className={inputClass} value={kpiForm.roleFilter} onChange={(e) => setKpiForm({ ...kpiForm, roleFilter: e.target.value })}>
                 <option value="">All roles</option>
-                <option value="EMPLOYEE">Employees</option>
-                <option value="MANAGER">Managers</option>
-                <option value="ADMIN">Admins</option>
+                {ORG_ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {roleLabel(role)}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -714,7 +725,6 @@ export function PerformanceHub({
 
       {/* Create cycle dialog */}
       <Dialog open={cycleOpen} onClose={() => setCycleOpen(false)} title="New review cycle" size="lg">
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>

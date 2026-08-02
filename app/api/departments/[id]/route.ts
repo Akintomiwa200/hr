@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastEvent } from "@/lib/events";
-import { badRequest, isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
+import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
+import { canManageDepartments } from "@/lib/roles";
 
 export async function GET(
   _request: NextRequest,
@@ -33,7 +34,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await requireSession();
-  if (!session || session.role !== "ADMIN") return unauthorized();
+  if (!session || !canManageDepartments(session.role)) return unauthorized();
 
   const { id } = await params;
   const { name, description } = await request.json();
@@ -54,7 +55,9 @@ export async function PATCH(
 
   broadcastEvent("department_updated", { id });
   revalidatePath("/departments");
+  revalidatePath("/teams");
   revalidatePath(`/departments/${id}`);
+  revalidatePath(`/teams/${id}`);
   return NextResponse.json(department);
 }
 
@@ -63,7 +66,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await requireSession();
-  if (!session || session.role !== "ADMIN") return unauthorized();
+  if (!session || !canManageDepartments(session.role)) return unauthorized();
 
   const { id } = await params;
   const existing = await prisma.department.findUnique({
@@ -78,5 +81,8 @@ export async function DELETE(
   await prisma.department.delete({ where: { id } });
   broadcastEvent("department_updated", { id });
   revalidatePath("/departments");
+  revalidatePath("/teams");
+  revalidatePath(`/departments/${id}`);
+  revalidatePath(`/teams/${id}`);
   return NextResponse.json({ success: true });
 }

@@ -19,7 +19,22 @@ import {
   CircleHelp,
   Settings,
   Activity,
+  Building2,
 } from "lucide-react";
+import {
+  ALL_STAFF,
+  CONTENT_ADMIN_ROLES,
+  DASHBOARD_ROLES,
+  DEVICE_ADMIN_ROLES,
+  ONBOARDING_ROLES,
+  ORG_CHART_ROLES,
+  PAYROLL_VIEW_ROLES,
+  PEOPLE_VIEW_ROLES,
+  PERFORMANCE_ADMIN_ROLES,
+  RECRUITMENT_ROLES,
+  SETTINGS_ROLES,
+  SUPER_ADMIN_ONLY,
+} from "@/lib/roles";
 
 export type NavItem = {
   id: string;
@@ -47,7 +62,15 @@ export const dashboardNavSections: NavSection[] = [
         label: "Dashboard",
         pageTitle: "Dashboard",
         icon: LayoutDashboard,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: DASHBOARD_ROLES,
+      },
+      {
+        id: "companies",
+        href: "/admin/companies",
+        label: "Companies",
+        pageTitle: "Companies",
+        icon: Building2,
+        roles: SUPER_ADMIN_ONLY,
       },
       {
         id: "notifications",
@@ -55,7 +78,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Notifications",
         pageTitle: "Notifications",
         icon: Bell,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: ALL_STAFF,
       },
       {
         id: "search",
@@ -63,7 +86,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Search",
         pageTitle: "Search",
         icon: Search,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: ALL_STAFF,
       },
       {
         id: "calendar",
@@ -71,7 +94,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Calendar",
         pageTitle: "Calendar",
         icon: Calendar,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: ALL_STAFF,
       },
     ],
   },
@@ -84,7 +107,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Employees",
         pageTitle: "Employees",
         icon: Users,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: PEOPLE_VIEW_ROLES,
         match: (pathname) =>
           pathname === "/employees" ||
           (pathname.startsWith("/employees/") &&
@@ -96,7 +119,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Org Chart",
         pageTitle: "Org Chart",
         icon: Network,
-        roles: ["ADMIN", "MANAGER"],
+        roles: ORG_CHART_ROLES,
       },
       {
         id: "teams",
@@ -104,7 +127,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Teams",
         pageTitle: "Teams",
         icon: UsersRound,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: PEOPLE_VIEW_ROLES,
       },
     ],
   },
@@ -117,7 +140,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Leave",
         pageTitle: "Leave",
         icon: CalendarOff,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: ALL_STAFF,
       },
       {
         id: "attendance",
@@ -125,7 +148,9 @@ export const dashboardNavSections: NavSection[] = [
         label: "Attendance",
         pageTitle: "Attendance",
         icon: Clock,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: ALL_STAFF,
+        match: (pathname) =>
+          pathname === "/attendance" || pathname.startsWith("/attendance/"),
       },
       {
         id: "payroll",
@@ -133,7 +158,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Payroll",
         pageTitle: "Payroll",
         icon: Wallet,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: PAYROLL_VIEW_ROLES,
       },
     ],
   },
@@ -146,7 +171,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Performance",
         pageTitle: "Performance",
         icon: Medal,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: [...PERFORMANCE_ADMIN_ROLES, "EMPLOYEE"],
       },
       {
         id: "onboarding",
@@ -154,7 +179,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Onboarding",
         pageTitle: "Onboarding",
         icon: GraduationCap,
-        roles: ["ADMIN", "MANAGER"],
+        roles: ONBOARDING_ROLES,
         match: (pathname) => pathname === "/employees/new",
       },
       {
@@ -163,7 +188,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Recruitment",
         pageTitle: "Recruitment",
         icon: Briefcase,
-        roles: ["ADMIN", "MANAGER"],
+        roles: RECRUITMENT_ROLES,
         match: (pathname) =>
           pathname.startsWith("/recruitment") &&
           !pathname.startsWith("/recruitment/candidates"),
@@ -179,7 +204,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Announcements",
         pageTitle: "Announcements",
         icon: Megaphone,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: ALL_STAFF,
       },
       {
         id: "documents",
@@ -187,7 +212,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Documents",
         pageTitle: "Documents",
         icon: FileText,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: ALL_STAFF,
       },
       {
         id: "help",
@@ -195,7 +220,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Help",
         pageTitle: "Help Center",
         icon: CircleHelp,
-        roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+        roles: [...ALL_STAFF, ...SUPER_ADMIN_ONLY],
       },
     ],
   },
@@ -207,7 +232,7 @@ export const settingsNavItem: NavItem = {
   label: "Settings",
   pageTitle: "Settings",
   icon: Settings,
-  roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+  roles: SETTINGS_ROLES,
 };
 
 export const brandIcon = Activity;
@@ -246,6 +271,10 @@ export function getActiveNavId(pathname: string, items: NavItem[]): string | nul
 }
 
 const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[] = [
+  {
+    test: (p) => p === "/admin/companies",
+    title: "Companies",
+  },
   {
     test: (p) => p === "/employees/new",
     title: "Onboarding",

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { canManageRecruitment } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card, Badge, statusBadge } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
@@ -33,7 +34,7 @@ export default async function JobDetailPage({
   });
 
   if (!job) notFound();
-  const canManage = session.role === "ADMIN" || session.role === "MANAGER";
+  const canManage = canManageRecruitment(session.role);
 
   return (
     <div>

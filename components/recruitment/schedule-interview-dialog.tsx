@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CalendarPlus } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { notify, readApiError } from "@/lib/toast";
 
 const inputClass =
   "w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500";
@@ -23,7 +24,6 @@ export function ScheduleInterviewDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [form, setForm] = useState({
     interviewerId: interviewers[0]?.id ?? "",
     scheduledAt: "",
@@ -35,19 +35,21 @@ export function ScheduleInterviewDialog({
 
   const submit = async () => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch("/api/interviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ applicationId, ...form }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to schedule");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to schedule interview"));
+        return;
+      }
+      notify.success("Interview scheduled successfully");
       setOpen(false);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to schedule");
+    } catch {
+      notify.error("Failed to schedule interview");
     } finally {
       setLoading(false);
     }
@@ -62,7 +64,6 @@ export function ScheduleInterviewDialog({
 
       <Dialog open={open} onClose={() => setOpen(false)} title="Schedule interview" size="lg">
         <div className="space-y-4">
-          {error && <p className="text-sm text-red-600">{error}</p>}
           <p className="text-xs text-gray-500">
             Creates a Google Calendar event with Google Meet when connected. Candidate receives an
             email invite.

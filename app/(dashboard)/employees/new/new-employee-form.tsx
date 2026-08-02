@@ -8,6 +8,8 @@ import {
   OnboardingSuccessMessage,
   type OnboardingSuccess,
 } from "@/components/employees/onboarding-notice";
+import { notify, readApiError } from "@/lib/toast";
+import { ORG_ROLES, roleLabel } from "@/lib/roles";
 
 type Department = { id: string; name: string };
 type Manager = { id: string; firstName: string; lastName: string };
@@ -26,13 +28,11 @@ export function NewEmployeeForm({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [success, setSuccess] = useState<OnboardingSuccess | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
-    setError("");
     setSuccess(null);
 
     const form = new FormData(e.currentTarget);
@@ -45,11 +45,11 @@ export function NewEmployeeForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to create employee");
+        notify.error(await readApiError(res, "Failed to create employee"));
         return;
       }
+      const data = await res.json();
 
       setSuccess({
         email,
@@ -58,6 +58,7 @@ export function NewEmployeeForm({
         emailPreviewUrl: data.emailPreviewUrl,
         employeeId: data.employee?.id,
       });
+      notify.success("Employee created successfully");
 
       window.setTimeout(() => {
         if (data.employee?.id) {
@@ -68,7 +69,7 @@ export function NewEmployeeForm({
         router.refresh();
       }, 2200);
     } catch {
-      setError("Something went wrong");
+      notify.error("Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -145,9 +146,11 @@ export function NewEmployeeForm({
         <div>
           <label className={labelClass}>Role</label>
           <select name="role" className={inputClass}>
-            <option value="EMPLOYEE">Employee</option>
-            <option value="MANAGER">Manager</option>
-            <option value="ADMIN">Admin</option>
+            {ORG_ROLES.map((role) => (
+              <option key={role} value={role}>
+                {roleLabel(role)}
+              </option>
+            ))}
           </select>
         </div>
         <div>
@@ -155,12 +158,6 @@ export function NewEmployeeForm({
           <input name="salary" type="number" min="0" className={inputClass} placeholder="85000" />
         </div>
       </div>
-
-      {error && (
-        <p className="text-[13px] text-red-600 bg-red-50 px-4 py-3 rounded-xl border border-red-100">
-          {error}
-        </p>
-      )}
 
       <div className="flex items-center gap-3 pt-2">
         <button

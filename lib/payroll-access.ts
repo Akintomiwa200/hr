@@ -1,15 +1,22 @@
 import { prisma } from "@/lib/prisma";
 import type { SessionUser } from "@/lib/auth";
+import {
+  canManagePayroll,
+  isCompanyAdmin,
+  isHrRole,
+  normalizeRole,
+} from "@/lib/roles";
 
 export async function canViewPayrollRecord(
   session: SessionUser,
   record: { employeeId: string }
 ) {
-  if (session.role === "ADMIN") return true;
-  if (session.role === "EMPLOYEE" && session.employeeId === record.employeeId) {
+  const role = normalizeRole(session.role);
+  if (isCompanyAdmin(role) || isHrRole(role)) return true;
+  if (role === "EMPLOYEE" && session.employeeId === record.employeeId) {
     return true;
   }
-  if (session.role === "MANAGER" && session.employeeId) {
+  if ((role === "MANAGER" || role === "SUPERVISOR") && session.employeeId) {
     if (session.employeeId === record.employeeId) return true;
     const employee = await prisma.employee.findUnique({
       where: { id: record.employeeId },
@@ -24,8 +31,9 @@ export async function canManagePayrollRecord(
   session: SessionUser,
   record: { employeeId: string }
 ) {
-  if (session.role === "ADMIN") return true;
-  if (session.role === "MANAGER" && session.employeeId) {
+  if (canManagePayroll(session.role)) return true;
+  const role = normalizeRole(session.role);
+  if (role === "MANAGER" && session.employeeId) {
     const employee = await prisma.employee.findUnique({
       where: { id: record.employeeId },
       select: { managerId: true },
@@ -36,14 +44,15 @@ export async function canManagePayrollRecord(
 }
 
 export function canManagePayrollSettings(session: SessionUser) {
-  return session.role === "ADMIN" || session.role === "MANAGER";
+  return canManagePayroll(session.role);
 }
 
 export async function payrollListWhere(session: SessionUser) {
-  if (session.role === "EMPLOYEE" && session.employeeId) {
+  const role = normalizeRole(session.role);
+  if (role === "EMPLOYEE" && session.employeeId) {
     return { employeeId: session.employeeId };
   }
-  if (session.role === "MANAGER" && session.employeeId) {
+  if ((role === "MANAGER" || role === "SUPERVISOR") && session.employeeId) {
     return {
       OR: [
         { employeeId: session.employeeId },

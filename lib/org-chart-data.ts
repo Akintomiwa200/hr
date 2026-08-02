@@ -45,9 +45,11 @@ type EmployeeRow = {
 };
 
 function roleRank(role: string) {
-  if (role === "ADMIN") return 0;
-  if (role === "MANAGER") return 1;
-  return 2;
+  if (role === "COMPANY_ADMIN") return 0;
+  if (role === "HR") return 1;
+  if (role === "MANAGER") return 2;
+  if (role === "SUPERVISOR") return 3;
+  return 4;
 }
 
 function buildTreeFromEmployees(

@@ -1,5 +1,6 @@
 import type { Role } from "@prisma/client";
 import type { LucideIcon } from "lucide-react";
+import { ALL_STAFF, RECRUITMENT_ROLES } from "@/lib/roles";
 import {
   Bell,
   Briefcase,
@@ -72,7 +73,7 @@ export const helpArticles: HelpArticle[] = [
     description: "Learn the layout, roles, and everyday workflows in your dashboard.",
     category: "basics",
     icon: LayoutDashboard,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     moduleHref: "/dashboard",
     sections: [
       {
@@ -112,7 +113,7 @@ export const helpArticles: HelpArticle[] = [
     description: "View holidays, leave, payroll runs, interviews, and attendance by day.",
     category: "time",
     icon: Calendar,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     moduleHref: "/holidays",
     sections: [
       {
@@ -150,7 +151,7 @@ export const helpArticles: HelpArticle[] = [
     description: "Submit, track, and approve time-off requests.",
     category: "time",
     icon: CalendarOff,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     moduleHref: "/leave",
     sections: [
       {
@@ -180,12 +181,20 @@ export const helpArticles: HelpArticle[] = [
     description: "Check in, review records, and export daily attendance.",
     category: "time",
     icon: Clock,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     moduleHref: "/attendance",
     sections: [
       {
         heading: "Daily check-in",
-        body: "Employees use the Check In button on the Attendance page to record arrival. Check out when leaving for the day.",
+        body: "Employees use the Check In button on the Attendance page to record arrival. Check out when leaving for the day. Punches from kiosk or biometric devices sync in real time and appear with a Device badge.",
+      },
+      {
+        heading: "Device integration API",
+        body: "Open Attendance → Device API for full REST documentation, register kiosks, ping devices, and test punches. GET /api/attendance/device returns the spec; authenticated devices receive live online status. Punches broadcast attendance_updated and device_ping over SSE.",
+      },
+      {
+        heading: "Device integration",
+        body: "HR admins configure check-in apps to POST to /api/attendance/device with X-Device-Key. Use employeeCode (e.g. EMP001), action check_in/check_out/toggle, and optional externalId for idempotent sync.",
       },
       {
         heading: "Team monitoring",
@@ -210,7 +219,7 @@ export const helpArticles: HelpArticle[] = [
     description: "Run payroll cycles, view payslip breakdowns, auto deductions, and downloads.",
     category: "pay",
     icon: Wallet,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     moduleHref: "/payroll",
     sections: [
       {
@@ -242,7 +251,7 @@ export const helpArticles: HelpArticle[] = [
     description: "Browse staff, view profiles, and manage employee records.",
     category: "people",
     icon: Users,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     moduleHref: "/employees",
     sections: [
       {
@@ -263,32 +272,33 @@ export const helpArticles: HelpArticle[] = [
   {
     slug: "teams",
     title: "Teams & org chart",
-    description: "Explore the visual organization chart, departments, and reporting lines.",
+    description: "Browse teams, explore reporting lines, and use the org chart as HR.",
     category: "people",
     icon: Network,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     moduleHref: "/teams",
     sections: [
       {
-        heading: "Visual org chart",
-        body: "Open Org Chart under People to see the full company hierarchy. Each card shows an employee with their title, department, and role. Lines connect managers to direct reports.",
+        heading: "Teams hub",
+        body: "Open Teams under People to browse every department team. Each card shows headcount, open roles, and a preview of colleagues. Click a team to see members and reporting structure.",
         bullets: [
-          "Switch between Org chart and Departments tabs",
-          "Filter by department or search by name or job title",
-          "Click any person to open their employee profile",
+          "Your team is highlighted at the top when you belong to a department",
+          "Search by team name or colleague name",
+          "Employees can view teams; managers and admins also get the org chart link",
         ],
       },
       {
-        heading: "Reporting structure",
-        body: "The chart is built from manager assignments on employee records. Set a manager when onboarding or editing an employee to update the tree automatically.",
+        heading: "Team detail",
+        body: "Each team page shows the hierarchy for that department, a searchable member list, and open job postings. Click any person to open their profile.",
       },
       {
-        heading: "Departments view",
-        body: "Use the Departments tab to browse department cards, open department details, and manage department names and descriptions as an admin.",
-      },
-      {
-        heading: "Department detail",
-        body: "Each department page shows a focused hierarchy for that team plus a member list with reporting lines and open job postings.",
+        heading: "Visual org chart (HR)",
+        body: "Managers and admins can open Org chart for the full company tree, filter by department, and manage department records.",
+        bullets: [
+          "Switch between Org chart and Departments tabs",
+          "Set managers on employee records to build reporting lines",
+          "Admins create departments and assign people during onboarding",
+        ],
       },
     ],
     relatedSlugs: ["employees", "recruitment"],
@@ -299,7 +309,7 @@ export const helpArticles: HelpArticle[] = [
     description: "Post jobs, manage candidates, schedule Google Calendar interviews with Meet, and submit reviews.",
     category: "talent",
     icon: Briefcase,
-    roles: ["ADMIN", "MANAGER"],
+    roles: RECRUITMENT_ROLES,
     moduleHref: "/recruitment",
     sections: [
       {
@@ -327,7 +337,7 @@ export const helpArticles: HelpArticle[] = [
     description: "Create KPIs, run review cycles, self-appraise, and complete manager reviews.",
     category: "talent",
     icon: Medal,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     moduleHref: "/performance",
     sections: [
       {
@@ -355,7 +365,7 @@ export const helpArticles: HelpArticle[] = [
     description: "Store and find company and employee documents.",
     category: "workspace",
     icon: FileText,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     moduleHref: "/documents",
     sections: [
       {
@@ -375,7 +385,7 @@ export const helpArticles: HelpArticle[] = [
     description: "Publish company news and stay informed.",
     category: "workspace",
     icon: Megaphone,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     moduleHref: "/announcements",
     sections: [
       {
@@ -395,7 +405,7 @@ export const helpArticles: HelpArticle[] = [
     description: "Find employees, holidays, documents, jobs, and announcements quickly.",
     category: "workspace",
     icon: Search,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     moduleHref: "/search",
     sections: [
       {
@@ -415,7 +425,7 @@ export const helpArticles: HelpArticle[] = [
     description: "Update your profile, contact details, notification preferences, and find support.",
     category: "account",
     icon: Settings,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     moduleHref: "/settings",
     sections: [
       {
@@ -443,7 +453,7 @@ export const helpArticles: HelpArticle[] = [
       },
       {
         heading: "Saving changes",
-        body: "After editing phone, address, or notification toggles, click Save Preferences. A success message confirms your updates were stored.",
+        body: "After editing phone, address, or notification toggles, click Save Preferences. A toast notification confirms your updates were stored.",
       },
       {
         heading: "Help from settings",
@@ -478,7 +488,7 @@ export const helpArticles: HelpArticle[] = [
     description: "Understand what each role can access in Smart HR.",
     category: "account",
     icon: Bell,
-    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+    roles: ALL_STAFF,
     sections: [
       {
         heading: "Admin",

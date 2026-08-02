@@ -6,6 +6,7 @@ import { Avatar, EmptyState } from "@/components/ui";
 import { useAutoHideScrollbar } from "@/hooks/use-auto-hide-scrollbar";
 import { cn } from "@/lib/utils";
 import type { OrgChartNode } from "@/lib/org-chart-data";
+import { roleLabel } from "@/lib/roles";
 
 const CARD_WIDTH = 192;
 
@@ -18,12 +19,20 @@ function splitName(fullNameStr: string) {
 }
 
 function roleStyles(role: string) {
-  if (role === "ADMIN") {
+  if (role === "COMPANY_ADMIN") {
     return {
       accent: "from-violet-500 to-brand-600",
       ring: "ring-violet-200/80",
       badge: "bg-violet-100 text-violet-700",
-      label: "Admin",
+      label: roleLabel(role as "COMPANY_ADMIN"),
+    };
+  }
+  if (role === "HR") {
+    return {
+      accent: "from-fuchsia-400 to-pink-500",
+      ring: "ring-fuchsia-200/80",
+      badge: "bg-fuchsia-100 text-fuchsia-700",
+      label: roleLabel(role as "HR"),
     };
   }
   if (role === "MANAGER") {
@@ -31,14 +40,22 @@ function roleStyles(role: string) {
       accent: "from-sky-400 to-blue-500",
       ring: "ring-sky-200/80",
       badge: "bg-sky-100 text-sky-700",
-      label: "Manager",
+      label: roleLabel(role as "MANAGER"),
+    };
+  }
+  if (role === "SUPERVISOR") {
+    return {
+      accent: "from-amber-400 to-orange-500",
+      ring: "ring-amber-200/80",
+      badge: "bg-amber-100 text-amber-700",
+      label: roleLabel(role as "SUPERVISOR"),
     };
   }
   return {
     accent: "from-gray-300 to-gray-400",
     ring: "ring-gray-200/80",
     badge: "bg-gray-100 text-gray-600",
-    label: "Employee",
+    label: roleLabel((role === "EMPLOYEE" ? role : "EMPLOYEE") as "EMPLOYEE"),
   };
 }
 

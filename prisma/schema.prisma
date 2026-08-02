@@ -8,8 +8,11 @@ datasource db {
 }
 
 enum Role {
-  ADMIN
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  HR
   MANAGER
+  SUPERVISOR
   EMPLOYEE
 }
 
@@ -35,6 +38,13 @@ enum AttendanceStatus {
   LATE
   REMOTE
   HALF_DAY
+}
+
+enum AttendanceMethod {
+  WEB
+  DEVICE
+  MOBILE
+  MANUAL
 }
 
 enum JobStatus {
@@ -107,15 +117,29 @@ enum AppraisalStatus {
   COMPLETED
 }
 
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      String   @default("trial")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String
   role         Role     @default(EMPLOYEE)
+  companyId    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  employee Employee?
+  company   Company?  @relation(fields: [companyId], references: [id])
+  employee  Employee?
   preferences String?
 }
 
@@ -185,18 +209,39 @@ model LeaveRequest {
 }
 
 model Attendance {
-  id         String           @id @default(cuid())
-  employeeId String
-  date       DateTime
-  checkIn    DateTime?
-  checkOut   DateTime?
-  status     AttendanceStatus @default(PRESENT)
-  notes      String?
-  createdAt  DateTime         @default(now())
+  id                 String            @id @default(cuid())
+  employeeId         String
+  date               DateTime
+  checkIn            DateTime?
+  checkOut           DateTime?
+  status             AttendanceStatus  @default(PRESENT)
+  checkInMethod      AttendanceMethod?
+  checkOutMethod     AttendanceMethod?
+  deviceId           String?
+  deviceName         String?
+  externalCheckInId  String?           @unique
+  externalCheckOutId String?           @unique
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @default(now()) @updatedAt
 
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  device   AttendanceDevice? @relation(fields: [deviceId], references: [id])
 
   @@unique([employeeId, date])
+}
+
+model AttendanceDevice {
+  id         String   @id @default(cuid())
+  name       String
+  location   String?
+  apiKey     String   @unique
+  isActive   Boolean  @default(true)
+  lastSeenAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  records Attendance[]
 }
 
 model PayrollRecord {

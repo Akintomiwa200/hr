@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Megaphone, Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { notify, readApiError } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 
 type Announcement = {
@@ -32,7 +33,6 @@ export function AnnouncementsModule({
   const [deleteAnn, setDeleteAnn] = useState<Announcement | null>(null);
   const [form, setForm] = useState({ title: "", content: "", priority: "NORMAL" });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const openEdit = (ann: Announcement) => {
     setEditAnn(ann);
@@ -41,7 +41,6 @@ export function AnnouncementsModule({
 
   const save = async (mode: "create" | "edit") => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(
         mode === "create" ? "/api/announcements" : `/api/announcements/${editAnn!.id}`,
@@ -51,13 +50,16 @@ export function AnnouncementsModule({
           body: JSON.stringify(form),
         }
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to save");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to save announcement"));
+        return;
+      }
+      notify.success(mode === "create" ? "Announcement published" : "Announcement updated");
       setCreateOpen(false);
       setEditAnn(null);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save");
+    } catch {
+      notify.error("Failed to save announcement");
     } finally {
       setLoading(false);
     }
@@ -68,9 +70,15 @@ export function AnnouncementsModule({
     setLoading(true);
     try {
       const res = await fetch(`/api/announcements/${deleteAnn.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to delete announcement"));
+        return;
+      }
+      notify.success("Announcement deleted");
       setDeleteAnn(null);
       router.refresh();
+    } catch {
+      notify.error("Failed to delete announcement");
     } finally {
       setLoading(false);
     }
@@ -119,7 +127,6 @@ export function AnnouncementsModule({
 
       <Dialog open={createOpen || !!editAnn} onClose={() => { setCreateOpen(false); setEditAnn(null); }} title={editAnn ? "Edit Announcement" : "Create Announcement"} size="lg">
         <div className="space-y-4">
-          {error && <p className="text-sm text-red-600">{error}</p>}
           <input className={inputClass} placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <textarea className={inputClass} rows={5} placeholder="Content" value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} />
           <select className={inputClass} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>

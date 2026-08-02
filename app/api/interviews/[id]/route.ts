@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
+import { canManageRecruitment } from "@/lib/roles";
 import { cancelInterview, rescheduleInterview } from "@/lib/recruitment/interviews";
 
 export async function GET(
@@ -64,7 +65,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await requireSession();
-  if (!session || session.role !== "ADMIN") return unauthorized();
+  if (!session || !canManageRecruitment(session.role)) return unauthorized();
 
   const { id } = await params;
   await cancelInterview(id);

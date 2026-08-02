@@ -59,20 +59,11 @@ function StatusPill({ label, variant }: { label: string; variant: "fulltime" | "
 
 function DeviceGauge({
   total,
-  present,
-  remote,
-  late,
+  devices,
 }: {
   total: number;
-  present: number;
-  remote: number;
-  late: number;
+  devices: { label: string; value: number; color: string }[];
 }) {
-  const items = [
-    { label: "Macbook", value: present, color: "bg-[#7B61FF]" },
-    { label: "Keyboard", value: remote, color: "bg-amber-400" },
-    { label: "Headphones", value: late, color: "bg-violet-300" },
-  ];
   const dashOffset = total > 0 ? Math.max(157 - (total / Math.max(total, 10)) * 140, 20) : 157;
 
   return (
@@ -98,19 +89,23 @@ function DeviceGauge({
         </svg>
         <div className="absolute inset-x-0 bottom-0 text-center">
           <p className="text-xl font-bold text-gray-900 leading-none">{total}</p>
-          <p className="text-[10px] text-gray-400 mt-0.5">Overall</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">Check-ins today</p>
         </div>
       </div>
       <div className="space-y-2.5 flex-1">
-        {items.map((item) => (
-          <div key={item.label} className="flex items-center justify-between text-[12px]">
-            <span className="flex items-center gap-2 text-gray-600">
-              <span className={`w-2 h-2 rounded-full ${item.color}`} />
-              {item.label}
-            </span>
-            <span className="font-semibold text-gray-900">{item.value}</span>
-          </div>
-        ))}
+        {devices.length > 0 ? (
+          devices.map((item) => (
+            <div key={item.label} className="flex items-center justify-between text-[12px]">
+              <span className="flex items-center gap-2 text-gray-600">
+                <span className={`w-2 h-2 rounded-full ${item.color}`} />
+                {item.label}
+              </span>
+              <span className="font-semibold text-gray-900">{item.value}</span>
+            </div>
+          ))
+        ) : (
+          <p className="text-[12px] text-gray-500">No active devices configured.</p>
+        )}
       </div>
     </div>
   );
@@ -217,9 +212,11 @@ export function HrDashboard({
         <WidgetCard title="Today Used Devices">
           <DeviceGauge
             total={data.deviceStats.total}
-            present={data.deviceStats.present}
-            remote={data.deviceStats.remote}
-            late={data.deviceStats.late}
+            devices={data.deviceStats.devices.map((d) => ({
+              label: d.label,
+              value: d.value,
+              color: d.color,
+            }))}
           />
         </WidgetCard>
       </div>
@@ -360,7 +357,17 @@ export function ManagerDashboard({
           </div>
         </WidgetCard>
 
-        <WidgetCard title="Pending Leave Approvals">
+        <WidgetCard
+          title="Pending Leave Approvals"
+          action={
+            <Link
+              href="/leave"
+              className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
+            >
+              Review all <ChevronRight className="w-3 h-3" />
+            </Link>
+          }
+        >
           <div className="space-y-3">
             {data.pendingLeaves.length > 0 ? (
               data.pendingLeaves.map((leave) => (
@@ -376,7 +383,12 @@ export function ManagerDashboard({
                       {leave.type.toLowerCase()} leave
                     </p>
                   </div>
-                  <StatusPill label="Pending" variant="freelance" />
+                  <Link
+                    href="/leave"
+                    className="text-[11px] font-medium text-[#7B61FF] hover:underline"
+                  >
+                    Approve
+                  </Link>
                 </div>
               ))
             ) : (
@@ -495,6 +507,191 @@ export function EmployeeDashboard({
 
         <UpcomingScheduleWidget events={upcomingEvents} />
       </div>
+    </div>
+  );
+}
+
+export function SuperAdminDashboard({
+  data,
+  userName,
+}: {
+  userName: string;
+  data: Awaited<ReturnType<typeof import("@/lib/dashboard-data").getSuperAdminDashboardData>>;
+}) {
+  return (
+    <div className="w-full">
+      <div className="py-[1em] mb-6">
+        <h2 className="text-[22px] font-bold text-gray-900 tracking-tight">
+          Platform overview, {userName}
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage companies and monitor platform-wide activity.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        {[
+          { label: "Active Companies", value: data.activeCompanies, color: "text-[#7B61FF]" },
+          { label: "Total Companies", value: data.companies.length, color: "text-blue-600" },
+          { label: "Platform Users", value: data.totalUsers, color: "text-emerald-600" },
+          { label: "Total Employees", value: data.totalEmployees, color: "text-amber-600" },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="bg-white rounded-2xl border border-gray-100 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+          >
+            <p className="text-[12px] text-gray-500">{stat.label}</p>
+            <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <WidgetCard
+        title="Companies"
+        action={
+          <Link
+            href="/admin/companies"
+            className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
+          >
+            Manage <ChevronRight className="w-3 h-3" />
+          </Link>
+        }
+      >
+        <div className="space-y-3">
+          {data.companies.length > 0 ? (
+            data.companies.map((company) => (
+              <div
+                key={company.id}
+                className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"
+              >
+                <div>
+                  <p className="text-[13px] font-medium text-gray-900">{company.name}</p>
+                  <p className="text-[11px] text-gray-500">
+                    {company.plan} plan · {company._count.users} users
+                  </p>
+                </div>
+                <StatusPill
+                  label={company.isActive ? "Active" : "Inactive"}
+                  variant={company.isActive ? "fulltime" : "freelance"}
+                />
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-gray-500">No companies registered yet.</p>
+          )}
+        </div>
+      </WidgetCard>
+    </div>
+  );
+}
+
+export function SupervisorDashboard({
+  data,
+  userName,
+  upcomingEvents = [],
+}: {
+  userName: string;
+  upcomingEvents?: UpcomingCalendarEvent[];
+  data: Awaited<ReturnType<typeof import("@/lib/dashboard-data").getSupervisorDashboardData>>;
+}) {
+  return (
+    <div className="w-full">
+      <Suspense
+        fallback={
+          <div className="py-[1em] mb-6">
+            <h2 className="text-[22px] font-bold text-gray-900 tracking-tight">
+              Hello, {userName}
+            </h2>
+          </div>
+        }
+      >
+        <GreetingHeader
+          name={userName}
+          rangeKey={data.rangeKey}
+          dateRange={data.dateRange}
+        />
+      </Suspense>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        {[
+          { label: "Team Members", value: data.teamSize, color: "text-[#7B61FF]" },
+          { label: "Present Today", value: data.presentToday, color: "text-blue-600" },
+          { label: "Pending Leave", value: data.pendingLeaves.length, color: "text-amber-600" },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="bg-white rounded-2xl border border-gray-100 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+          >
+            <p className="text-[12px] text-gray-500">{stat.label}</p>
+            <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <WidgetCard
+          title="Team Attendance"
+          action={
+            <Link
+              href="/attendance"
+              className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
+            >
+              View all <ChevronRight className="w-3 h-3" />
+            </Link>
+          }
+        >
+          <p className="text-[32px] font-bold text-emerald-600 leading-none">
+            {data.attendanceRate}%
+          </p>
+          <p className="text-[12px] text-gray-500 mt-2">Team attendance this period</p>
+        </WidgetCard>
+
+        <WidgetCard
+          title="Leave Approvals"
+          action={
+            <Link
+              href="/leave"
+              className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
+            >
+              Review <ChevronRight className="w-3 h-3" />
+            </Link>
+          }
+        >
+          <div className="space-y-3">
+            {data.pendingLeaves.length > 0 ? (
+              data.pendingLeaves.map((leave) => (
+                <div
+                  key={leave.id}
+                  className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"
+                >
+                  <div>
+                    <p className="text-[13px] font-medium text-gray-900">
+                      {fullName(leave.employee.firstName, leave.employee.lastName)}
+                    </p>
+                    <p className="text-[11px] text-gray-500 capitalize">
+                      {leave.type.toLowerCase()} leave
+                    </p>
+                  </div>
+                  <Link
+                    href="/leave"
+                    className="text-[11px] font-medium text-[#7B61FF] hover:underline"
+                  >
+                    Approve
+                  </Link>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-gray-500">No pending leave requests.</p>
+            )}
+          </div>
+        </WidgetCard>
+      </div>
+
+      <div className="mb-4">
+        <UpcomingScheduleWidget events={upcomingEvents} />
+      </div>
+
+      <EmployeeTable employees={data.team} />
     </div>
   );
 }

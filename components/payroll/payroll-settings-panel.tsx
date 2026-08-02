@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Settings2 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { notify, readApiError } from "@/lib/toast";
 import type { PayrollSettingsData } from "@/lib/payroll-types";
 
 const inputClass =
@@ -19,23 +20,24 @@ export function PayrollSettingsPanel({
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(settings);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const save = async () => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch("/api/payroll/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to save settings");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to save payroll settings"));
+        return;
+      }
+      notify.success("Payroll settings saved");
       setOpen(false);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save");
+    } catch {
+      notify.error("Failed to save payroll settings");
     } finally {
       setLoading(false);
     }
@@ -49,8 +51,6 @@ export function PayrollSettingsPanel({
       </Button>
 
       <Dialog open={open} onClose={() => setOpen(false)} title="Payroll settings" size="lg">
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
-
         <div className="space-y-4">
           <Card className="p-4 bg-violet-50/40 border-violet-100">
             <label className="flex items-center justify-between gap-3 cursor-pointer">

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { notify, readApiError } from "@/lib/toast";
 
 const inputClass =
   "w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500";
@@ -13,7 +14,6 @@ export function AddCandidateDialog({ jobId }: { jobId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -25,19 +25,21 @@ export function AddCandidateDialog({ jobId }: { jobId: string }) {
 
   const submit = async () => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch("/api/applications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobId, ...form }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to add candidate");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to add candidate"));
+        return;
+      }
+      notify.success("Candidate added successfully");
       setOpen(false);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to add candidate");
+    } catch {
+      notify.error("Failed to add candidate");
     } finally {
       setLoading(false);
     }
@@ -51,7 +53,6 @@ export function AddCandidateDialog({ jobId }: { jobId: string }) {
       </Button>
       <Dialog open={open} onClose={() => setOpen(false)} title="Add candidate" size="lg">
         <div className="space-y-3">
-          {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="grid grid-cols-2 gap-3">
             <input className={inputClass} placeholder="First name" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
             <input className={inputClass} placeholder="Last name" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />

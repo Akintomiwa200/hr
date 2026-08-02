@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Role } from "@prisma/client";
 import { getSession, canManageEmployees } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notifyEmployeeChange } from "@/lib/employees/mutations";
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
     where: {
       ...(status && status !== "ALL" ? { status } : {}),
       ...(role && role !== "ALL"
-        ? { user: { role: role as "ADMIN" | "MANAGER" | "EMPLOYEE" } }
+        ? { user: { role: role as Role } }
         : {}),
       ...(search
         ? {

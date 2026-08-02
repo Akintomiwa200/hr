@@ -1,5 +1,5 @@
 import { redirect, notFound } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { getSession, canManagePayroll } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canViewEmployee } from "@/lib/employee-access";
 import { EmployeeDetailContent } from "@/components/employees/employee-detail-content";
@@ -34,7 +34,8 @@ export default async function EmployeeDetailPage({
 
   if (!employee) notFound();
 
-  const canViewSalary = session.role === "ADMIN" || session.employeeId === employee.id;
+  const canViewSalary =
+    canManagePayroll(session.role) || session.employeeId === employee.id;
 
   return (
     <EmployeeDetailContent employee={employee} canViewSalary={canViewSalary} />

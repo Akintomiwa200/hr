@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { canManagePerformance } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
@@ -10,7 +11,7 @@ export default async function PerformancePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const canManage = session.role === "ADMIN" || session.role === "MANAGER";
+  const canManage = canManagePerformance(session.role);
 
   const [kpis, cycles, appraisals, departments] = await Promise.all([
     prisma.kpiDefinition.findMany({

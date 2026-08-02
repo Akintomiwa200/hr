@@ -26,6 +26,7 @@ import type {
   ManagerOption,
 } from "./types";
 import { employmentLabel, employmentVariant, resolveEmploymentType } from "@/lib/employment";
+import { notify, readApiError } from "@/lib/toast";
 import { formatCurrency, formatDate, fullName } from "@/lib/utils";
 import {
   OnboardingPasswordNotice,
@@ -73,7 +74,6 @@ export function EmployeesModule({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const [viewEmployee, setViewEmployee] = useState<EmployeeRow | null>(null);
   const [editEmployee, setEditEmployee] = useState<EmployeeRow | null>(null);
@@ -146,7 +146,6 @@ export function EmployeesModule({
 
   function openCreate() {
     setFormData(emptyEmployeeForm(departments));
-    setError("");
     setCreateSuccess(null);
     setCreateOpen(true);
   }
@@ -154,7 +153,6 @@ export function EmployeesModule({
   function openEdit(emp: EmployeeRow) {
     setEditEmployee(emp);
     setFormData(employeeToFormData(emp));
-    setError("");
     setMenuOpen(null);
   }
 
@@ -175,7 +173,6 @@ export function EmployeesModule({
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setError("");
     setCreateSuccess(null);
     try {
       const res = await fetch("/api/employees", {
@@ -183,11 +180,11 @@ export function EmployeesModule({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to create employee");
+        notify.error(await readApiError(res, "Failed to create employee"));
         return;
       }
+      const data = await res.json();
       setCreateSuccess({
         email: formData.email,
         emailSent: Boolean(data.emailSent),
@@ -195,13 +192,14 @@ export function EmployeesModule({
         emailPreviewUrl: data.emailPreviewUrl,
         employeeId: data.employee?.id,
       });
+      notify.success("Employee created successfully");
       await refreshList();
       window.setTimeout(() => {
         setCreateOpen(false);
         setCreateSuccess(null);
       }, 2500);
     } catch {
-      setError("Something went wrong");
+      notify.error("Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -211,22 +209,21 @@ export function EmployeesModule({
     e.preventDefault();
     if (!editEmployee) return;
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(`/api/employees/${editEmployee.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to update employee");
+        notify.error(await readApiError(res, "Failed to update employee"));
         return;
       }
+      notify.success("Employee updated successfully");
       setEditEmployee(null);
       await refreshList();
     } catch {
-      setError("Something went wrong");
+      notify.error("Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -235,16 +232,15 @@ export function EmployeesModule({
   async function handleDelete() {
     if (!deleteEmployee) return;
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(`/api/employees/${deleteEmployee.id}`, {
         method: "DELETE",
       });
-      const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to deactivate employee");
+        notify.error(await readApiError(res, "Failed to deactivate employee"));
         return;
       }
+      notify.success("Employee deactivated");
       setDeleteEmployee(null);
       setSelected((prev) => {
         const next = new Set(prev);
@@ -253,7 +249,7 @@ export function EmployeesModule({
       });
       await refreshList();
     } catch {
-      setError("Something went wrong");
+      notify.error("Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -262,7 +258,6 @@ export function EmployeesModule({
   async function handleBulk(action: "deactivate" | "activate" | "set_department") {
     if (selected.size === 0) return;
     setLoading(true);
-    setError("");
     try {
       const res = await fetch("/api/employees/bulk", {
         method: "PATCH",
@@ -273,16 +268,21 @@ export function EmployeesModule({
           ...(action === "set_department" && { departmentId: bulkDepartment }),
         }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Bulk action failed");
+        notify.error(await readApiError(res, "Bulk action failed"));
         return;
       }
+      const messages = {
+        deactivate: "Employees deactivated",
+        activate: "Employees activated",
+        set_department: "Department updated for selected employees",
+      };
+      notify.success(messages[action]);
       setBulkOpen(false);
       setSelected(new Set());
       await refreshList();
     } catch {
-      setError("Something went wrong");
+      notify.error("Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -663,7 +663,6 @@ export function EmployeesModule({
             departments={departments}
             managers={managers}
           />
-          {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
@@ -703,7 +702,6 @@ export function EmployeesModule({
             managers={managers}
             isEdit
           />
-          {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
@@ -740,7 +738,6 @@ export function EmployeesModule({
               </strong>
               ?
             </p>
-            {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex gap-3">
               <button
                 type="button"
@@ -783,7 +780,6 @@ export function EmployeesModule({
               </option>
             ))}
           </select>
-          {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-3">
             <button
               type="button"

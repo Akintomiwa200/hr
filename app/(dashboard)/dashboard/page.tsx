@@ -3,15 +3,20 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import {
   getHrDashboardData,
+  getCompanyAdminDashboardData,
   getManagerDashboardData,
+  getSupervisorDashboardData,
   getEmployeeDashboardData,
+  getSuperAdminDashboardData,
 } from "@/lib/dashboard-data";
 import { getUpcomingCalendarEvents } from "@/lib/calendar-summary";
 import { parseDashboardRangeKey } from "@/lib/dashboard-date-range";
 import {
   HrDashboard,
   ManagerDashboard,
+  SupervisorDashboard,
   EmployeeDashboard,
+  SuperAdminDashboard,
 } from "@/components/dashboard/role-dashboards";
 
 export default async function DashboardPage({
@@ -31,7 +36,20 @@ export default async function DashboardPage({
     employeeId: session.employeeId,
   };
 
-  if (session.role === "ADMIN") {
+  if (session.role === "SUPER_ADMIN") {
+    const data = await getSuperAdminDashboardData();
+    return <SuperAdminDashboard data={data} userName={userName} />;
+  }
+
+  if (session.role === "COMPANY_ADMIN") {
+    const [data, upcomingEvents] = await Promise.all([
+      getCompanyAdminDashboardData(rangeKey),
+      getUpcomingCalendarEvents(sessionContext),
+    ]);
+    return <HrDashboard data={data} userName={userName} upcomingEvents={upcomingEvents} />;
+  }
+
+  if (session.role === "HR") {
     const [data, upcomingEvents] = await Promise.all([
       getHrDashboardData(rangeKey),
       getUpcomingCalendarEvents(sessionContext),
@@ -49,6 +67,16 @@ export default async function DashboardPage({
     );
   }
 
+  if (session.role === "SUPERVISOR" && session.employeeId) {
+    const [data, upcomingEvents] = await Promise.all([
+      getSupervisorDashboardData(session.employeeId, rangeKey),
+      getUpcomingCalendarEvents(sessionContext),
+    ]);
+    return (
+      <SupervisorDashboard data={data} userName={userName} upcomingEvents={upcomingEvents} />
+    );
+  }
+
   if (session.role === "EMPLOYEE" && session.employeeId) {
     const [data, upcomingEvents] = await Promise.all([
       getEmployeeDashboardData(session.employeeId, rangeKey),
@@ -59,9 +87,5 @@ export default async function DashboardPage({
     );
   }
 
-  const [data, upcomingEvents] = await Promise.all([
-    getHrDashboardData(rangeKey),
-    getUpcomingCalendarEvents(sessionContext),
-  ]);
-  return <HrDashboard data={data} userName={userName} upcomingEvents={upcomingEvents} />;
+  redirect("/login");
 }

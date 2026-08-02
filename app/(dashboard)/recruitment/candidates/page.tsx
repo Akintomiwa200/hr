@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { canManageRecruitment, RECRUITMENT_ROLES } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
@@ -16,7 +17,7 @@ export default async function CandidatesPage() {
       orderBy: { appliedAt: "desc" },
     }),
     prisma.employee.findMany({
-      where: { user: { role: { in: ["ADMIN", "MANAGER"] } } },
+      where: { user: { role: { in: RECRUITMENT_ROLES } } },
       select: { id: true, firstName: true, lastName: true },
       orderBy: { firstName: "asc" },
     }),
@@ -39,7 +40,7 @@ export default async function CandidatesPage() {
       <CandidatesModule
         applications={applications}
         reviewers={reviewers}
-        canManage={session.role === "ADMIN" || session.role === "MANAGER"}
+        canManage={canManageRecruitment(session.role)}
       />
     </div>
   );

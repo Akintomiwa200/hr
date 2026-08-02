@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Briefcase, MapPin, Pencil, Plus, Trash2, UserRound } from "lucide-react";
 import { Badge, Button, Card, statusBadge } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { notify, readApiError } from "@/lib/toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 type Department = { id: string; name: string };
@@ -58,11 +59,9 @@ export function RecruitmentModule({
   const [deleteJob, setDeleteJob] = useState<Job | null>(null);
   const [form, setForm] = useState(emptyJob(departments[0]?.id ?? ""));
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const openCreate = () => {
     setForm(emptyJob(departments[0]?.id ?? ""));
-    setError("");
     setCreateOpen(true);
   };
 
@@ -81,25 +80,26 @@ export function RecruitmentModule({
       benefits: job.benefits ?? "",
       status: job.status,
     });
-    setError("");
   };
 
   const save = async (mode: "create" | "edit") => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(mode === "create" ? "/api/jobs" : `/api/jobs/${editJob!.id}`, {
         method: mode === "create" ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to save");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to save job"));
+        return;
+      }
+      notify.success(mode === "create" ? "Job posted successfully" : "Job updated successfully");
       setCreateOpen(false);
       setEditJob(null);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save");
+    } catch {
+      notify.error("Failed to save job");
     } finally {
       setLoading(false);
     }
@@ -110,12 +110,15 @@ export function RecruitmentModule({
     setLoading(true);
     try {
       const res = await fetch(`/api/jobs/${deleteJob.id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to delete job"));
+        return;
+      }
+      notify.success("Job deleted successfully");
       setDeleteJob(null);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete");
+    } catch {
+      notify.error("Failed to delete job");
     } finally {
       setLoading(false);
     }
@@ -123,7 +126,6 @@ export function RecruitmentModule({
 
   const formFields = (
     <div className="space-y-4">
-      {error && <p className="text-sm text-red-600">{error}</p>}
       <input className={inputClass} placeholder="Job title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
       <select className={inputClass} value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })}>
         {departments.map((d) => (

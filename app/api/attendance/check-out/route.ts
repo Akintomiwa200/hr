@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { recordCheckOut } from "@/lib/attendance-service";
 
 export async function POST() {
   const session = await getSession();
@@ -10,30 +8,23 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const record = await prisma.attendance.findUnique({
-    where: {
-      employeeId_date: {
-        employeeId: session.employeeId,
-        date: today,
+  try {
+    const result = await recordCheckOut({
+      employeeId: session.employeeId,
+      method: "WEB",
+    });
+    return NextResponse.json({ success: true, ...result });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Check-out failed";
+    const status = message === "NO_CHECK_IN" ? 400 : 400;
+    return NextResponse.json(
+      {
+        error:
+          message === "NO_CHECK_IN"
+            ? "No check-in found for today"
+            : message,
       },
-    },
-  });
-
-  if (!record) {
-    return NextResponse.json({ error: "No check-in found" }, { status: 400 });
+      { status }
+    );
   }
-
-  await prisma.attendance.update({
-    where: { id: record.id },
-    data: { checkOut: new Date() },
-  });
-
-  broadcastEvent("attendance_updated", { employeeId: session.employeeId });
-  revalidatePath("/attendance");
-  revalidatePath("/dashboard");
-
-  return NextResponse.json({ success: true });
 }

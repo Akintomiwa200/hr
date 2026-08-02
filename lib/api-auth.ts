@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Role } from "@prisma/client";
 import { getSession } from "@/lib/auth";
+import { hasRole, isPeopleManager, normalizeRole } from "@/lib/roles";
 
 export function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -27,12 +28,18 @@ export async function requireSession() {
 export async function requireRoles(roles: Role[]) {
   const session = await requireSession();
   if (!session) return { error: unauthorized() as NextResponse, session: null };
-  if (!roles.includes(session.role)) {
+  if (!hasRole(session.role, roles)) {
     return { error: forbidden() as NextResponse, session: null };
   }
   return { error: null, session };
 }
 
 export function isHr(session: { role: Role }) {
-  return session.role === "ADMIN" || session.role === "MANAGER";
+  const role = normalizeRole(session.role);
+  return (
+    role === "SUPER_ADMIN" ||
+    role === "COMPANY_ADMIN" ||
+    role === "HR" ||
+    isPeopleManager(role)
+  );
 }

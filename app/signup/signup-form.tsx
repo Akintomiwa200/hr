@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { notify, readApiError } from "@/lib/toast";
 
 export function SignupForm({ initialEmail = "" }: { initialEmail?: string }) {
   const router = useRouter();
@@ -11,20 +12,18 @@ export function SignupForm({ initialEmail = "" }: { initialEmail?: string }) {
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      notify.error("Password must be at least 8 characters.");
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      notify.error("Passwords do not match.");
       return;
     }
 
@@ -37,17 +36,15 @@ export function SignupForm({ initialEmail = "" }: { initialEmail?: string }) {
         body: JSON.stringify({ firstName, lastName, email, password }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        setError(data.error || "Signup failed");
+        notify.error(await readApiError(res, "Signup failed"));
         return;
       }
 
       router.push("/dashboard");
       router.refresh();
     } catch {
-      setError("Something went wrong. Please try again.");
+      notify.error("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -132,12 +129,6 @@ export function SignupForm({ initialEmail = "" }: { initialEmail?: string }) {
           className="w-full px-4 py-3 text-[14px] border border-gray-200 rounded-xl bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/30 focus:border-[#7B61FF] transition-shadow"
         />
       </div>
-
-      {error && (
-        <p className="text-[13px] text-red-600 bg-red-50 px-4 py-3 rounded-xl border border-red-100">
-          {error}
-        </p>
-      )}
 
       <button
         type="submit"

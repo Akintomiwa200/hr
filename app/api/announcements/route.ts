@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
+import { canManageOrgContent } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { broadcastEvent } from "@/lib/events";
 
@@ -19,7 +20,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
-  if (!session || session.role !== "ADMIN") {
+  if (!session || !canManageOrgContent(session.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

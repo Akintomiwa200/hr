@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Card } from "@/components/ui";
+import { notify, readApiError } from "@/lib/toast";
 import { fullName } from "@/lib/utils";
 
 const STATUSES = ["APPLIED", "SCREENING", "INTERVIEW", "OFFER", "HIRED", "REJECTED"];
@@ -28,22 +29,23 @@ export function CandidateDetailActions({
   const [reviewerId, setReviewerId] = useState(application.reviewerId ?? "");
   const [notes, setNotes] = useState(application.notes ?? "");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const save = async () => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(`/api/applications/${application.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, reviewerId: reviewerId || null, notes }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to update application"));
+        return;
+      }
+      notify.success("Application updated successfully");
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update");
+    } catch {
+      notify.error("Failed to update application");
     } finally {
       setLoading(false);
     }
@@ -52,7 +54,6 @@ export function CandidateDetailActions({
   return (
     <Card className="p-6">
       <h3 className="text-sm font-semibold text-gray-900 mb-4">Update Application</h3>
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <select className={inputClass} value={status} onChange={(e) => setStatus(e.target.value)}>
           {STATUSES.map((s) => (

@@ -13,7 +13,10 @@ import {
   UserRound,
 } from "lucide-react";
 import { Button, Card, CardHeader } from "@/components/ui";
+import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
+import { canManageDevices, roleLabel } from "@/lib/roles";
+import type { Role } from "@prisma/client";
 
 type EmployeeProfile = {
   id: string;
@@ -97,24 +100,23 @@ export function SettingsModule({
     performance: preferences.performance ?? true,
   });
   const [loading, setLoading] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState("");
 
   const save = async () => {
     setLoading(true);
-    setSaved(false);
-    setError("");
     try {
       const res = await fetch("/api/settings/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, address, preferences: prefs }),
       });
-      if (!res.ok) throw new Error("Failed to save");
-      setSaved(true);
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Could not save preferences. Please try again."));
+        return;
+      }
+      notify.success("Preferences saved successfully");
       router.refresh();
     } catch {
-      setError("Could not save preferences. Please try again.");
+      notify.error("Could not save preferences. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -136,7 +138,7 @@ export function SettingsModule({
             </div>
             <div className="flex justify-between py-3 border-b border-gray-100">
               <dt className="text-gray-500">Role</dt>
-              <dd className="font-medium text-gray-900 capitalize">{role.toLowerCase()}</dd>
+              <dd className="font-medium text-gray-900">{roleLabel(role as Role)}</dd>
             </div>
             {employee && (
               <>
@@ -237,8 +239,6 @@ export function SettingsModule({
               <Button loading={loading} onClick={save}>
                 Save preferences
               </Button>
-              {saved && <span className="text-sm text-emerald-600">Saved successfully</span>}
-              {error && <span className="text-sm text-red-600">{error}</span>}
             </div>
           </div>
         </Card>
@@ -285,6 +285,38 @@ export function SettingsModule({
             </Link>
           )}
         </Card>
+
+        {canManageDevices(role as Role) && (
+          <Card className="p-6 bg-brand-50/50 border-brand-100 lg:col-span-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-brand-500 flex items-center justify-center shrink-0">
+                  <ExternalLink className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">API & device integration</h3>
+                  <p className="text-xs text-gray-500 leading-relaxed max-w-xl">
+                    Full REST reference, attendance device endpoints, SSE realtime events, and kiosk setup console.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <Link
+                  href="/api"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600"
+                >
+                  API reference
+                </Link>
+                <Link
+                  href="/attendance/devices"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-brand-600 bg-white border border-brand-200 rounded-xl hover:bg-brand-50"
+                >
+                  Device console
+                </Link>
+              </div>
+            </div>
+          </Card>
+        )}
 
         <Card className="p-6 bg-violet-50/50 border-violet-100">
           <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center mb-4">

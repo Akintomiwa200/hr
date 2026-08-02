@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button, Card, statusBadge } from "@/components/ui";
+import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
 
 const inputClass =
@@ -47,7 +48,6 @@ export function AppraisalDetailModule({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [selfForm, setSelfForm] = useState({
     selfRating: appraisal.selfRating?.toString() ?? "4",
     selfAchievements: appraisal.selfAchievements ?? "",
@@ -70,7 +70,6 @@ export function AppraisalDetailModule({
 
   const saveSelf = async (submit: boolean) => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(`/api/performance/appraisals/${appraisal.id}`, {
         method: "PATCH",
@@ -89,12 +88,13 @@ export function AppraisalDetailModule({
         }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to save");
+        notify.error(await readApiError(res, "Failed to save self-appraisal"));
+        return;
       }
+      notify.success(submit ? "Self-appraisal submitted" : "Self-appraisal draft saved");
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed");
+    } catch {
+      notify.error("Failed to save self-appraisal");
     } finally {
       setLoading(false);
     }
@@ -102,7 +102,6 @@ export function AppraisalDetailModule({
 
   const saveManager = async (submit: boolean) => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(`/api/performance/appraisals/${appraisal.id}`, {
         method: "PATCH",
@@ -120,12 +119,13 @@ export function AppraisalDetailModule({
         }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to save");
+        notify.error(await readApiError(res, "Failed to save manager review"));
+        return;
       }
+      notify.success(submit ? "Manager review completed" : "Manager review draft saved");
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed");
+    } catch {
+      notify.error("Failed to save manager review");
     } finally {
       setLoading(false);
     }
@@ -160,8 +160,6 @@ export function AppraisalDetailModule({
           </div>
         </div>
       </Card>
-
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
       {/* Self appraisal */}
       <Card className="p-6 mb-6">

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Eye, Pencil } from "lucide-react";
 import { Button, Card, CardHeader, statusBadge } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
 
 type Application = {
@@ -43,14 +44,12 @@ export function CandidatesModule({
   const [reviewerId, setReviewerId] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const openEdit = (app: Application) => {
     setEditApp(app);
     setStatus(app.status);
     setReviewerId(app.reviewer?.id ?? "");
     setNotes(app.notes ?? "");
-    setError("");
   };
 
   const save = async () => {
@@ -62,12 +61,15 @@ export function CandidatesModule({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, reviewerId: reviewerId || null, notes }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to update candidate"));
+        return;
+      }
+      notify.success("Candidate updated successfully");
       setEditApp(null);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update");
+    } catch {
+      notify.error("Failed to update candidate");
     } finally {
       setLoading(false);
     }
@@ -125,7 +127,6 @@ export function CandidatesModule({
 
       <Dialog open={!!editApp} onClose={() => setEditApp(null)} title="Update Candidate">
         <div className="space-y-4">
-          {error && <p className="text-sm text-red-600">{error}</p>}
           <select className={inputClass} value={status} onChange={(e) => setStatus(e.target.value)}>
             {STATUSES.map((s) => (
               <option key={s} value={s}>{s}</option>

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { notify, readApiError } from "@/lib/toast";
 import { fullName } from "@/lib/utils";
 import type {
   CalendarAttendanceRow,
@@ -138,7 +139,6 @@ export function CalendarModule({
   const [deleteHoliday, setDeleteHoliday] = useState<CalendarHoliday | null>(null);
   const [form, setForm] = useState({ name: "", date: "", type: "Public" });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
 
   const weekDays = useMemo(() => {
@@ -278,7 +278,6 @@ export function CalendarModule({
 
   const openCreate = () => {
     setForm({ name: "", date: dateKey(selectedDate), type: "Public" });
-    setError("");
     setCreateOpen(true);
   };
 
@@ -289,12 +288,10 @@ export function CalendarModule({
       date: dateKey(parseDate(holiday.date)),
       type: holiday.type,
     });
-    setError("");
   };
 
   const save = async (mode: "create" | "edit") => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(
         mode === "create" ? "/api/holidays" : `/api/holidays/${editHoliday!.id}`,
@@ -304,13 +301,16 @@ export function CalendarModule({
           body: JSON.stringify(form),
         }
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to save");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to save holiday"));
+        return;
+      }
+      notify.success(mode === "create" ? "Holiday added successfully" : "Holiday updated successfully");
       setCreateOpen(false);
       setEditHoliday(null);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save");
+    } catch {
+      notify.error("Failed to save holiday");
     } finally {
       setLoading(false);
     }
@@ -321,12 +321,15 @@ export function CalendarModule({
     setLoading(true);
     try {
       const res = await fetch(`/api/holidays/${deleteHoliday.id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to delete holiday"));
+        return;
+      }
+      notify.success("Holiday deleted successfully");
       setDeleteHoliday(null);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete");
+    } catch {
+      notify.error("Failed to delete holiday");
     } finally {
       setLoading(false);
     }
@@ -553,7 +556,6 @@ export function CalendarModule({
         title={editHoliday ? "Edit Holiday" : "Add Holiday"}
       >
         <div className="space-y-4">
-          {error && <p className="text-sm text-red-600">{error}</p>}
           <input
             className={inputClass}
             placeholder="Holiday name"

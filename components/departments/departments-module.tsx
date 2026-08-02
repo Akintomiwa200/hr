@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button, EmptyState } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { notify, readApiError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 type Department = {
@@ -62,7 +63,6 @@ export function DepartmentsModule({
   const [description, setDescription] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -85,7 +85,6 @@ export function DepartmentsModule({
   const openCreate = () => {
     setName("");
     setDescription("");
-    setError("");
     setCreateOpen(true);
   };
 
@@ -93,12 +92,10 @@ export function DepartmentsModule({
     setEditDept(dept);
     setName(dept.name);
     setDescription(dept.description ?? "");
-    setError("");
   };
 
   const save = async (mode: "create" | "edit") => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(
         mode === "create" ? "/api/departments" : `/api/departments/${editDept!.id}`,
@@ -108,13 +105,16 @@ export function DepartmentsModule({
           body: JSON.stringify({ name, description }),
         }
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to save");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to save department"));
+        return;
+      }
+      notify.success(mode === "create" ? "Department created successfully" : "Department updated successfully");
       setCreateOpen(false);
       setEditDept(null);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save");
+    } catch {
+      notify.error("Failed to save department");
     } finally {
       setLoading(false);
     }
@@ -123,16 +123,18 @@ export function DepartmentsModule({
   const remove = async () => {
     if (!deleteDept) return;
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(`/api/departments/${deleteDept.id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to delete department"));
+        return;
+      }
+      notify.success("Department deleted successfully");
       setDepartments((d) => d.filter((x) => x.id !== deleteDept.id));
       setDeleteDept(null);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete");
+    } catch {
+      notify.error("Failed to delete department");
     } finally {
       setLoading(false);
     }
@@ -207,7 +209,7 @@ export function DepartmentsModule({
 
               <div className="p-5">
                 <div className="flex items-start justify-between gap-2">
-                  <Link href={`/departments/${dept.id}`} className="min-w-0 flex-1">
+                  <Link href={`/teams/${dept.id}`} className="min-w-0 flex-1">
                     <div className="flex items-start gap-3">
                       <div className="w-11 h-11 rounded-xl bg-brand-50 flex items-center justify-center shrink-0 group-hover:bg-brand-100 transition-colors">
                         <Building2 className="w-5 h-5 text-brand-600" />
@@ -237,10 +239,7 @@ export function DepartmentsModule({
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          setError("");
-                          setDeleteDept(dept);
-                        }}
+                        onClick={() => setDeleteDept(dept)}
                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                         aria-label={`Delete ${dept.name}`}
                       >
@@ -269,7 +268,7 @@ export function DepartmentsModule({
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Link
-                    href={`/departments/${dept.id}`}
+                    href={`/teams/${dept.id}`}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors"
                   >
                     View team
@@ -297,13 +296,11 @@ export function DepartmentsModule({
         onClose={() => {
           setCreateOpen(false);
           setEditDept(null);
-          setError("");
         }}
         title={editDept ? "Edit department" : "Add department"}
         size="md"
       >
         <div className="space-y-4">
-          {error && <p className="text-sm text-red-600">{error}</p>}
           <div>
             <label className={labelClass}>Name</label>
             <input
@@ -329,7 +326,6 @@ export function DepartmentsModule({
               onClick={() => {
                 setCreateOpen(false);
                 setEditDept(null);
-                setError("");
               }}
             >
               Cancel
@@ -343,10 +339,7 @@ export function DepartmentsModule({
 
       <Dialog
         open={!!deleteDept}
-        onClose={() => {
-          setDeleteDept(null);
-          setError("");
-        }}
+        onClose={() => setDeleteDept(null)}
         title="Delete department"
         size="sm"
       >
@@ -354,14 +347,10 @@ export function DepartmentsModule({
           Delete <strong>{deleteDept?.name}</strong>? Employees must be reassigned first — this cannot
           be undone.
         </p>
-        {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
         <div className="flex justify-end gap-2">
           <Button
             variant="secondary"
-            onClick={() => {
-              setDeleteDept(null);
-              setError("");
-            }}
+            onClick={() => setDeleteDept(null)}
           >
             Cancel
           </Button>

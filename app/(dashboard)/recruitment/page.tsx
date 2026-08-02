@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { canManageRecruitment } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
@@ -39,7 +40,7 @@ export default async function RecruitmentPage() {
       <RecruitmentModule
         jobs={jobs}
         departments={departments}
-        canManage={session.role === "ADMIN" || session.role === "MANAGER"}
+        canManage={canManageRecruitment(session.role)}
       />
     </div>
   );

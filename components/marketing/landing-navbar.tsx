@@ -9,9 +9,10 @@ const navLinks = [
   { href: "/features", label: "Features" },
   { href: "/why", label: "Why Smart HR" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/api", label: "API" },
 ];
 
-export function LandingNavbar() {
+export function LandingNavbar({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -49,18 +50,29 @@ export function LandingNavbar() {
         </nav>
 
         <div className="flex items-center gap-3 sm:gap-5 shrink-0">
-          <Link
-            href="/login"
-            className="text-[13px] font-medium text-gray-700 hover:text-[#7B61FF] transition-colors"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/signup"
-            className="inline-flex items-center px-4 sm:px-5 py-2 text-[13px] font-semibold text-white bg-[#7B61FF] rounded-full hover:bg-[#6b51ef] transition-colors shadow-sm shadow-violet-200"
-          >
-            Start Free Trial
-          </Link>
+          {isAuthenticated ? (
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center px-4 sm:px-5 py-2 text-[13px] font-semibold text-white bg-[#7B61FF] rounded-full hover:bg-[#6b51ef] transition-colors shadow-sm shadow-violet-200"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="text-[13px] font-medium text-gray-700 hover:text-[#7B61FF] transition-colors"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/signup"
+                className="inline-flex items-center px-4 sm:px-5 py-2 text-[13px] font-semibold text-white bg-[#7B61FF] rounded-full hover:bg-[#6b51ef] transition-colors shadow-sm shadow-violet-200"
+              >
+                Start Free Trial
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>

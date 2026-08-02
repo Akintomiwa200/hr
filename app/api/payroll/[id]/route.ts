@@ -8,6 +8,7 @@ import {
   requireSession,
   unauthorized,
 } from "@/lib/api-auth";
+import { canManagePayroll } from "@/lib/roles";
 import {
   canManagePayrollRecord,
   canViewPayrollRecord,
@@ -136,7 +137,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await requireSession();
-  if (!session || session.role !== "ADMIN") return unauthorized();
+  if (!session || !canManagePayroll(session.role)) return unauthorized();
 
   const { id } = await params;
   const existing = await prisma.payrollRecord.findUnique({ where: { id } });

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Role } from "@prisma/client";
 import { parseJsonArray } from "@/lib/performance/access";
 
 export async function getEligibleEmployees(cycle: {
@@ -20,7 +21,7 @@ export async function getEligibleEmployees(cycle: {
                 ? [{ departmentId: { in: departmentIds } }]
                 : []),
               ...(roleFilters.length > 0
-                ? [{ user: { role: { in: roleFilters as ("ADMIN" | "MANAGER" | "EMPLOYEE")[] } } }]
+                ? [{ user: { role: { in: roleFilters as Role[] } } }]
                 : []),
             ],
           }),

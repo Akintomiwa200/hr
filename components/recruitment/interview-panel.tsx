@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Star, Video } from "lucide-react";
 import { Button, statusBadge } from "@/components/ui";
+import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
 import { ScheduleInterviewDialog } from "./schedule-interview-dialog";
 
@@ -58,7 +59,6 @@ export function InterviewPanel({
   const router = useRouter();
   const [reviewFor, setReviewFor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [form, setForm] = useState({
     rating: "4",
     recommendation: "YES",
@@ -69,19 +69,21 @@ export function InterviewPanel({
 
   const submitReview = async (interviewId: string) => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(`/api/interviews/${interviewId}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to submit review");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to submit review"));
+        return;
+      }
+      notify.success("Interview review submitted");
       setReviewFor(null);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to submit review");
+    } catch {
+      notify.error("Failed to submit review");
     } finally {
       setLoading(false);
     }
@@ -89,12 +91,17 @@ export function InterviewPanel({
 
   const cancelInterview = async (interviewId: string) => {
     if (!confirm("Cancel this interview?")) return;
-    await fetch(`/api/interviews/${interviewId}`, {
+    const res = await fetch(`/api/interviews/${interviewId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "cancel" }),
     });
-    router.refresh();
+    if (!res.ok) {
+      notify.error(await readApiError(res, "Failed to cancel interview"));
+    } else {
+      notify.success("Interview cancelled");
+      router.refresh();
+    }
   };
 
   return (
@@ -199,7 +206,6 @@ export function InterviewPanel({
 
               {reviewFor === interview.id && canManage && currentEmployeeId && (
                 <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                  {error && <p className="text-sm text-red-600">{error}</p>}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs font-semibold text-gray-500 uppercase">Rating</label>

@@ -2,16 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { notify, readApiError } from "@/lib/toast";
 
 export function AnnouncementForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
-    setError("");
 
     const form = new FormData(e.currentTarget);
 
@@ -25,15 +24,15 @@ export function AnnouncementForm() {
           priority: form.get("priority"),
         }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to create announcement");
+        notify.error(await readApiError(res, "Failed to create announcement"));
         return;
       }
+      notify.success("Announcement published");
       e.currentTarget.reset();
       router.refresh();
     } catch {
-      setError("Something went wrong");
+      notify.error("Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -56,7 +55,6 @@ export function AnnouncementForm() {
           <option value="HIGH">High</option>
         </select>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         type="submit"
         disabled={loading}

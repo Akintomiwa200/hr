@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button, Card, statusBadge } from "@/components/ui";
+import { notify, readApiError } from "@/lib/toast";
 import { formatCurrency, formatDate, fullName } from "@/lib/utils";
 import type { PayrollLineItem } from "@/lib/payroll-types";
 
@@ -72,7 +73,6 @@ export function PayslipDetailModule({
   const [notes, setNotes] = useState(record.notes ?? "");
   const [status, setStatus] = useState(record.status);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const earnings = items.filter((item) => item.type === "EARNING");
   const deductions = items.filter((item) => item.type === "DEDUCTION");
@@ -90,18 +90,20 @@ export function PayslipDetailModule({
 
   const recalculate = async () => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(`/api/payroll/${record.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ recalculate: true }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to recalculate");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to recalculate"));
+        return;
+      }
+      notify.success("Payslip recalculated successfully");
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to recalculate");
+    } catch {
+      notify.error("Failed to recalculate");
     } finally {
       setLoading(false);
     }
@@ -109,7 +111,6 @@ export function PayslipDetailModule({
 
   const save = async () => {
     setLoading(true);
-    setError("");
     try {
       const res = await fetch(`/api/payroll/${record.id}`, {
         method: "PATCH",
@@ -117,13 +118,14 @@ export function PayslipDetailModule({
         body: JSON.stringify({ breakdown: items, notes, status }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to save");
+        notify.error(await readApiError(res, "Failed to save payslip"));
+        return;
       }
+      notify.success("Payslip updated successfully");
       setEditing(false);
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save");
+    } catch {
+      notify.error("Failed to save payslip");
     } finally {
       setLoading(false);
     }
@@ -205,7 +207,7 @@ export function PayslipDetailModule({
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <Link
           href="/payroll"
-          className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-violet-600"
+          className="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to payroll
@@ -243,48 +245,39 @@ export function PayslipDetailModule({
         </div>
       </div>
 
-      {error && (
-        <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-          {error}
-        </p>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <Card className="lg:col-span-2 p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Payslip</p>
-              <h2 className="text-xl font-bold text-gray-900 mt-1">
-                {fullName(record.employee.firstName, record.employee.lastName)}
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {record.employee.jobTitle} · {record.employee.department.name}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">ID: {record.employee.employeeCode}</p>
-            </div>
-            <div className="text-right">
-              {statusBadge(status)}
-              <p className="text-sm text-gray-500 mt-2">
-                {formatDate(record.periodStart)} – {formatDate(record.periodEnd)}
-              </p>
-            </div>
+      <div className="rounded-2xl border border-gray-100 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden mb-6">
+        <div className="h-2 bg-gradient-to-r from-brand-500 to-violet-600" />
+        <div className="p-5 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">Payslip</p>
+            <h2 className="text-xl font-bold text-gray-900 mt-1">
+              {fullName(record.employee.firstName, record.employee.lastName)}
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {record.employee.jobTitle} · {record.employee.department.name}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">ID: {record.employee.employeeCode}</p>
           </div>
-        </Card>
-
-        <Card className="bg-violet-50/60 border-violet-100 p-5">
-          <p className="text-xs uppercase tracking-wide text-violet-700 font-semibold">Net pay</p>
-          <p className="text-3xl font-bold text-emerald-600 mt-2">{formatCurrency(netPay)}</p>
-          <div className="mt-4 space-y-1 text-sm text-gray-600">
-            <div className="flex justify-between">
-              <span>Gross</span>
-              <span className="font-medium">{formatCurrency(grossPay)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Deductions</span>
-              <span className="font-medium text-amber-700">{formatCurrency(totalDeductions)}</span>
-            </div>
+          <div className="text-right">
+            {statusBadge(status)}
+            <p className="text-sm text-gray-500 mt-2">
+              {formatDate(record.periodStart)} – {formatDate(record.periodEnd)}
+            </p>
+            <p className="text-3xl font-bold text-emerald-600 mt-3">{formatCurrency(netPay)}</p>
+            <p className="text-xs text-gray-400">net pay</p>
           </div>
-        </Card>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+          <p className="text-xs text-gray-500">Gross pay</p>
+          <p className="text-lg font-bold text-gray-900">{formatCurrency(grossPay)}</p>
+        </div>
+        <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+          <p className="text-xs text-gray-500">Total deductions</p>
+          <p className="text-lg font-bold text-amber-700">{formatCurrency(totalDeductions)}</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { canManageOrgContent } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { DocumentsModule } from "@/components/documents/documents-module";
@@ -36,7 +37,7 @@ export default async function DocumentsPage() {
       <DocumentsModule
         documents={documents}
         employees={employees}
-        canManage={session.role === "ADMIN" || session.role === "MANAGER"}
+        canManage={canManageOrgContent(session.role)}
       />
     </div>
   );

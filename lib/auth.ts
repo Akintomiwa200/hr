@@ -1,11 +1,18 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { Role } from "@prisma/client";
+import {
+  canApproveLeave,
+  canManageEmployees,
+  canManagePayroll,
+  normalizeRole,
+} from "@/lib/roles";
 
 export interface SessionUser {
   id: string;
   email: string;
   role: Role;
+  companyId?: string | null;
   employeeId?: string;
   firstName?: string;
   lastName?: string;
@@ -18,7 +25,9 @@ const secret = new TextEncoder().encode(
 const COOKIE_NAME = "smart-hr-session";
 
 export async function createSession(user: SessionUser) {
-  const token = await new SignJWT({ user })
+  const token = await new SignJWT({
+    user: { ...user, role: normalizeRole(user.role) },
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
@@ -41,7 +50,9 @@ export async function getSession(): Promise<SessionUser | null> {
 
   try {
     const { payload } = await jwtVerify(token, secret);
-    return (payload.user as SessionUser) ?? null;
+    const user = payload.user as SessionUser;
+    if (!user) return null;
+    return { ...user, role: normalizeRole(user.role) };
   } catch {
     return null;
   }
@@ -52,14 +63,4 @@ export async function destroySession() {
   cookieStore.delete(COOKIE_NAME);
 }
 
-export function canManageEmployees(role: Role) {
-  return role === "ADMIN" || role === "MANAGER";
-}
-
-export function canManagePayroll(role: Role) {
-  return role === "ADMIN";
-}
-
-export function canApproveLeave(role: Role) {
-  return role === "ADMIN" || role === "MANAGER";
-}
+export { canManageEmployees, canManagePayroll, canApproveLeave };

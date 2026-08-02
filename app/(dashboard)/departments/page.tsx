@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { canManageDepartments } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { getOrgChartData } from "@/lib/org-chart-data";
 import { PageHeader } from "@/components/ui";
@@ -35,7 +36,7 @@ export default async function DepartmentsPage({
       <OrgChartModule
         data={orgData}
         departments={departments}
-        canManage={session.role === "ADMIN"}
+        canManage={canManageDepartments(session.role)}
         initialDepartmentId={params.dept}
         initialView={params.view === "departments" ? "departments" : "chart"}
       />

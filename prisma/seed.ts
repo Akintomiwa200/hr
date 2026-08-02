@@ -18,13 +18,24 @@ async function main() {
   await prisma.payrollRecord.deleteMany();
   await prisma.payrollSettings.deleteMany();
   await prisma.attendance.deleteMany();
+  await prisma.attendanceDevice.deleteMany();
   await prisma.leaveRequest.deleteMany();
   await prisma.employee.deleteMany();
   await prisma.department.deleteMany();
   await prisma.announcement.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.company.deleteMany();
 
   const passwordHash = await bcrypt.hash("password123", 10);
+
+  const company = await prisma.company.create({
+    data: {
+      name: "Smart HR Demo",
+      slug: "smarthr-demo",
+      plan: "enterprise",
+      isActive: true,
+    },
+  });
 
   const departments = await Promise.all([
     prisma.department.create({ data: { name: "Human Resources", description: "HR and people operations" } }),
@@ -36,23 +47,64 @@ async function main() {
 
   const [hrDept, engDept, mktDept, finDept, opsDept] = departments;
 
+  await prisma.user.create({
+    data: {
+      email: "superadmin@smarthr.com",
+      passwordHash,
+      role: Role.SUPER_ADMIN,
+    },
+  });
+
   const adminUser = await prisma.user.create({
-    data: { email: "admin@smarthr.com", passwordHash, role: Role.ADMIN },
+    data: {
+      email: "admin@smarthr.com",
+      passwordHash,
+      role: Role.COMPANY_ADMIN,
+      companyId: company.id,
+    },
+  });
+
+  const hrUser = await prisma.user.create({
+    data: {
+      email: "hr@smarthr.com",
+      passwordHash,
+      role: Role.HR,
+      companyId: company.id,
+    },
   });
 
   const managerUser = await prisma.user.create({
-    data: { email: "manager@smarthr.com", passwordHash, role: Role.MANAGER },
+    data: {
+      email: "manager@smarthr.com",
+      passwordHash,
+      role: Role.MANAGER,
+      companyId: company.id,
+    },
+  });
+
+  const supervisorUser = await prisma.user.create({
+    data: {
+      email: "supervisor@smarthr.com",
+      passwordHash,
+      role: Role.SUPERVISOR,
+      companyId: company.id,
+    },
   });
 
   const employeeUser = await prisma.user.create({
-    data: { email: "employee@smarthr.com", passwordHash, role: Role.EMPLOYEE },
+    data: {
+      email: "employee@smarthr.com",
+      passwordHash,
+      role: Role.EMPLOYEE,
+      companyId: company.id,
+    },
   });
 
   const extraUsers = await Promise.all([
-    prisma.user.create({ data: { email: "sarah.j@smarthr.com", passwordHash, role: Role.EMPLOYEE } }),
-    prisma.user.create({ data: { email: "mike.c@smarthr.com", passwordHash, role: Role.EMPLOYEE } }),
-    prisma.user.create({ data: { email: "lisa.w@smarthr.com", passwordHash, role: Role.MANAGER } }),
-    prisma.user.create({ data: { email: "david.r@smarthr.com", passwordHash, role: Role.EMPLOYEE } }),
+    prisma.user.create({ data: { email: "sarah.j@smarthr.com", passwordHash, role: Role.EMPLOYEE, companyId: company.id } }),
+    prisma.user.create({ data: { email: "mike.c@smarthr.com", passwordHash, role: Role.EMPLOYEE, companyId: company.id } }),
+    prisma.user.create({ data: { email: "lisa.w@smarthr.com", passwordHash, role: Role.MANAGER, companyId: company.id } }),
+    prisma.user.create({ data: { email: "david.r@smarthr.com", passwordHash, role: Role.EMPLOYEE, companyId: company.id } }),
   ]);
 
   const admin = await prisma.employee.create({
@@ -86,6 +138,37 @@ async function main() {
     },
   });
 
+  const hrEmployee = await prisma.employee.create({
+    data: {
+      userId: hrUser.id,
+      employeeCode: "EMP008",
+      firstName: "Morgan",
+      lastName: "Lee",
+      email: "hr@smarthr.com",
+      phone: "+1 555-0108",
+      jobTitle: "HR Manager",
+      departmentId: hrDept.id,
+      hireDate: new Date("2020-08-01"),
+      salary: 88000,
+    },
+  });
+
+  const supervisor = await prisma.employee.create({
+    data: {
+      userId: supervisorUser.id,
+      employeeCode: "EMP009",
+      firstName: "Casey",
+      lastName: "Nguyen",
+      email: "supervisor@smarthr.com",
+      phone: "+1 555-0109",
+      jobTitle: "Team Supervisor",
+      departmentId: engDept.id,
+      managerId: manager.id,
+      hireDate: new Date("2021-03-20"),
+      salary: 82000,
+    },
+  });
+
   const employee = await prisma.employee.create({
     data: {
       userId: employeeUser.id,
@@ -113,7 +196,7 @@ async function main() {
       email: "sarah.j@smarthr.com",
       jobTitle: "Marketing Specialist",
       departmentId: mktDept.id,
-      managerId: admin.id,
+      managerId: hrEmployee.id,
       hireDate: new Date("2023-01-20"),
       salary: 72000,
     },
@@ -156,7 +239,7 @@ async function main() {
       email: "david.r@smarthr.com",
       jobTitle: "Junior Developer",
       departmentId: engDept.id,
-      managerId: manager.id,
+      managerId: supervisor.id,
       hireDate: new Date("2024-02-01"),
       salary: 65000,
     },
@@ -165,19 +248,33 @@ async function main() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const receptionKiosk = await prisma.attendanceDevice.create({
+    data: {
+      name: "Reception Kiosk",
+      location: "Main lobby",
+      apiKey: "dev-device-key-reception-kiosk",
+      isActive: true,
+    },
+  });
+
   for (let i = 0; i < 7; i++) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     if (date.getDay() === 0 || date.getDay() === 6) continue;
 
     for (const emp of [admin, manager, employee, sarah, mike, lisa]) {
+      const isToday = i === 0;
+      const isDeviceCheckIn = isToday && emp.id === sarah.id;
       await prisma.attendance.create({
         data: {
           employeeId: emp.id,
           date,
           checkIn: new Date(date.getTime() + 9 * 60 * 60 * 1000),
-          checkOut: new Date(date.getTime() + 17 * 60 * 60 * 1000),
+          checkOut: isToday ? null : new Date(date.getTime() + 17 * 60 * 60 * 1000),
           status: i === 1 && emp.id === employee.id ? "LATE" : "PRESENT",
+          checkInMethod: isDeviceCheckIn ? "DEVICE" : "WEB",
+          deviceId: isDeviceCheckIn ? receptionKiosk.id : undefined,
+          deviceName: isDeviceCheckIn ? receptionKiosk.name : undefined,
         },
       });
     }
@@ -477,9 +574,12 @@ async function main() {
 
   console.log("Seed completed!");
   console.log("\nDemo accounts (password: password123):");
-  console.log("  Admin:    admin@smarthr.com");
-  console.log("  Manager:  manager@smarthr.com");
-  console.log("  Employee: employee@smarthr.com");
+  console.log("  Super Admin:  superadmin@smarthr.com");
+  console.log("  Company Admin: admin@smarthr.com");
+  console.log("  HR:           hr@smarthr.com");
+  console.log("  Manager:      manager@smarthr.com");
+  console.log("  Supervisor:   supervisor@smarthr.com");
+  console.log("  Employee:     employee@smarthr.com");
 }
 
 main()

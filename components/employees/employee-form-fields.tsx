@@ -2,6 +2,7 @@
 
 import type { EmployeeFormData, DepartmentOption, ManagerOption } from "./types";
 import type { Role } from "@prisma/client";
+import { ORG_ROLES, isCompanyAdmin, roleLabel } from "@/lib/roles";
 
 const inputClass =
   "w-full px-4 py-3 text-[14px] border border-gray-200 rounded-xl bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/30 focus:border-[#7B61FF] transition-shadow";
@@ -161,11 +162,13 @@ export function EmployeeFormFields({
             value={data.role}
             onChange={(e) => set("role", e.target.value)}
             className={inputClass}
-            disabled={isEdit && data.role === "ADMIN"}
+            disabled={isEdit && isCompanyAdmin(data.role as Role)}
           >
-            <option value="EMPLOYEE">Employee</option>
-            <option value="MANAGER">Manager</option>
-            <option value="ADMIN">Admin</option>
+            {ORG_ROLES.map((role) => (
+              <option key={role} value={role}>
+                {roleLabel(role)}
+              </option>
+            ))}
           </select>
         </div>
         <div>

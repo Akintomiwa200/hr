@@ -1,5 +1,11 @@
 import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  isCompanyAdmin,
+  isHrRole,
+  isSuperAdmin,
+  normalizeRole,
+} from "@/lib/roles";
 
 export function parseJsonArray(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -11,11 +17,15 @@ export function parseJsonArray(raw: string | null | undefined): string[] {
   }
 }
 
-export async function canViewAppraisal(session: SessionUser, appraisal: { employeeId: string; managerId: string }) {
-  if (session.role === "ADMIN") return true;
+export async function canViewAppraisal(
+  session: SessionUser,
+  appraisal: { employeeId: string; managerId: string }
+) {
+  const role = normalizeRole(session.role);
+  if (isSuperAdmin(role) || isCompanyAdmin(role) || isHrRole(role)) return true;
   if (session.employeeId === appraisal.employeeId) return true;
   if (session.employeeId === appraisal.managerId) return true;
-  if (session.role === "MANAGER" && session.employeeId) {
+  if ((role === "MANAGER" || role === "SUPERVISOR") && session.employeeId) {
     const report = await prisma.employee.findFirst({
       where: { id: appraisal.employeeId, managerId: session.employeeId },
       select: { id: true },
@@ -25,7 +35,10 @@ export async function canViewAppraisal(session: SessionUser, appraisal: { employ
   return false;
 }
 
-export function canEditSelfAppraisal(session: SessionUser, appraisal: { employeeId: string; status: string }) {
+export function canEditSelfAppraisal(
+  session: SessionUser,
+  appraisal: { employeeId: string; status: string }
+) {
   return (
     session.employeeId === appraisal.employeeId &&
     (appraisal.status === "NOT_STARTED" || appraisal.status === "SELF_REVIEW")
@@ -36,16 +49,26 @@ export function canEditManagerAppraisal(
   session: SessionUser,
   appraisal: { managerId: string; status: string }
 ) {
-  if (appraisal.status === "COMPLETED" || appraisal.status === "NOT_STARTED") return false;
-  if (session.role === "ADMIN") return appraisal.status === "MANAGER_REVIEW" || appraisal.status === "SELF_REVIEW";
-  return session.employeeId === appraisal.managerId && appraisal.status === "MANAGER_REVIEW";
+  if (appraisal.status === "COMPLETED" || appraisal.status === "NOT_STARTED")
+    return false;
+  const role = normalizeRole(session.role);
+  if (isCompanyAdmin(role) || isHrRole(role)) {
+    return (
+      appraisal.status === "MANAGER_REVIEW" || appraisal.status === "SELF_REVIEW"
+    );
+  }
+  return (
+    session.employeeId === appraisal.managerId &&
+    appraisal.status === "MANAGER_REVIEW"
+  );
 }
 
 export async function appraisalListWhere(session: SessionUser) {
-  if (session.role === "EMPLOYEE" && session.employeeId) {
+  const role = normalizeRole(session.role);
+  if (role === "EMPLOYEE" && session.employeeId) {
     return { employeeId: session.employeeId };
   }
-  if (session.role === "MANAGER" && session.employeeId) {
+  if ((role === "MANAGER" || role === "SUPERVISOR") && session.employeeId) {
     return {
       OR: [
         { employeeId: session.employeeId },
@@ -57,7 +80,9 @@ export async function appraisalListWhere(session: SessionUser) {
   return {};
 }
 
-export function computeOverallRating(scores: { selfScore: number | null; managerScore: number | null; weight: number }[]) {
+export function computeOverallRating(
+  scores: { selfScore: number | null; managerScore: number | null; weight: number }[]
+) {
   const rated = scores.filter((s) => s.managerScore != null || s.selfScore != null);
   if (rated.length === 0) return null;
   const totalWeight = rated.reduce((sum, s) => sum + s.weight, 0);

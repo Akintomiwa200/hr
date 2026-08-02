@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
       id: user.id,
       email: user.email,
       role: user.role,
+      companyId: user.companyId,
       employeeId: user.employee?.id,
       firstName: user.employee?.firstName,
       lastName: user.employee?.lastName,

@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import {
+  recordCheckIn,
+  recordCheckOut,
+} from "@/lib/attendance-service";
 
 export async function POST() {
   const session = await getSession();
@@ -10,34 +11,16 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const now = new Date();
-  const isLate = now.getHours() >= 9 && now.getMinutes() > 15;
-
-  await prisma.attendance.upsert({
-    where: {
-      employeeId_date: {
-        employeeId: session.employeeId,
-        date: today,
-      },
-    },
-    create: {
+  try {
+    const result = await recordCheckIn({
       employeeId: session.employeeId,
-      date: today,
-      checkIn: now,
-      status: isLate ? "LATE" : "PRESENT",
-    },
-    update: {
-      checkIn: now,
-      status: isLate ? "LATE" : "PRESENT",
-    },
-  });
-
-  broadcastEvent("attendance_updated", { employeeId: session.employeeId });
-  revalidatePath("/attendance");
-  revalidatePath("/dashboard");
-
-  return NextResponse.json({ success: true });
+      method: "WEB",
+    });
+    return NextResponse.json({ success: true, ...result });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Check-in failed" },
+      { status: 400 }
+    );
+  }
 }

@@ -3,6 +3,7 @@ export type RealtimeEventType =
   | "employee_updated"
   | "leave_updated"
   | "attendance_updated"
+  | "device_ping"
   | "announcement_created"
   | "payroll_updated"
   | "performance_updated"
