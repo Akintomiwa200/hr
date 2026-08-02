@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { getSession } from "@/lib/auth";
+import { getSession, canManageEmployees } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ModulePageActions } from "@/components/help/module-page-actions";
 import { NewEmployeeForm } from "./new-employee-form";
 
 export default async function NewEmployeePage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role !== "ADMIN") redirect("/employees");
+  if (!canManageEmployees(session.role)) redirect("/employees");
 
   const [departments, managers] = await Promise.all([
     prisma.department.findMany({ orderBy: { name: "asc" } }),
@@ -28,10 +29,15 @@ export default async function NewEmployeePage() {
           <ArrowLeft className="w-4 h-4" />
           Back to employees
         </Link>
-        <h1 className="text-[22px] font-bold text-gray-900 tracking-tight">Add Employee</h1>
-        <p className="text-[14px] text-gray-500 mt-1">
-          Create a new employee account and profile
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[22px] font-bold text-gray-900 tracking-tight">Onboarding</h1>
+            <p className="text-[14px] text-gray-500 mt-1">
+              Create an employee account with default password and send a welcome email instantly
+            </p>
+          </div>
+          <ModulePageActions helpSlug="employees" helpLabel="Employees guide" />
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">

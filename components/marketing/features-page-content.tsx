@@ -296,7 +296,7 @@ export function FeaturesPageContent() {
             icon={MessageCircle}
             title="Get feedback on new features, fast"
             linkLabel="Learn about feedback"
-            linkHref="/help"
+            linkHref="/login"
             visual={<FeedbackMockup />}
           >
             <BulletItem

@@ -134,14 +134,18 @@ export const marketingPages: Record<string, PageConfig> = {
     sections: [
       {
         heading: "Getting started",
-        body: "Learn how to set up departments, invite employees, configure leave policies, and run your first payroll cycle.",
+        body: "Sign in to access guides for calendar, leave, attendance, payroll, recruitment, and every module in your dashboard.",
       },
       {
-        heading: "Common topics",
-        body: "Attendance check-in, leave approvals, role permissions, payslip access, and recruitment workflows.",
+        heading: "In-app documentation",
+        body: "Once signed in, open Help from the sidebar for searchable guides, FAQs, and contact support.",
+      },
+      {
+        heading: "Support",
+        body: "Email support@smarthr.com for account issues, or use the Contact support form inside the Help Center.",
       },
     ],
-    cta: { label: "View Documentation", href: "/documentation" },
+    cta: { label: "Sign in to Help Center", href: "/login" },
   },
   documentation: {
     title: "Documentation",

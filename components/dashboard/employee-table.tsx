@@ -1,17 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, Download, Eye, MoreVertical } from "lucide-react";
+import { Download, Eye } from "lucide-react";
 import { Avatar } from "@/components/ui";
 import { employmentLabel, employmentVariant, resolveEmploymentType } from "@/lib/employment";
 import { fullName } from "@/lib/utils";
-import type { Department, Employee, Role } from "@prisma/client";
-
-type EmployeeRow = Employee & {
-  department: Department;
-  user?: { role: Role };
-};
+import type { EmployeeRow } from "@/components/employees/types";
 
 function StatusPill({ label, variant }: { label: string; variant: "fulltime" | "freelance" }) {
   const styles = {
@@ -33,10 +28,15 @@ function StatusPill({ label, variant }: { label: string; variant: "fulltime" | "
   );
 }
 
-export function EmployeeTable({ employees }: { employees: EmployeeRow[] }) {
+export function EmployeeTable({ employees: initialEmployees }: { employees: EmployeeRow[] }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [roleFilter, setRoleFilter] = useState("ALL");
+  const [employees, setEmployees] = useState(initialEmployees);
+
+  useEffect(() => {
+    setEmployees(initialEmployees);
+  }, [initialEmployees]);
 
   const roles = useMemo(
     () => [...new Set(employees.map((e) => e.user?.role ?? "EMPLOYEE"))],
@@ -123,6 +123,7 @@ export function EmployeeTable({ employees }: { employees: EmployeeRow[] }) {
               <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Employee ID</th>
               <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Employee name</th>
               <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Email</th>
+              <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Job title</th>
               <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Role</th>
               <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Departments</th>
               <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Status</th>
@@ -150,7 +151,10 @@ export function EmployeeTable({ employees }: { employees: EmployeeRow[] }) {
                   </td>
                   <td className="px-3 py-3.5 text-gray-500 text-[12px]">{emp.email}</td>
                   <td className="px-3 py-3.5 text-gray-700 text-[12px] whitespace-nowrap">
-                    {emp.jobTitle}
+                    {emp.jobTitle.replace(/\s*\(Freelance\)/i, "")}
+                  </td>
+                  <td className="px-3 py-3.5 text-gray-600 text-[12px] capitalize">
+                    {(emp.user?.role ?? "EMPLOYEE").toLowerCase()}
                   </td>
                   <td className="px-3 py-3.5">
                     <span className="inline-block px-2.5 py-1 text-[11px] text-gray-600 bg-gray-100 rounded-md">
@@ -168,15 +172,22 @@ export function EmployeeTable({ employees }: { employees: EmployeeRow[] }) {
                       <Link
                         href={`/employees/${emp.id}`}
                         className="p-1.5 text-gray-400 hover:text-violet-600 rounded-lg"
+                        title="View profile"
                       >
                         <Eye className="w-4 h-4" />
                       </Link>
-                      <button
-                        type="button"
-                        className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg"
+                      <Link
+                        href={`/employees/${emp.id}/attendance`}
+                        className="px-2 py-1 text-[11px] text-gray-500 hover:text-violet-600"
                       >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
+                        Attendance
+                      </Link>
+                      <Link
+                        href={`/employees/${emp.id}/leave`}
+                        className="px-2 py-1 text-[11px] text-gray-500 hover:text-violet-600"
+                      >
+                        Leave
+                      </Link>
                     </div>
                   </td>
                 </tr>

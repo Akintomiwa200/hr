@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { resolveEmploymentType } from "@/lib/employment";
-
+import {
+  getPreviousPeriod,
+  parseDashboardRangeKey,
+  resolveDashboardRange,
+  type DashboardRangeKey,
+} from "@/lib/dashboard-date-range";
 const CHART_MONTHS = [
   "Jan",
   "Feb",
@@ -47,15 +52,14 @@ async function getAttendanceRateForRange(start: Date, end: Date, employeeIds?: s
   return Math.round((presentCount / totalEmployees) * 100);
 }
 
-export async function getHrDashboardData() {
+export async function getHrDashboardData(rangeInput?: DashboardRangeKey | string) {
+  const rangeKey = parseDashboardRangeKey(rangeInput);
+  const period = resolveDashboardRange(rangeKey);
+  const previousPeriod = getPreviousPeriod(period);
+
   const today = startOfDay();
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
-  const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-
+  const rangeStart = period.start;
+  const rangeEnd = period.end;
   const [
     employees,
     totalEmployees,
@@ -86,12 +90,18 @@ export async function getHrDashboardData() {
       include: { _count: { select: { employees: true } } },
     }),
     prisma.payrollRecord.findMany({
-      where: { status: { in: ["PROCESSED", "PAID"] } },
+      where: {
+        status: { in: ["PROCESSED", "PAID"] },
+        periodStart: { gte: rangeStart, lte: rangeEnd },
+      },
       orderBy: { periodStart: "desc" },
-      take: 24,
     }),
     prisma.performanceReview.findMany({
-      where: { status: "COMPLETED", rating: { not: null } },
+      where: {
+        status: "COMPLETED",
+        rating: { not: null },
+        reviewDate: { gte: rangeStart, lte: rangeEnd },
+      },
       include: { employee: true },
       take: 5,
       orderBy: { reviewDate: "desc" },
@@ -99,13 +109,13 @@ export async function getHrDashboardData() {
     prisma.attendance.groupBy({
       by: ["status"],
       _count: { status: true },
-      where: { date: { gte: thirtyDaysAgo } },
+      where: { date: { gte: rangeStart, lte: rangeEnd } },
     }),
     prisma.employee.findMany({
-      where: { hireDate: { gte: thirtyDaysAgo } },
+      where: { hireDate: { gte: rangeStart, lte: rangeEnd } },
     }),
-    getAttendanceRateForRange(thisMonthStart, today),
-    getAttendanceRateForRange(lastMonthStart, lastMonthEnd),
+    getAttendanceRateForRange(rangeStart, rangeEnd),
+    getAttendanceRateForRange(previousPeriod.start, previousPeriod.end),
   ]);
 
   const activeEmployees = employees.filter((e) => e.status === "ACTIVE");
@@ -130,12 +140,6 @@ export async function getHrDashboardData() {
     todayAttendanceByStatus.find((s) => s.status === "LATE")?._count.status ?? 0;
   const todayDevicesTotal = todayPresent + todayRemote + todayLate;
 
-  const attendanceRate = totalEmployees
-    ? Math.round(
-        ((todayPresent + todayRemote + todayLate) / totalEmployees) * 100
-      )
-    : 0;
-
   const attendanceTrend = thisMonthRate - lastMonthRate;
 
   const sickLeave =
@@ -148,9 +152,15 @@ export async function getHrDashboardData() {
     attendanceByStatus.find((s) => s.status === "REMOTE")?._count.status ?? 0;
   const totalStatus = sickLeave + onTime + late + remote || 1;
 
+  const attendanceRate = thisMonthRate;
+
+  const chartYear = rangeEnd.getFullYear();
+
   const monthlyPayroll = payrollRecords.reduce(
     (acc, record) => {
-      const month = monthKey(new Date(record.periodStart));
+      const recordDate = new Date(record.periodStart);
+      if (recordDate < rangeStart || recordDate > rangeEnd) return acc;
+      const month = monthKey(recordDate);
       if (!acc[month]) acc[month] = { income: 0, expense: 0 };
       acc[month].income += record.netPay;
       acc[month].expense += record.deductions;
@@ -161,13 +171,18 @@ export async function getHrDashboardData() {
 
   const incomeChart = CHART_MONTHS.map((month) => ({
     month,
+    year: chartYear,
     income: monthlyPayroll[month]?.income ?? 0,
     expense: monthlyPayroll[month]?.expense ?? 0,
   }));
 
+  const currentMonth = monthKey(today);
   const highlightMonth =
-    CHART_MONTHS.find((m) => (monthlyPayroll[m]?.income ?? 0) > 0) ??
-    monthKey(today);
+    (monthlyPayroll[currentMonth]?.income ?? 0) > 0
+      ? currentMonth
+      : CHART_MONTHS.slice()
+          .reverse()
+          .find((m) => (monthlyPayroll[m]?.income ?? 0) > 0) ?? currentMonth;
 
   const avgPerformance =
     performanceReviews.length > 0
@@ -178,9 +193,6 @@ export async function getHrDashboardData() {
             100
         )
       : 0;
-
-  const dateRangeStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const dateRangeEnd = new Date(today.getFullYear(), today.getMonth(), 15);
 
   return {
     employees,
@@ -210,14 +222,21 @@ export async function getHrDashboardData() {
     avgPerformance,
     incomeChart,
     highlightMonth,
+    chartYear,
+    rangeKey,
     dateRange: {
-      start: dateRangeStart.toISOString(),
-      end: dateRangeEnd.toISOString(),
+      start: rangeStart.toISOString(),
+      end: rangeEnd.toISOString(),
     },
   };
 }
 
-export async function getManagerDashboardData(managerEmployeeId: string) {
+export async function getManagerDashboardData(
+  managerEmployeeId: string,
+  rangeInput?: DashboardRangeKey | string
+) {
+  const rangeKey = parseDashboardRangeKey(rangeInput);
+  const period = resolveDashboardRange(rangeKey);
   const today = startOfDay();
 
   const [team, pendingLeaves, teamReviews, teamAttendance] = await Promise.all([
@@ -248,21 +267,34 @@ export async function getManagerDashboardData(managerEmployeeId: string) {
     }),
   ]);
 
+  const teamIds = team.map((member) => member.id);
+  const rangeAttendanceRate = await getAttendanceRateForRange(
+    period.start,
+    period.end,
+    teamIds
+  );
+
   return {
     team,
     teamSize: team.length,
     pendingLeaves,
     teamReviews,
     presentToday: teamAttendance,
-    attendanceRate: team.length
-      ? Math.round((teamAttendance / team.length) * 100)
-      : 0,
+    attendanceRate: rangeAttendanceRate,
+    rangeKey,
+    dateRange: {
+      start: period.start.toISOString(),
+      end: period.end.toISOString(),
+    },
   };
 }
 
-export async function getEmployeeDashboardData(employeeId: string) {
-  const thirtyDaysAgo = startOfDay();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+export async function getEmployeeDashboardData(
+  employeeId: string,
+  rangeInput?: DashboardRangeKey | string
+) {
+  const rangeKey = parseDashboardRangeKey(rangeInput);
+  const period = resolveDashboardRange(rangeKey);
 
   const [employee, leaveRequests, attendanceRecords, payrollRecords, reviews] =
     await Promise.all([
@@ -276,7 +308,7 @@ export async function getEmployeeDashboardData(employeeId: string) {
         take: 3,
       }),
       prisma.attendance.findMany({
-        where: { employeeId, date: { gte: thirtyDaysAgo } },
+        where: { employeeId, date: { gte: period.start, lte: period.end } },
         orderBy: { date: "desc" },
       }),
       prisma.payrollRecord.findMany({
@@ -302,5 +334,10 @@ export async function getEmployeeDashboardData(employeeId: string) {
     latestPayroll: payrollRecords[0] ?? null,
     latestReview: reviews[0] ?? null,
     presentDays,
+    rangeKey,
+    dateRange: {
+      start: period.start.toISOString(),
+      end: period.end.toISOString(),
+    },
   };
 }

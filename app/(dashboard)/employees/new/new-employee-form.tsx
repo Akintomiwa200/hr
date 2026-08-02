@@ -3,6 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
+import {
+  OnboardingPasswordNotice,
+  OnboardingSuccessMessage,
+  type OnboardingSuccess,
+} from "@/components/employees/onboarding-notice";
 
 type Department = { id: string; name: string };
 type Manager = { id: string; firstName: string; lastName: string };
@@ -22,14 +27,17 @@ export function NewEmployeeForm({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState<OnboardingSuccess | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess(null);
 
     const form = new FormData(e.currentTarget);
     const payload = Object.fromEntries(form.entries());
+    const email = String(payload.email || "").trim();
 
     try {
       const res = await fetch("/api/employees", {
@@ -42,8 +50,23 @@ export function NewEmployeeForm({
         setError(data.error || "Failed to create employee");
         return;
       }
-      router.push("/employees");
-      router.refresh();
+
+      setSuccess({
+        email,
+        emailSent: Boolean(data.emailSent),
+        emailError: data.emailError,
+        emailPreviewUrl: data.emailPreviewUrl,
+        employeeId: data.employee?.id,
+      });
+
+      window.setTimeout(() => {
+        if (data.employee?.id) {
+          router.push(`/employees/${data.employee.id}`);
+        } else {
+          router.push("/employees");
+        }
+        router.refresh();
+      }, 2200);
     } catch {
       setError("Something went wrong");
     } finally {
@@ -53,6 +76,10 @@ export function NewEmployeeForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
+      <OnboardingPasswordNotice />
+
+      {success && <OnboardingSuccessMessage result={success} />}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelClass}>First name</label>
@@ -65,7 +92,7 @@ export function NewEmployeeForm({
       </div>
 
       <div>
-        <label className={labelClass}>Email</label>
+        <label className={labelClass}>Work email</label>
         <input
           name="email"
           type="email"
@@ -73,6 +100,9 @@ export function NewEmployeeForm({
           className={inputClass}
           placeholder="alex@company.com"
         />
+        <p className="text-[12px] text-gray-500 mt-1.5">
+          Login credentials are emailed to this address immediately.
+        </p>
       </div>
 
       <div>
@@ -135,10 +165,10 @@ export function NewEmployeeForm({
       <div className="flex items-center gap-3 pt-2">
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !!success}
           className="px-5 py-2.5 text-[14px] font-semibold bg-[#7B61FF] text-white rounded-xl hover:bg-violet-600 disabled:opacity-60 shadow-sm"
         >
-          {loading ? "Creating..." : "Create Employee"}
+          {loading ? "Creating..." : "Create employee"}
         </button>
         <Link
           href="/employees"

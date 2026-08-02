@@ -1,35 +1,56 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Download } from "lucide-react";
-
-function formatDateRange(startIso: string, endIso: string) {
-  const start = new Date(startIso);
-  const end = new Date(endIso);
-  const fmt = (d: Date) =>
-    d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  return `${fmt(start)} – ${fmt(end)}`;
-}
+import {
+  dashboardRangeOptions,
+  formatDashboardRangeLabel,
+  type DashboardRangeKey,
+} from "@/lib/dashboard-date-range";
 
 export function GreetingHeader({
   name,
+  rangeKey,
   dateRange,
 }: {
   name: string;
-  dateRange?: { start: string; end: string };
+  rangeKey: DashboardRangeKey;
+  dateRange: { start: string; end: string };
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
 
-  const rangeLabel = dateRange
-    ? formatDateRange(dateRange.start, dateRange.end)
-    : formatDateRange(
-        new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
-        new Date(new Date().getFullYear(), new Date().getMonth(), 15).toISOString()
-      );
+  const rangeLabel = formatDashboardRangeLabel(
+    new Date(dateRange.start),
+    new Date(dateRange.end)
+  );
+
+  useEffect(() => {
+    function onClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  const selectRange = (key: DashboardRangeKey) => {
+    setOpen(false);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("range", key);
+    router.push(`/dashboard?${params.toString()}`);
+  };
 
   function handleExport() {
-    window.open("/api/dashboard/export?type=dashboard", "_blank");
+    window.open(`/api/dashboard/export?type=dashboard&range=${rangeKey}`, "_blank");
   }
 
   return (
@@ -38,13 +59,38 @@ export function GreetingHeader({
         {greeting}, {name}
       </h2>
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 px-4 py-2 text-[13px] bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50"
-        >
-          {rangeLabel}
-          <ChevronDown className="w-4 h-4 text-gray-400" />
-        </button>
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            className="inline-flex items-center gap-2 px-4 py-2 text-[13px] bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 min-w-[220px] justify-between"
+            aria-haspopup="listbox"
+            aria-expanded={open}
+          >
+            <span className="truncate">{rangeLabel}</span>
+            <ChevronDown
+              className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+            />
+          </button>
+          {open && (
+            <div className="absolute right-0 top-full mt-1 z-20 w-56 py-1 bg-white border border-gray-100 rounded-xl shadow-lg">
+              {dashboardRangeOptions.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => selectRange(option.key)}
+                  className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                    option.key === rangeKey
+                      ? "bg-violet-50 text-violet-700 font-medium"
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button
           type="button"
           onClick={handleExport}

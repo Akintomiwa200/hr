@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { Sidebar } from "@/components/layout/sidebar";
-import { TopBar } from "@/components/layout/topbar";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { RealtimeProvider } from "@/components/providers/realtime-provider";
 import { prisma } from "@/lib/prisma";
 
@@ -16,21 +15,24 @@ export default async function DashboardLayout({
   const firstName = session.firstName || "User";
   const lastName = session.lastName || "";
 
-  const employeeCount = await prisma.employee.count();
+  const [employeeCount, notificationCount] = await Promise.all([
+    prisma.employee.count(),
+    prisma.announcement.count(),
+  ]);
 
   return (
     <RealtimeProvider>
-      <div className="min-h-screen bg-[#f8f9fc]">
-        <Sidebar role={session.role} userName={`${firstName} ${lastName}`} />
-        <div className="ml-[260px] min-h-screen">
-          <TopBar
-            firstName={firstName}
-            lastName={lastName}
-            teamCount={Math.max(employeeCount - 3, 0)}
-          />
-          <main className="px-8 pb-8 max-w-6xl mx-auto w-full">{children}</main>
-        </div>
-      </div>
+      <DashboardShell
+        role={session.role}
+        userName={`${firstName} ${lastName}`}
+        userEmail={session.email}
+        firstName={firstName}
+        lastName={lastName}
+        teamCount={Math.max(employeeCount - 3, 0)}
+        notificationCount={notificationCount}
+      >
+        {children}
+      </DashboardShell>
     </RealtimeProvider>
   );
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { Wallet } from "lucide-react";
+import { Download, Eye, Wallet } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canViewEmployee, getEmployeeOrNull } from "@/lib/employee-access";
@@ -24,7 +24,10 @@ export default async function EmployeePayrollPage({
   if (!allowed) redirect("/employees");
 
   const canViewSalary =
-    session.role === "ADMIN" || session.employeeId === id;
+    allowed &&
+    (session.role === "ADMIN" ||
+      session.role === "MANAGER" ||
+      session.employeeId === id);
 
   if (!canViewSalary) redirect(`/employees/${id}`);
 
@@ -116,6 +119,7 @@ export default async function EmployeePayrollPage({
                   <th className="px-3 py-3 text-[11px] font-semibold text-gray-500 text-left">Deductions</th>
                   <th className="px-3 py-3 text-[11px] font-semibold text-gray-500 text-left">Net Pay</th>
                   <th className="px-5 py-3 text-[11px] font-semibold text-gray-500 text-left">Status</th>
+                  <th className="px-5 py-3 text-[11px] font-semibold text-gray-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -137,6 +141,25 @@ export default async function EmployeePayrollPage({
                       {formatCurrency(record.netPay)}
                     </td>
                     <td className="px-5 py-3.5">{statusBadge(record.status)}</td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex justify-end gap-1">
+                        <Link
+                          href={`/payroll/${record.id}`}
+                          className="p-2 text-gray-400 hover:text-violet-600 rounded-lg"
+                          title="View breakdown"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Link>
+                        <a
+                          href={`/api/payroll/${record.id}/payslip`}
+                          download
+                          className="p-2 text-gray-400 hover:text-violet-600 rounded-lg"
+                          title="Download payslip"
+                        >
+                          <Download className="w-4 h-4" />
+                        </a>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

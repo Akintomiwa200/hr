@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, canApproveLeave } from "@/lib/auth";
+import { CalendarLink } from "@/components/holidays/calendar-link";
+import { ModulePageActions } from "@/components/help/module-page-actions";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card, statusBadge, EmptyState } from "@/components/ui";
 import { formatDate, fullName } from "@/lib/utils";
@@ -32,6 +34,7 @@ export default async function LeavePage() {
             ? "Request and track your leave"
             : "Review and approve leave requests"
         }
+        action={<ModulePageActions helpSlug="leave" showCalendar calendarLabel="View calendar" />}
       />
 
       {session.role === "EMPLOYEE" && (

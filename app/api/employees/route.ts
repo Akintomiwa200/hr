@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
-import { Role } from "@prisma/client";
-import { getSession } from "@/lib/auth";
+import { getSession, canManageEmployees } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notifyEmployeeChange } from "@/lib/employees/mutations";
+import { createEmployeeAccount } from "@/lib/employees/create-employee";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -45,7 +44,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
-  if (!session || session.role !== "ADMIN") {
+  if (!session || !canManageEmployees(session.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -65,57 +64,41 @@ export async function POST(request: NextRequest) {
     status = "ACTIVE",
   } = body;
 
-  const resolvedJobTitle =
-    employmentType === "FREELANCE" && !jobTitle.toLowerCase().includes("freelance")
-      ? `${jobTitle} (Freelance)`
-      : jobTitle;
-
   if (!firstName || !lastName || !email || !jobTitle || !departmentId) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return NextResponse.json({ error: "Email already exists" }, { status: 409 });
-  }
-
-  const count = await prisma.employee.count();
-  const employeeCode = `EMP${String(count + 1).padStart(3, "0")}`;
-  const passwordHash = await bcrypt.hash("password123", 10);
-
-  const user = await prisma.user.create({
-    data: {
+  try {
+    const { employee, email: emailResult } = await createEmployeeAccount({
+      firstName,
+      lastName,
       email,
-      passwordHash,
-      role: role as Role,
-      employee: {
-        create: {
-          employeeCode,
-          firstName,
-          lastName,
-          email,
-          phone: phone || null,
-          address: address || null,
-          jobTitle: resolvedJobTitle,
-          departmentId,
-          managerId: managerId || null,
-          hireDate: new Date(),
-          salary: Number(salary) || 0,
-          status,
-        },
-      },
-    },
-    include: {
-      employee: {
-        include: {
-          department: true,
-          user: { select: { role: true } },
-        },
-      },
-    },
-  });
+      phone,
+      address,
+      jobTitle,
+      departmentId,
+      managerId,
+      employmentType,
+      role,
+      salary,
+      status,
+    });
 
-  notifyEmployeeChange(user.employee!.id, "created");
+    notifyEmployeeChange(employee.id, "created");
 
-  return NextResponse.json({ success: true, employee: user.employee });
+    return NextResponse.json({
+      success: true,
+      employee,
+      emailSent: emailResult.sent,
+      emailError: emailResult.sent ? null : emailResult.error,
+      emailPreviewUrl:
+        "previewUrl" in emailResult ? emailResult.previewUrl : undefined,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === "EMAIL_EXISTS") {
+      return NextResponse.json({ error: "Email already exists" }, { status: 409 });
+    }
+    console.error("[employees] create failed:", err);
+    return NextResponse.json({ error: "Failed to create employee" }, { status: 500 });
+  }
 }

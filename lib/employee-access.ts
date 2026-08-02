@@ -5,7 +5,7 @@ export async function canManageEmployee(
   session: SessionUser,
   employeeId?: string
 ): Promise<boolean> {
-  if (session.role === "ADMIN") return true;
+  if (session.role === "ADMIN" || session.role === "MANAGER") return true;
   return false;
 }
 

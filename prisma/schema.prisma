@@ -52,6 +52,29 @@ enum ApplicationStatus {
   REJECTED
 }
 
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum InterviewType {
+  PHONE
+  VIDEO
+  ONSITE
+  TECHNICAL
+  FINAL
+}
+
+enum InterviewRecommendation {
+  STRONG_YES
+  YES
+  NEUTRAL
+  NO
+  STRONG_NO
+}
+
 enum PayrollStatus {
   DRAFT
   PROCESSED
@@ -64,6 +87,26 @@ enum ReviewStatus {
   COMPLETED
 }
 
+enum KpiMetricType {
+  NUMBER
+  PERCENTAGE
+  BOOLEAN
+  RATING
+}
+
+enum AppraisalCycleStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum AppraisalStatus {
+  NOT_STARTED
+  SELF_REVIEW
+  MANAGER_REVIEW
+  COMPLETED
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -73,6 +116,7 @@ model User {
   updatedAt    DateTime @updatedAt
 
   employee Employee?
+  preferences String?
 }
 
 model Department {
@@ -82,6 +126,7 @@ model Department {
   createdAt   DateTime   @default(now())
   employees   Employee[]
   jobs        Job[]
+  kpis        KpiDefinition[]
 }
 
 model Employee {
@@ -116,6 +161,10 @@ model Employee {
   conductedReviews  PerformanceReview[] @relation("ReviewManager")
   documents         Document[]
   jobApplications   JobApplication[]   @relation("ApplicationReviewer")
+  interviews        Interview[]        @relation("InterviewInterviewer")
+  interviewReviews  InterviewReview[]  @relation("InterviewReviewAuthor")
+  appraisalsAsEmployee PerformanceAppraisal[] @relation("AppraisalEmployee")
+  appraisalsAsManager  PerformanceAppraisal[] @relation("AppraisalManager")
 }
 
 model LeaveRequest {
@@ -158,7 +207,10 @@ model PayrollRecord {
   baseSalary  Float
   bonus       Float         @default(0)
   deductions  Float         @default(0)
+  grossPay    Float         @default(0)
   netPay      Float
+  breakdown   String?
+  notes       String?
   status      PayrollStatus @default(DRAFT)
   paidAt      DateTime?
   createdAt   DateTime      @default(now())
@@ -166,20 +218,33 @@ model PayrollRecord {
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }
 
+model PayrollSettings {
+  id                      String   @id @default("default")
+  holidayAllowanceEnabled Boolean  @default(false)
+  holidayAllowanceAmount  Float    @default(150)
+  latenessDeductionPerDay Float    @default(25)
+  absenceDeductionPerDay  Float    @default(100)
+  damageDeductionEnabled  Boolean  @default(true)
+  taxRatePercent          Float    @default(10)
+  updatedAt               DateTime @updatedAt
+}
+
 model Job {
-  id           String    @id @default(cuid())
-  title        String
-  departmentId String
-  location     String
-  type         String
-  salaryMin    Float?
-  salaryMax    Float?
-  description  String
-  requirements String
-  status       JobStatus @default(OPEN)
-  postedAt     DateTime  @default(now())
-  closedAt     DateTime?
-  createdAt    DateTime  @default(now())
+  id               String    @id @default(cuid())
+  title            String
+  departmentId     String
+  location         String
+  type             String
+  salaryMin        Float?
+  salaryMax        Float?
+  description      String
+  requirements     String
+  responsibilities String?
+  benefits         String?
+  status           JobStatus @default(OPEN)
+  postedAt         DateTime  @default(now())
+  closedAt         DateTime?
+  createdAt        DateTime  @default(now())
 
   department   Department       @relation(fields: [departmentId], references: [id])
   applications JobApplication[]
@@ -200,8 +265,56 @@ model JobApplication {
   appliedAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  job      Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  reviewer Employee? @relation("ApplicationReviewer", fields: [reviewerId], references: [id])
+  job        Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  reviewer   Employee?   @relation("ApplicationReviewer", fields: [reviewerId], references: [id])
+  interviews Interview[]
+}
+
+model Interview {
+  id                    String          @id @default(cuid())
+  applicationId         String
+  interviewerId         String
+  scheduledAt           DateTime
+  durationMinutes       Int             @default(60)
+  type                  InterviewType   @default(VIDEO)
+  status                InterviewStatus @default(SCHEDULED)
+  location              String?
+  googleCalendarEventId String?
+  googleMeetLink        String?
+  calendarSynced        Boolean         @default(false)
+  notes                 String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  application JobApplication    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  interviewer Employee          @relation("InterviewInterviewer", fields: [interviewerId], references: [id])
+  reviews     InterviewReview[]
+}
+
+model InterviewReview {
+  id             String                  @id @default(cuid())
+  interviewId    String
+  reviewerId     String
+  rating         Int
+  strengths      String?
+  weaknesses     String?
+  recommendation InterviewRecommendation
+  notes          String?
+  createdAt      DateTime                @default(now())
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  reviewer  Employee  @relation("InterviewReviewAuthor", fields: [reviewerId], references: [id])
+}
+
+model GoogleIntegration {
+  id           String    @id @default("default")
+  accessToken  String?
+  refreshToken String?
+  expiryDate   DateTime?
+  email        String?
+  calendarId   String    @default("primary")
+  connectedAt  DateTime?
+  updatedAt    DateTime  @updatedAt
 }
 
 model PerformanceReview {
@@ -222,6 +335,100 @@ model PerformanceReview {
   manager  Employee @relation("ReviewManager", fields: [managerId], references: [id])
 }
 
+model KpiDefinition {
+  id           String        @id @default(cuid())
+  title        String
+  description  String?
+  metricType   KpiMetricType @default(RATING)
+  targetValue  Float?
+  weight       Float         @default(1)
+  departmentId String?
+  roleFilter   String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  department Department?         @relation(fields: [departmentId], references: [id])
+  cycleLinks AppraisalCycleKpi[]
+  scores     AppraisalKpiScore[]
+}
+
+model AppraisalCycle {
+  id                    String               @id @default(cuid())
+  name                  String
+  period                String
+  description           String?
+  startDate             DateTime
+  endDate               DateTime
+  selfReviewDeadline    DateTime?
+  managerReviewDeadline DateTime?
+  status                AppraisalCycleStatus @default(DRAFT)
+  includeAllEmployees   Boolean              @default(true)
+  departmentIds         String?
+  roleFilters           String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  kpis       AppraisalCycleKpi[]
+  appraisals PerformanceAppraisal[]
+}
+
+model AppraisalCycleKpi {
+  id      String @id @default(cuid())
+  cycleId String
+  kpiId   String
+  weight  Float  @default(1)
+
+  cycle AppraisalCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  kpi   KpiDefinition  @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+
+  @@unique([cycleId, kpiId])
+}
+
+model PerformanceAppraisal {
+  id         String          @id @default(cuid())
+  cycleId    String
+  employeeId String
+  managerId  String
+  status     AppraisalStatus @default(NOT_STARTED)
+
+  selfRating       Int?
+  selfAchievements String?
+  selfComments     String?
+  selfSubmittedAt  DateTime?
+
+  managerRating      Int?
+  managerFeedback    String?
+  managerSubmittedAt DateTime?
+
+  overallRating Int?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  cycle     AppraisalCycle      @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  employee  Employee            @relation("AppraisalEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  manager   Employee            @relation("AppraisalManager", fields: [managerId], references: [id])
+  kpiScores AppraisalKpiScore[]
+
+  @@unique([cycleId, employeeId])
+}
+
+model AppraisalKpiScore {
+  id           String  @id @default(cuid())
+  appraisalId  String
+  kpiId        String
+  selfScore    Float?
+  selfNotes    String?
+  managerScore Float?
+  managerNotes String?
+
+  appraisal PerformanceAppraisal @relation(fields: [appraisalId], references: [id], onDelete: Cascade)
+  kpi       KpiDefinition        @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+
+  @@unique([appraisalId, kpiId])
+}
+
 model Document {
   id         String   @id @default(cuid())
   employeeId String?
@@ -240,5 +447,13 @@ model Announcement {
   content   String
   author    String
   priority  String   @default("NORMAL")
+  createdAt DateTime @default(now())
+}
+
+model Holiday {
+  id        String   @id @default(cuid())
+  name      String
+  date      DateTime
+  type      String   @default("Public")
   createdAt DateTime @default(now())
 }

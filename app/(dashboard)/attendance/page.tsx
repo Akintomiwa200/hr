@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card, statusBadge, EmptyState } from "@/components/ui";
+import { ModulePageActions } from "@/components/help/module-page-actions";
 import { formatDate, fullName } from "@/lib/utils";
 import { Clock } from "lucide-react";
 import { CheckInButton } from "./check-in-button";
@@ -54,9 +55,12 @@ export default async function AttendancePage() {
             : "Monitor team attendance records"
         }
         action={
-          session.role === "EMPLOYEE" ? (
-            <CheckInButton todayRecord={todayRecord} />
-          ) : undefined
+          <div className="flex flex-wrap items-center gap-4">
+            <ModulePageActions helpSlug="attendance" helpLabel="Attendance guide" />
+            {session.role === "EMPLOYEE" && (
+              <CheckInButton todayRecord={todayRecord} />
+            )}
+          </div>
         }
       />
 

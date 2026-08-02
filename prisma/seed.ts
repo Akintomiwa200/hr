@@ -4,11 +4,19 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.interviewReview.deleteMany();
+  await prisma.interview.deleteMany();
   await prisma.jobApplication.deleteMany();
   await prisma.job.deleteMany();
+  await prisma.appraisalKpiScore.deleteMany();
+  await prisma.performanceAppraisal.deleteMany();
+  await prisma.appraisalCycleKpi.deleteMany();
+  await prisma.appraisalCycle.deleteMany();
+  await prisma.kpiDefinition.deleteMany();
   await prisma.performanceReview.deleteMany();
   await prisma.document.deleteMany();
   await prisma.payrollRecord.deleteMany();
+  await prisma.payrollSettings.deleteMany();
   await prisma.attendance.deleteMany();
   await prisma.leaveRequest.deleteMany();
   await prisma.employee.deleteMany();
@@ -208,9 +216,34 @@ async function main() {
   const periodStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const periodEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
+  await prisma.payrollSettings.create({
+    data: {
+      id: "default",
+      holidayAllowanceEnabled: true,
+      holidayAllowanceAmount: 150,
+      latenessDeductionPerDay: 25,
+      absenceDeductionPerDay: 100,
+      damageDeductionEnabled: true,
+      taxRatePercent: 10,
+    },
+  });
+
   for (const emp of [admin, manager, employee, sarah, mike, lisa]) {
-    const bonus = emp.salary * 0.05;
-    const deductions = emp.salary * 0.15;
+    const bonus = Math.round(emp.salary * 0.05);
+    const holidayAllowance = 150;
+    const taxBase = emp.salary + bonus + holidayAllowance;
+    const tax = Math.round(taxBase * 0.1);
+    const lateness = emp.id === employee.id ? 25 : 0;
+    const grossPay = emp.salary + bonus + holidayAllowance;
+    const deductions = tax + lateness;
+    const breakdown = JSON.stringify([
+      { id: "base", type: "EARNING", category: "BASE_SALARY", label: "Base salary", amount: emp.salary, auto: false, editable: true },
+      { id: "bonus", type: "EARNING", category: "BONUS", label: "Performance bonus", amount: bonus, auto: false, editable: true },
+      { id: "holiday", type: "EARNING", category: "HOLIDAY_ALLOWANCE", label: "Holiday allowance", amount: holidayAllowance, auto: true, editable: true },
+      ...(lateness > 0 ? [{ id: "late", type: "DEDUCTION", category: "LATENESS", label: "Lateness deduction (1 day)", amount: lateness, auto: true, editable: true }] : []),
+      { id: "tax", type: "DEDUCTION", category: "TAX", label: "Tax (10%)", amount: tax, auto: true, editable: true },
+    ]);
+
     await prisma.payrollRecord.create({
       data: {
         employeeId: emp.id,
@@ -219,7 +252,9 @@ async function main() {
         baseSalary: emp.salary,
         bonus,
         deductions,
-        netPay: emp.salary + bonus - deductions,
+        grossPay,
+        netPay: grossPay - deductions,
+        breakdown,
         status: "PAID",
         paidAt: new Date(),
       },
@@ -234,8 +269,10 @@ async function main() {
       type: "Full-time",
       salaryMin: 90000,
       salaryMax: 130000,
-      description: "We are looking for an experienced full stack developer to join our engineering team.",
+      description: "We are looking for an experienced full stack developer to join our engineering team and help build the next generation of our HR platform.",
       requirements: "5+ years experience, React, Node.js, TypeScript, PostgreSQL",
+      responsibilities: "Design and ship features end-to-end\nCollaborate with product and design\nMentor junior engineers\nParticipate in code reviews",
+      benefits: "Health insurance\nRemote flexibility\nLearning budget\nEquity options",
       status: "OPEN",
     },
   });
@@ -250,21 +287,27 @@ async function main() {
       salaryMax: 70000,
       description: "Support HR operations including recruitment, onboarding, and employee relations.",
       requirements: "2+ years HR experience, excellent communication skills",
+      responsibilities: "Coordinate interviews and onboarding\nMaintain employee records\nSupport payroll and benefits admin",
+      benefits: "Health & dental\nPaid time off\nProfessional development",
       status: "OPEN",
+    },
+  });
+
+  const chrisApp = await prisma.jobApplication.create({
+    data: {
+      jobId: engJob.id,
+      firstName: "Chris",
+      lastName: "Anderson",
+      email: "chris.a@email.com",
+      phone: "+1 555-0201",
+      status: "INTERVIEW",
+      reviewerId: manager.id,
+      coverLetter: "I am excited to apply for the Senior Full Stack Developer role. I have 6 years of experience building React and Node applications.",
     },
   });
 
   await prisma.jobApplication.createMany({
     data: [
-      {
-        jobId: engJob.id,
-        firstName: "Chris",
-        lastName: "Anderson",
-        email: "chris.a@email.com",
-        phone: "+1 555-0201",
-        status: "INTERVIEW",
-        reviewerId: manager.id,
-      },
       {
         jobId: engJob.id,
         firstName: "Emma",
@@ -282,28 +325,123 @@ async function main() {
     ],
   });
 
+  const interviewDate = new Date();
+  interviewDate.setDate(interviewDate.getDate() + 3);
+  interviewDate.setHours(14, 0, 0, 0);
+
+  await prisma.interview.create({
+    data: {
+      applicationId: chrisApp.id,
+      interviewerId: manager.id,
+      scheduledAt: interviewDate,
+      durationMinutes: 60,
+      type: "VIDEO",
+      status: "SCHEDULED",
+      notes: "Technical screen — system design and coding exercise",
+      calendarSynced: false,
+    },
+  });
+
   await prisma.performanceReview.createMany({
     data: [
       {
         employeeId: employee.id,
         managerId: manager.id,
-        period: "Q2 2026",
+        period: "Q1 2026",
         rating: 4,
         goals: "Deliver feature X, improve code quality, mentor junior dev",
         achievements: "Shipped 3 major features, reduced bug count by 30%",
         feedback: "Strong performer, ready for senior role consideration",
         status: "COMPLETED",
-        reviewDate: new Date("2026-07-01"),
-      },
-      {
-        employeeId: sarah.id,
-        managerId: admin.id,
-        period: "Q2 2026",
-        goals: "Launch Q3 campaign, grow social media by 20%",
-        status: "IN_PROGRESS",
+        reviewDate: new Date("2026-04-01"),
       },
     ],
   });
+
+  const kpiDelivery = await prisma.kpiDefinition.create({
+    data: {
+      title: "Delivery & quality",
+      description: "On-time delivery and code quality standards",
+      metricType: "RATING",
+      targetValue: 4,
+      weight: 1.5,
+      departmentId: engDept.id,
+    },
+  });
+  const kpiCollaboration = await prisma.kpiDefinition.create({
+    data: {
+      title: "Collaboration",
+      description: "Teamwork, communication, and mentoring",
+      metricType: "RATING",
+      targetValue: 4,
+    },
+  });
+  const kpiAttendance = await prisma.kpiDefinition.create({
+    data: {
+      title: "Attendance & presence",
+      description: "Reliability and punctuality",
+      metricType: "PERCENTAGE",
+      targetValue: 95,
+    },
+  });
+
+  const cycle = await prisma.appraisalCycle.create({
+    data: {
+      name: "Mid-Year 2026 Review",
+      period: "H1 2026",
+      description: "Company-wide mid-year performance and KPI review",
+      startDate: new Date("2026-06-01"),
+      endDate: new Date("2026-07-31"),
+      selfReviewDeadline: new Date("2026-07-15"),
+      managerReviewDeadline: new Date("2026-07-31"),
+      status: "ACTIVE",
+      includeAllEmployees: true,
+      kpis: {
+        create: [
+          { kpiId: kpiDelivery.id },
+          { kpiId: kpiCollaboration.id },
+          { kpiId: kpiAttendance.id },
+        ],
+      },
+    },
+  });
+
+  const appraisalEmployee = await prisma.performanceAppraisal.create({
+    data: {
+      cycleId: cycle.id,
+      employeeId: employee.id,
+      managerId: manager.id,
+      status: "MANAGER_REVIEW",
+      selfRating: 4,
+      selfAchievements: "Delivered payroll module and calendar rewrite on schedule.",
+      selfComments: "Ready for more ownership on architecture decisions.",
+      selfSubmittedAt: new Date(),
+      kpiScores: {
+        create: [
+          { kpiId: kpiDelivery.id, selfScore: 4, selfNotes: "Met sprint commitments" },
+          { kpiId: kpiCollaboration.id, selfScore: 5, selfNotes: "Helped onboard new hire" },
+          { kpiId: kpiAttendance.id, selfScore: 98 },
+        ],
+      },
+    },
+  });
+
+  await prisma.performanceAppraisal.create({
+    data: {
+      cycleId: cycle.id,
+      employeeId: sarah.id,
+      managerId: admin.id,
+      status: "SELF_REVIEW",
+      kpiScores: {
+        create: [
+          { kpiId: kpiCollaboration.id },
+          { kpiId: kpiAttendance.id },
+        ],
+      },
+    },
+  });
+
+  void appraisalEmployee;
 
   await prisma.document.createMany({
     data: [

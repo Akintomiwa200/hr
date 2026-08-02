@@ -5,7 +5,11 @@ export type RealtimeEventType =
   | "attendance_updated"
   | "announcement_created"
   | "payroll_updated"
-  | "performance_updated";
+  | "performance_updated"
+  | "department_updated"
+  | "job_updated"
+  | "document_updated"
+  | "holiday_updated";
 
 export type RealtimeEvent = {
   type: RealtimeEventType;

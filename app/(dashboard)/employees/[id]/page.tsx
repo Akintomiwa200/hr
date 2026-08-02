@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { canViewEmployee } from "@/lib/employee-access";
 import { EmployeeDetailContent } from "@/components/employees/employee-detail-content";
 
 export default async function EmployeeDetailPage({
@@ -12,6 +13,10 @@ export default async function EmployeeDetailPage({
   if (!session) redirect("/login");
 
   const { id } = await params;
+
+  if (!(await canViewEmployee(session, id))) {
+    redirect("/employees");
+  }
 
   const employee = await prisma.employee.findUnique({
     where: { id },

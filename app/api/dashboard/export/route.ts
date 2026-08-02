@@ -3,6 +3,11 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { fullName } from "@/lib/utils";
 import { employmentLabel, resolveEmploymentType } from "@/lib/employment";
+import {
+  parseDashboardRangeKey,
+  resolveDashboardRange,
+  formatDashboardRangeLabel,
+} from "@/lib/dashboard-date-range";
 
 function toCsv(rows: string[][]) {
   return rows.map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -44,23 +49,81 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  if (type === "attendance") {
+    const dateParam = request.nextUrl.searchParams.get("date");
+    const dayStart = dateParam ? new Date(dateParam) : new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const whereEmployee =
+      session.role === "EMPLOYEE" && session.employeeId
+        ? { employeeId: session.employeeId }
+        : {};
+
+    const records = await prisma.attendance.findMany({
+      where: {
+        ...whereEmployee,
+        date: { gte: dayStart, lte: dayEnd },
+      },
+      include: { employee: true },
+      orderBy: { checkIn: "asc" },
+    });
+
+    const csv = toCsv([
+      ["Employee", "Job Title", "Date", "Clock In", "Clock Out", "Status", "Schedule In", "Schedule Out"],
+      ...records.map((record) => [
+        fullName(record.employee.firstName, record.employee.lastName),
+        record.employee.jobTitle,
+        record.date.toISOString().slice(0, 10),
+        record.checkIn
+          ? new Date(record.checkIn).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+          : "",
+        record.checkOut
+          ? new Date(record.checkOut).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+          : "",
+        record.status,
+        "9:00 AM",
+        "5:00 PM",
+      ]),
+    ]);
+
+    return new NextResponse(csv, {
+      headers: {
+        "Content-Type": "text/csv",
+        "Content-Disposition": `attachment; filename="attendance-${dayStart.toISOString().slice(0, 10)}.csv"`,
+      },
+    });
+  }
+
+  const period = resolveDashboardRange(parseDashboardRangeKey(request.nextUrl.searchParams.get("range")));
+
   const [employees, leaves, attendance, payroll] = await Promise.all([
     prisma.employee.count({ where: { status: "ACTIVE" } }),
-    prisma.leaveRequest.count({ where: { status: "PENDING" } }),
+    prisma.leaveRequest.count({
+      where: {
+        status: "PENDING",
+        createdAt: { gte: period.start, lte: period.end },
+      },
+    }),
     prisma.attendance.count({
       where: {
-        date: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+        date: { gte: period.start, lte: period.end },
         status: { in: ["PRESENT", "REMOTE", "LATE"] },
       },
     }),
     prisma.payrollRecord.aggregate({
       _sum: { netPay: true, deductions: true },
-      where: { status: { in: ["PROCESSED", "PAID"] } },
+      where: {
+        status: { in: ["PROCESSED", "PAID"] },
+        periodStart: { gte: period.start, lte: period.end },
+      },
     }),
   ]);
 
   const csv = toCsv([
     ["Metric", "Value"],
+    ["Date Range", formatDashboardRangeLabel(period.start, period.end)],
     ["Active Employees", String(employees)],
     ["Present Today", String(attendance)],
     ["Pending Leave Requests", String(leaves)],

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import {
   ChevronRight,
   TrendingDown,
@@ -8,6 +9,9 @@ import { employmentLabel, employmentVariant, resolveEmploymentType } from "@/lib
 import { formatCurrency, fullName } from "@/lib/utils";
 import { EmployeeTable } from "./employee-table";
 import { GreetingHeader } from "./greeting-header";
+import { IncomeChart } from "./income-chart";
+import { UpcomingScheduleWidget } from "@/components/holidays/upcoming-schedule-widget";
+import type { UpcomingCalendarEvent } from "@/lib/calendar-summary";
 
 function WidgetCard({
   title,
@@ -112,78 +116,13 @@ function DeviceGauge({
   );
 }
 
-function IncomeChart({
-  data,
-  highlightMonth,
-}: {
-  data: { month: string; income: number; expense: number }[];
-  highlightMonth: string;
-}) {
-  const maxVal = Math.max(...data.map((d) => Math.max(d.income, d.expense)), 1);
-
-  return (
-    <div>
-      <div className="flex items-end justify-between gap-[6px] h-[160px] px-1 relative">
-        {data.slice(0, 12).map((item) => {
-          const incomeH = (item.income / maxVal) * 130;
-          const expenseH = (item.expense / maxVal) * 130;
-          const isHighlight = item.month.startsWith(highlightMonth);
-
-          return (
-            <div key={item.month} className="flex flex-col items-center gap-1 flex-1 relative">
-              {isHighlight && item.income > 0 && (
-                <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10 bg-gray-900 text-white text-[10px] rounded-lg px-2 py-1.5 whitespace-nowrap shadow-lg">
-                  <p className="font-medium">{item.month} {new Date().getFullYear()}</p>
-                  <p className="text-violet-300">Income: ${item.income.toFixed(2)}</p>
-                  <p className="text-blue-300">Expense: ${item.expense.toFixed(2)}</p>
-                </div>
-              )}
-              <div
-                className="flex flex-col justify-end w-full max-w-[18px] mx-auto"
-                style={{ height: "130px" }}
-              >
-                <div
-                  className="w-full rounded-t-sm bg-blue-300"
-                  style={{
-                    height: `${Math.min(expenseH, 50)}px`,
-                    backgroundImage:
-                      "repeating-linear-gradient(-45deg, #93c5fd, #93c5fd 2px, #bfdbfe 2px, #bfdbfe 4px)",
-                  }}
-                />
-                <div
-                  className="w-full bg-[#7B61FF] rounded-b-sm"
-                  style={{ height: `${Math.min(incomeH, 100)}px` }}
-                />
-              </div>
-              <span className="text-[10px] text-gray-400">{item.month.slice(0, 3)}</span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex gap-5 mt-4 text-[11px] text-gray-500 justify-center">
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-[#7B61FF]" /> Income
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span
-            className="w-3 h-3 rounded-sm bg-blue-300"
-            style={{
-              backgroundImage:
-                "repeating-linear-gradient(-45deg, #93c5fd, #93c5fd 1px, #bfdbfe 1px, #bfdbfe 2px)",
-            }}
-          />
-          Expense
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export function HrDashboard({
   data,
   userName,
+  upcomingEvents = [],
 }: {
   userName: string;
+  upcomingEvents?: UpcomingCalendarEvent[];
   data: Awaited<ReturnType<typeof import("@/lib/dashboard-data").getHrDashboardData>>;
 }) {
   const performanceItems =
@@ -196,7 +135,21 @@ export function HrDashboard({
 
   return (
     <div className="w-full">
-      <GreetingHeader name={userName} dateRange={data.dateRange} />
+      <Suspense
+        fallback={
+          <div className="py-[1em] mb-6">
+            <h2 className="text-[22px] font-bold text-gray-900 tracking-tight">
+              Hello, {userName}
+            </h2>
+          </div>
+        }
+      >
+        <GreetingHeader
+          name={userName}
+          rangeKey={data.rangeKey}
+          dateRange={data.dateRange}
+        />
+      </Suspense>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         <WidgetCard title="Total Employees">
@@ -320,8 +273,16 @@ export function HrDashboard({
             </Link>
           }
         >
-          <IncomeChart data={data.incomeChart} highlightMonth={data.highlightMonth} />
+          <IncomeChart
+            data={data.incomeChart}
+            highlightMonth={data.highlightMonth}
+            chartYear={data.chartYear}
+          />
         </WidgetCard>
+      </div>
+
+      <div className="mb-4">
+        <UpcomingScheduleWidget events={upcomingEvents} />
       </div>
 
       <EmployeeTable employees={data.employees} />
@@ -332,13 +293,29 @@ export function HrDashboard({
 export function ManagerDashboard({
   data,
   userName,
+  upcomingEvents = [],
 }: {
   userName: string;
+  upcomingEvents?: UpcomingCalendarEvent[];
   data: Awaited<ReturnType<typeof import("@/lib/dashboard-data").getManagerDashboardData>>;
 }) {
   return (
     <div className="w-full">
-      <GreetingHeader name={userName} />
+      <Suspense
+        fallback={
+          <div className="py-[1em] mb-6">
+            <h2 className="text-[22px] font-bold text-gray-900 tracking-tight">
+              Hello, {userName}
+            </h2>
+          </div>
+        }
+      >
+        <GreetingHeader
+          name={userName}
+          rangeKey={data.rangeKey}
+          dateRange={data.dateRange}
+        />
+      </Suspense>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         {[
@@ -409,6 +386,10 @@ export function ManagerDashboard({
         </WidgetCard>
       </div>
 
+      <div className="mb-4">
+        <UpcomingScheduleWidget events={upcomingEvents} />
+      </div>
+
       <EmployeeTable employees={data.team} />
     </div>
   );
@@ -417,15 +398,31 @@ export function ManagerDashboard({
 export function EmployeeDashboard({
   data,
   userName,
+  upcomingEvents = [],
 }: {
   userName: string;
+  upcomingEvents?: UpcomingCalendarEvent[];
   data: Awaited<ReturnType<typeof import("@/lib/dashboard-data").getEmployeeDashboardData>>;
 }) {
   const empType = data.employee ? resolveEmploymentType(data.employee) : "FULL_TIME";
 
   return (
     <div className="w-full">
-      <GreetingHeader name={userName} />
+      <Suspense
+        fallback={
+          <div className="py-[1em] mb-6">
+            <h2 className="text-[22px] font-bold text-gray-900 tracking-tight">
+              Hello, {userName}
+            </h2>
+          </div>
+        }
+      >
+        <GreetingHeader
+          name={userName}
+          rangeKey={data.rangeKey}
+          dateRange={data.dateRange}
+        />
+      </Suspense>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
@@ -495,6 +492,8 @@ export function EmployeeDashboard({
             )}
           </div>
         </WidgetCard>
+
+        <UpcomingScheduleWidget events={upcomingEvents} />
       </div>
     </div>
   );
