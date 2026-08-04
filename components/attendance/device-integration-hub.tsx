@@ -84,7 +84,7 @@ export function DeviceIntegrationHub() {
   }, [loadDocs]);
 
   useDeviceLive(
-    useCallback((ping) => {
+    useCallback((ping: { deviceId?: string | null; lastSeenAt?: string }) => {
       if (!ping.deviceId) return;
       setDocs((prev) => {
         if (!prev) return prev;

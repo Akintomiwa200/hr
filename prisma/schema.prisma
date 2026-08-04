@@ -127,6 +127,7 @@ model Company {
   updatedAt DateTime @updatedAt
 
   users User[]
+  integrations Integration[]
 }
 
 model User {
@@ -360,6 +361,60 @@ model GoogleIntegration {
   calendarId   String    @default("primary")
   connectedAt  DateTime?
   updatedAt    DateTime  @updatedAt
+}
+
+enum IntegrationProvider {
+  GOOGLE_WORKSPACE
+  ZOHO_PEOPLE
+  ZOHO_RECRUIT
+  ZOHO_BOOKS
+  ZOHO_SIGN
+  ZOHO_MAIL
+}
+
+enum IntegrationStatus {
+  DISCONNECTED
+  CONNECTED
+  ERROR
+  SYNCING
+}
+
+model Integration {
+  id            String              @id @default(cuid())
+  companyId     String?
+  provider      IntegrationProvider
+  status        IntegrationStatus   @default(DISCONNECTED)
+  accessToken   String?
+  refreshToken  String?
+  expiryDate    DateTime?
+  accountEmail  String?
+  accountId     String?
+  scopes        String?
+  metadata      String?
+  webhookSecret String?
+  lastSyncAt    DateTime?
+  lastError     String?
+  connectedAt   DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  company  Company?              @relation(fields: [companyId], references: [id])
+  syncLogs IntegrationSyncLog[]
+
+  @@unique([companyId, provider])
+}
+
+model IntegrationSyncLog {
+  id            String   @id @default(cuid())
+  integrationId String
+  direction     String
+  eventType     String
+  summary       String?
+  payload       String?
+  status        String   @default("success")
+  createdAt     DateTime @default(now())
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 }
 
 model PerformanceReview {

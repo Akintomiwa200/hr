@@ -2,7 +2,9 @@ import { rmSync, readFileSync, existsSync } from "fs";
 import { execSync } from "child_process";
 import { join } from "path";
 
-const lockPath = join(process.cwd(), ".next", "dev", "lock");
+const root = process.cwd();
+const lockPath = join(root, ".next", "dev", "lock");
+const nextDir = join(root, ".next");
 
 function killPid(pid) {
   try {
@@ -33,4 +35,14 @@ if (existsSync(lockPath)) {
   }
 } else {
   console.log("No dev lock found");
+}
+
+if (existsSync(nextDir)) {
+  try {
+    rmSync(nextDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+    console.log("Removed .next cache");
+  } catch (error) {
+    console.warn("Could not remove .next — stop the dev server and run again.");
+    console.warn(error instanceof Error ? error.message : error);
+  }
 }

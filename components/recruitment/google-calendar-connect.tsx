@@ -69,7 +69,7 @@ export function GoogleCalendarConnect() {
               Disconnect
             </Button>
           ) : (
-            <a href="/api/google/auth">
+            <a href="/api/integrations/google-workspace/connect">
               <Button>
                 <Link2 className="w-4 h-4" />
                 Connect Google

@@ -74,7 +74,7 @@ export const dashboardNavSections: NavSection[] = [
       },
       {
         id: "notifications",
-        href: "/announcements",
+        href: "/notifications",
         label: "Notifications",
         pageTitle: "Notifications",
         icon: Bell,
@@ -271,6 +271,10 @@ export function getActiveNavId(pathname: string, items: NavItem[]): string | nul
 }
 
 const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[] = [
+  {
+    test: (p) => p === "/notifications",
+    title: "Notifications",
+  },
   {
     test: (p) => p === "/admin/companies",
     title: "Companies",

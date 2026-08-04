@@ -7,6 +7,7 @@ import {
   Bell,
   CircleHelp,
   ExternalLink,
+  Link2,
   Mail,
   MessageSquare,
   Shield,
@@ -15,7 +16,7 @@ import {
 import { Button, Card, CardHeader } from "@/components/ui";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
-import { canManageDevices, roleLabel } from "@/lib/roles";
+import { canManageDevices, hasRole, INTEGRATION_ADMIN_ROLES, roleLabel } from "@/lib/roles";
 import type { Role } from "@prisma/client";
 
 type EmployeeProfile = {
@@ -285,6 +286,30 @@ export function SettingsModule({
             </Link>
           )}
         </Card>
+
+        {hasRole(role as Role, INTEGRATION_ADMIN_ROLES) && (
+          <Card className="p-6 bg-violet-50/40 border-violet-100 lg:col-span-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
+                  <Link2 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Google & Zoho integrations</h3>
+                  <p className="text-xs text-gray-500 leading-relaxed max-w-xl">
+                    Connect Google Workspace and all Zoho apps for real-time sync — employees, leave, jobs, payroll, e-sign, and mail.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/settings/integrations"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-xl hover:bg-violet-700 shrink-0"
+              >
+                Manage integrations
+              </Link>
+            </div>
+          </Card>
+        )}
 
         {canManageDevices(role as Role) && (
           <Card className="p-6 bg-brand-50/50 border-brand-100 lg:col-span-3">

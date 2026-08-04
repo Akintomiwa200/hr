@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { RealtimeProvider } from "@/components/providers/realtime-provider";
-import { prisma } from "@/lib/prisma";
+import { NavProvider } from "@/components/layout/nav-provider";
+import { getNavSummary } from "@/lib/nav-summary";
 
 export default async function DashboardLayout({
   children,
@@ -14,25 +14,19 @@ export default async function DashboardLayout({
 
   const firstName = session.firstName || "User";
   const lastName = session.lastName || "";
-
-  const [employeeCount, notificationCount] = await Promise.all([
-    prisma.employee.count(),
-    prisma.announcement.count(),
-  ]);
+  const navSummary = await getNavSummary(session);
 
   return (
-    <RealtimeProvider>
+    <NavProvider initialSummary={navSummary}>
       <DashboardShell
         role={session.role}
         userName={`${firstName} ${lastName}`}
         userEmail={session.email}
         firstName={firstName}
         lastName={lastName}
-        teamCount={Math.max(employeeCount - 3, 0)}
-        notificationCount={notificationCount}
       >
         {children}
       </DashboardShell>
-    </RealtimeProvider>
+    </NavProvider>
   );
 }

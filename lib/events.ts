@@ -10,7 +10,9 @@ export type RealtimeEventType =
   | "department_updated"
   | "job_updated"
   | "document_updated"
-  | "holiday_updated";
+  | "holiday_updated"
+  | "integration_sync"
+  | "integration_webhook";
 
 export type RealtimeEvent = {
   type: RealtimeEventType;

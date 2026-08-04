@@ -214,7 +214,7 @@ export function DepartmentDetailModule({
           </div>
 
           <div
-            ref={membersScroll.ref}
+            ref={membersScroll.ref as React.Ref<HTMLDivElement>}
             className={cn("p-3 max-h-[480px] overflow-y-auto overscroll-contain", membersScroll.className)}
           >
             {members.length === 0 ? (
@@ -302,7 +302,7 @@ export function DepartmentDetailModule({
           </div>
 
           <div
-            ref={jobsScroll.ref}
+            ref={jobsScroll.ref as React.Ref<HTMLDivElement>}
             className={cn("p-3 max-h-[480px] overflow-y-auto overscroll-contain", jobsScroll.className)}
           >
             {jobs.length === 0 ? (

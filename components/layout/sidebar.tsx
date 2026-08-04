@@ -15,6 +15,7 @@ import {
 } from "@/lib/dashboard-nav";
 import { useEffect, useState } from "react";
 import { useAutoHideScrollbar } from "@/hooks/use-auto-hide-scrollbar";
+import { useNavSummary } from "@/components/layout/nav-provider";
 
 const SIDEBAR_WIDTH = 260;
 const SIDEBAR_COLLAPSED_WIDTH = 72;
@@ -88,6 +89,7 @@ function NavSection({
   role,
   activeId,
   notificationCount,
+  pendingLeaveCount,
   collapsed,
   onNavigate,
 }: {
@@ -96,6 +98,7 @@ function NavSection({
   role: Role;
   activeId: string | null;
   notificationCount: number;
+  pendingLeaveCount: number;
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
@@ -115,7 +118,13 @@ function NavSection({
             key={item.id}
             item={item}
             isActive={activeId === item.id}
-            badge={item.id === "notifications" ? notificationCount : undefined}
+            badge={
+              item.id === "notifications"
+                ? notificationCount
+                : item.id === "leave" && pendingLeaveCount > 0
+                  ? pendingLeaveCount
+                  : undefined
+            }
             collapsed={collapsed}
             onNavigate={onNavigate}
           />
@@ -138,7 +147,6 @@ export function Sidebar({
   role,
   userName,
   userEmail,
-  notificationCount,
   collapsed,
   mobileOpen = false,
   onCloseMobile,
@@ -146,7 +154,6 @@ export function Sidebar({
   role: Role;
   userName: string;
   userEmail: string;
-  notificationCount: number;
   collapsed?: boolean;
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
@@ -154,6 +161,7 @@ export function Sidebar({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const navScroll = useAutoHideScrollbar();
+  const { summary } = useNavSummary();
 
   useEffect(() => {
     onCloseMobile?.();
@@ -175,7 +183,11 @@ export function Sidebar({
       )}
     >
       <div className={cn("shrink-0", collapsed ? "px-3 pt-4 pb-3" : "px-5 pt-5 pb-4")}>
-        <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
+        <Link
+          href="/dashboard"
+          className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}
+          onClick={onCloseMobile}
+        >
           <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
             <BrandIcon className="w-5 h-5 text-white" strokeWidth={2.5} />
           </div>
@@ -185,7 +197,7 @@ export function Sidebar({
               <p className="text-[11px] text-gray-400 mt-0.5">HR Dashboard</p>
             </div>
           )}
-        </div>
+        </Link>
       </div>
 
       <nav
@@ -203,7 +215,8 @@ export function Sidebar({
             items={section.items}
             role={role}
             activeId={activeId}
-            notificationCount={notificationCount}
+            notificationCount={summary.notificationCount}
+            pendingLeaveCount={summary.pendingLeaveCount}
             collapsed={collapsed}
             onNavigate={onCloseMobile}
           />

@@ -179,7 +179,7 @@ export function OrgChartTree({
 
   return (
     <div
-      ref={scroll.ref}
+      ref={scroll.ref as React.Ref<HTMLDivElement>}
       className={cn(
         "w-full overflow-x-auto overflow-y-visible py-8 px-6 -mx-2",
         scroll.className

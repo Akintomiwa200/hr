@@ -43,6 +43,7 @@ export const PAYROLL_VIEW_ROLES: Role[] = [
 export const PAYROLL_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
 export const RECRUITMENT_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "MANAGER"];
 export const DEVICE_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
+export const INTEGRATION_ADMIN_ROLES: Role[] = ["SUPER_ADMIN", "COMPANY_ADMIN", "HR"];
 export const ONBOARDING_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "MANAGER"];
 export const PERFORMANCE_ADMIN_ROLES: Role[] = [
   "COMPANY_ADMIN",

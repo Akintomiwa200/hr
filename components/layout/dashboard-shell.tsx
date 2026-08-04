@@ -27,8 +27,6 @@ export function DashboardShell({
   userEmail,
   firstName,
   lastName,
-  teamCount,
-  notificationCount,
   children,
 }: {
   role: Role;
@@ -36,8 +34,6 @@ export function DashboardShell({
   userEmail: string;
   firstName: string;
   lastName: string;
-  teamCount: number;
-  notificationCount: number;
   children: React.ReactNode;
 }) {
   const isMobile = useIsMobile();
@@ -94,7 +90,6 @@ export function DashboardShell({
         role={role}
         userName={userName}
         userEmail={userEmail}
-        notificationCount={notificationCount}
         collapsed={!isMobile && sidebarCollapsed}
         mobileOpen={mobileOpen}
         onCloseMobile={closeMobile}
@@ -108,7 +103,6 @@ export function DashboardShell({
           firstName={firstName}
           lastName={lastName}
           role={role}
-          teamCount={teamCount}
           sidebarCollapsed={isMobile ? !mobileOpen : sidebarCollapsed}
           onToggleSidebar={toggleSidebar}
           isMobile={isMobile}
