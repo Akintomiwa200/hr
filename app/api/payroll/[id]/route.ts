@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import {
   forbidden,
   notFound,
@@ -22,6 +22,7 @@ import {
   type PayrollLineItem,
   serializeBreakdown,
 } from "@/lib/payroll-types";
+import { createNotification } from "@/lib/notifications";
 
 export async function GET(
   _request: NextRequest,
@@ -122,10 +123,24 @@ export async function PATCH(
         paidAt: body.status === "PAID" ? new Date() : existing.paidAt,
       }),
     },
-    include: { employee: { include: { department: true } } },
+    include: { employee: { include: { user: true, department: true } } },
   });
 
-  broadcastEvent("payroll_updated", { id });
+  if (
+    body.status !== undefined &&
+    (body.status === "PAID" || body.status === "PROCESSED") &&
+    existing.status !== body.status
+  ) {
+    await createNotification({
+      userId: record.employee.userId,
+      type: "payroll",
+      title: "Payslip available",
+      message: `Payroll for ${record.periodStart.toLocaleDateString()} is ready to view`,
+      href: "/payroll",
+    });
+  }
+
+  broadcastAppEvent("payroll_updated", { id });
   revalidatePath("/payroll");
   revalidatePath(`/payroll/${id}`);
   revalidatePath(`/employees/${record.employeeId}/payroll`);
@@ -144,7 +159,7 @@ export async function DELETE(
   if (!existing) return notFound();
 
   await prisma.payrollRecord.delete({ where: { id } });
-  broadcastEvent("payroll_updated", { id });
+  broadcastAppEvent("payroll_updated", { id });
   revalidatePath("/payroll");
   return NextResponse.json({ success: true });
 }

@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { HelpHub } from "@/components/help/help-hub";
-import { HelpLink } from "@/components/help/help-link";
 
 export default async function HelpPage() {
   const session = await getSession();

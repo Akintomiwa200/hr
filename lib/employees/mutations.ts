@@ -1,11 +1,11 @@
 import { revalidatePath } from "next/cache";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export function notifyEmployeeChange(
   id: string,
   action: "created" | "updated" | "deleted" | "bulk_updated"
 ) {
-  broadcastEvent("employee_updated", { id, action });
+  broadcastAppEvent("employee_updated", { id, action });
   revalidatePath("/employees");
   revalidatePath("/dashboard");
   revalidatePath(`/employees/${id}`);

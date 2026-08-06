@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
+import { RecruitmentTabs } from "@/components/recruitment/recruitment-tabs";
 import { InterviewsModule } from "@/components/recruitment/interviews-module";
 import { GoogleCalendarConnect } from "@/components/recruitment/google-calendar-connect";
 
@@ -34,6 +35,7 @@ export default async function InterviewsPage() {
           />
         }
       />
+      <RecruitmentTabs />
       <div className="mb-6">
         <GoogleCalendarConnect />
       </div>

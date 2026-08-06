@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import {
   badRequest,
   forbidden,
@@ -21,6 +21,7 @@ import {
   type PayrollLineItem,
   serializeBreakdown,
 } from "@/lib/payroll-types";
+import { createNotification } from "@/lib/notifications";
 
 export async function GET() {
   const session = await requireSession();
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
   const canManage = await canManagePayrollRecord(session, { employeeId });
   if (!canManage) return forbidden();
 
-  await ensurePayrollSettings();
+  await ensurePayrollSettings(session.companyId);
 
   let items: PayrollLineItem[];
   if (Array.isArray(breakdown) && breakdown.length > 0) {
@@ -94,10 +95,20 @@ export async function POST(request: NextRequest) {
       status: status || "DRAFT",
       paidAt: status === "PAID" ? new Date() : null,
     },
-    include: { employee: true },
+    include: { employee: { include: { user: true } } },
   });
 
-  broadcastEvent("payroll_updated", { id: record.id });
+  if (status === "PAID" || status === "PROCESSED") {
+    await createNotification({
+      userId: record.employee.userId,
+      type: "payroll",
+      title: "Payslip available",
+      message: `Payroll for ${new Date(periodStart).toLocaleDateString()} is ready to view`,
+      href: "/payroll",
+    });
+  }
+
+  broadcastAppEvent("payroll_updated", { id: record.id });
   revalidatePath("/payroll");
   revalidatePath(`/employees/${employeeId}/payroll`);
   return NextResponse.json(record);

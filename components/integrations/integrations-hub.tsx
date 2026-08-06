@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   BookOpen,
   ExternalLink,
@@ -106,7 +106,6 @@ function formatWhen(value: string | null) {
 
 export function IntegrationsHub() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [items, setItems] = useState<IntegrationItem[]>([]);
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,19 +126,6 @@ export function IntegrationsHub() {
   useEffect(() => {
     void load().finally(() => setLoading(false));
   }, [load]);
-
-  useEffect(() => {
-    const connected = searchParams.get("connected");
-    const error = searchParams.get("error");
-    if (connected) {
-      notify.success(`${connected.replace(/-/g, " ")} connected — syncing in real time`);
-      router.replace("/settings/integrations");
-    }
-    if (error) {
-      notify.error(`Integration failed: ${error}`);
-      router.replace("/settings/integrations");
-    }
-  }, [searchParams, router]);
 
   useEffect(() => {
     let source: EventSource | null = null;
@@ -301,7 +287,7 @@ export function IntegrationsHub() {
                   </p>
                 )}
                 {item.lastError && (
-                  <p className="text-xs text-red-600">{item.lastError}</p>
+                  <p className="text-xs text-amber-700">Last sync failed. Use Sync now to retry.</p>
                 )}
                 {item.webhookPath && item.webhookSecret && (
                   <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 space-y-1">

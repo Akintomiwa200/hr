@@ -4,6 +4,8 @@ import { getSession, canManageEmployees } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notifyEmployeeChange } from "@/lib/employees/mutations";
 import { createEmployeeAccount } from "@/lib/employees/create-employee";
+import { assertCanAddEmployee, subscriptionErrorMessage } from "@/lib/subscription";
+import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -15,8 +17,11 @@ export async function GET(request: NextRequest) {
   const status = request.nextUrl.searchParams.get("status");
   const role = request.nextUrl.searchParams.get("role");
 
+  const scope = getCompanyScope(session);
+
   const employees = await prisma.employee.findMany({
     where: {
+      ...employeeCompanyWhere(scope),
       ...(status && status !== "ALL" ? { status } : {}),
       ...(role && role !== "ALL"
         ? { user: { role: role as Role } }
@@ -70,6 +75,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    await assertCanAddEmployee(session.companyId);
+
     const { employee, email: emailResult } = await createEmployeeAccount({
       firstName,
       lastName,
@@ -83,6 +90,7 @@ export async function POST(request: NextRequest) {
       role,
       salary,
       status,
+      companyId: session.companyId,
     });
 
     notifyEmployeeChange(employee.id, "created");
@@ -98,6 +106,17 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     if (err instanceof Error && err.message === "EMAIL_EXISTS") {
       return NextResponse.json({ error: "Email already exists" }, { status: 409 });
+    }
+    if (
+      err instanceof Error &&
+      ["SUBSCRIPTION_INACTIVE", "SUBSCRIPTION_EXPIRED", "TRIAL_EXPIRED", "EMPLOYEE_LIMIT"].includes(
+        err.message
+      )
+    ) {
+      return NextResponse.json(
+        { error: subscriptionErrorMessage(err.message) },
+        { status: 402 }
+      );
     }
     console.error("[employees] create failed:", err);
     return NextResponse.json({ error: "Failed to create employee" }, { status: 500 });

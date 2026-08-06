@@ -6,6 +6,7 @@ import { disconnectGoogleWorkspace } from "@/lib/integrations/google/workspace";
 import { isGoogleWorkspaceConfigured } from "@/lib/integrations/google/workspace";
 import { isZohoConfigured } from "@/lib/integrations/zoho/oauth";
 import { INTEGRATION_ADMIN_ROLES } from "@/lib/roles";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function GET(
   _request: Request,
@@ -59,6 +60,8 @@ export async function DELETE(
   } else {
     await disconnectIntegration(provider, companyId);
   }
+
+  broadcastAppEvent("integration_updated", { provider, action: "disconnected" });
 
   return NextResponse.json({ success: true });
 }

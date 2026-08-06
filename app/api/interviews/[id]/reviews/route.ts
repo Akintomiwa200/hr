@@ -8,6 +8,7 @@ import {
   requireSession,
   unauthorized,
 } from "@/lib/api-auth";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function POST(
   request: NextRequest,
@@ -50,5 +51,6 @@ export async function POST(
 
   revalidatePath(`/recruitment/candidates/${interview.applicationId}`);
   revalidatePath("/recruitment/interviews");
+  broadcastAppEvent("interview_updated", { id, action: "reviewed" });
   return NextResponse.json(review);
 }

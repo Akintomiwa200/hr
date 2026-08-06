@@ -3,7 +3,9 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { canManageOrgContent } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { getCompanyScope, announcementCompanyWhere, requireOrgCompanyId } from "@/lib/company-scope";
+import { notifyCompanyUsers } from "@/lib/notifications";
 
 export async function GET() {
   const session = await getSession();
@@ -11,7 +13,10 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const scope = getCompanyScope(session);
+
   const announcements = await prisma.announcement.findMany({
+    where: announcementCompanyWhere(scope),
     orderBy: { createdAt: "desc" },
   });
 
@@ -31,12 +36,22 @@ export async function POST(request: NextRequest) {
   }
 
   const author = `${session.firstName ?? "Admin"} ${session.lastName ?? ""}`.trim();
+  const companyId = requireOrgCompanyId(getCompanyScope(session));
 
   const announcement = await prisma.announcement.create({
-    data: { title, content, author, priority },
+    data: { title, content, author, priority, companyId },
   });
 
-  broadcastEvent("announcement_created", { id: announcement.id });
+  if (companyId) {
+    await notifyCompanyUsers(companyId, {
+      type: "announcement",
+      title: "New announcement",
+      message: title,
+      href: "/announcements",
+    });
+  }
+
+  broadcastAppEvent("announcement_created", { id: announcement.id });
   revalidatePath("/announcements");
   revalidatePath("/dashboard");
 

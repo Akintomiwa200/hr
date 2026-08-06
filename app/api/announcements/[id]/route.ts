@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageOrgContent } from "@/lib/roles";
 
@@ -27,7 +27,7 @@ export async function PATCH(
     },
   });
 
-  broadcastEvent("announcement_created", { id });
+  broadcastAppEvent("announcement_created", { id });
   revalidatePath("/announcements");
   return NextResponse.json(announcement);
 }
@@ -44,7 +44,7 @@ export async function DELETE(
   if (!existing) return notFound();
 
   await prisma.announcement.delete({ where: { id } });
-  broadcastEvent("announcement_created", { id });
+  broadcastAppEvent("announcement_created", { id });
   revalidatePath("/announcements");
   return NextResponse.json({ success: true });
 }

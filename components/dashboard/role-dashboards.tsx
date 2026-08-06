@@ -115,36 +115,42 @@ export function HrDashboard({
   data,
   userName,
   upcomingEvents = [],
+  hideGreeting = false,
 }: {
   userName: string;
   upcomingEvents?: UpcomingCalendarEvent[];
+  hideGreeting?: boolean;
   data: Awaited<ReturnType<typeof import("@/lib/dashboard-data").getHrDashboardData>>;
 }) {
   const performanceItems =
-    data.performanceReviews.length > 0
-      ? data.performanceReviews.map((review) => ({
-          name: fullName(review.employee.firstName, review.employee.lastName),
-          pct: (review.rating ?? 4) * 20,
+    data.performanceAppraisals.length > 0
+      ? data.performanceAppraisals.map((appraisal) => ({
+          id: appraisal.id,
+          name: fullName(appraisal.employee.firstName, appraisal.employee.lastName),
+          rating: appraisal.overallRating ?? appraisal.selfRating ?? 0,
+          cycle: appraisal.cycle.name,
         }))
       : [];
 
   return (
     <div className="w-full">
-      <Suspense
-        fallback={
-          <div className="py-[1em] mb-6">
-            <h2 className="text-[22px] font-bold text-gray-900 tracking-tight">
-              Hello, {userName}
-            </h2>
-          </div>
-        }
-      >
-        <GreetingHeader
-          name={userName}
-          rangeKey={data.rangeKey}
-          dateRange={data.dateRange}
-        />
-      </Suspense>
+      {!hideGreeting && (
+        <Suspense
+          fallback={
+            <div className="py-[1em] mb-6">
+              <h2 className="text-[22px] font-bold text-gray-900 tracking-tight">
+                Hello, {userName}
+              </h2>
+            </div>
+          }
+        >
+          <GreetingHeader
+            name={userName}
+            rangeKey={data.rangeKey}
+            dateRange={data.dateRange}
+          />
+        </Suspense>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         <WidgetCard title="Total Employees">
@@ -222,39 +228,48 @@ export function HrDashboard({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        <WidgetCard title="Employee Performance Ratings">
+        <WidgetCard
+          title="Appraisal ratings"
+          action={
+            <Link
+              href="/performance"
+              className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
+            >
+              View all <ChevronRight className="w-3 h-3" />
+            </Link>
+          }
+        >
           <div className="flex items-start justify-between mb-5">
             <p className="text-[28px] font-bold text-[#7B61FF] leading-none">
               {data.avgPerformance}%
             </p>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-gray-500 justify-end max-w-[200px]">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-sm bg-[#7B61FF]" /> Task completed
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-sm bg-blue-400" /> Presence
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-sm bg-teal-400" /> Completed Meeting
-              </span>
-            </div>
+            <p className="text-[11px] text-gray-500 text-right max-w-[140px]">
+              Average from completed cycle reviews
+            </p>
           </div>
           <div className="space-y-3.5">
             {performanceItems.length > 0 ? (
-              performanceItems.map((item, i) => (
-                <div key={i}>
-                  <div className="flex justify-between text-[12px] mb-1.5">
-                    <span className="text-gray-700 font-medium">{item.name}</span>
+              performanceItems.map((item) => (
+                <Link key={item.id} href={`/performance/appraisals/${item.id}`}>
+                  <div className="group">
+                    <div className="flex justify-between text-[12px] mb-1.5">
+                      <span className="text-gray-700 font-medium group-hover:text-violet-700">
+                        {item.name}
+                      </span>
+                      <span className="text-gray-400">{item.rating}/5</span>
+                    </div>
+                    <div className="h-2.5 rounded-full overflow-hidden bg-gray-100">
+                      <div
+                        className="h-full bg-[#7B61FF] rounded-full"
+                        style={{ width: `${Math.max(item.rating * 20, 4)}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">{item.cycle}</p>
                   </div>
-                  <div className="flex h-2.5 rounded-full overflow-hidden bg-gray-100">
-                    <div className="bg-[#7B61FF]" style={{ width: `${item.pct * 0.45}%` }} />
-                    <div className="bg-blue-400" style={{ width: `${item.pct * 0.35}%` }} />
-                    <div className="bg-teal-400" style={{ width: `${item.pct * 0.2}%` }} />
-                  </div>
-                </div>
+                </Link>
               ))
             ) : (
-              <p className="text-sm text-gray-500">No completed performance reviews yet.</p>
+              <p className="text-sm text-gray-500">No completed appraisals in this period yet.</p>
             )}
           </div>
         </WidgetCard>
@@ -319,7 +334,7 @@ export function ManagerDashboard({
           { label: "Team Members", value: data.teamSize, color: "text-[#7B61FF]" },
           { label: "Present Today", value: data.presentToday, color: "text-blue-600" },
           { label: "Pending Leave", value: data.pendingLeaves.length, color: "text-amber-600" },
-          { label: "Attendance Rate", value: `${data.attendanceRate}%`, color: "text-emerald-600" },
+          { label: "Reviews due", value: data.pendingAppraisalReviews, color: "text-violet-600" },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -332,27 +347,42 @@ export function ManagerDashboard({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        <WidgetCard title="Team Performance">
+        <WidgetCard
+          title="Team appraisals"
+          action={
+            <Link href="/performance" className="text-[11px] text-[#7B61FF] font-medium hover:underline">
+              Performance hub
+            </Link>
+          }
+        >
           <div className="space-y-3">
             {data.teamReviews.length > 0 ? (
-              data.teamReviews.map((review) => (
-                <div key={review.id}>
-                  <div className="flex justify-between text-[12px] mb-1">
-                    <span className="font-medium text-gray-700">
-                      {fullName(review.employee.firstName, review.employee.lastName)}
-                    </span>
-                    <span className="text-gray-400">{review.status}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                    <div
-                      className="h-full bg-[#7B61FF] rounded-full"
-                      style={{ width: `${(review.rating ?? 3) * 20}%` }}
-                    />
-                  </div>
-                </div>
-              ))
+              data.teamReviews.map((review) => {
+                const rating = review.overallRating ?? review.selfRating ?? 0;
+                return (
+                  <Link key={review.id} href={`/performance/appraisals/${review.id}`}>
+                    <div className="py-2 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 -mx-2 px-2 rounded-lg">
+                      <div className="flex justify-between text-[12px] mb-1">
+                        <span className="font-medium text-gray-700">
+                          {fullName(review.employee.firstName, review.employee.lastName)}
+                        </span>
+                        <span className="text-gray-400 capitalize">
+                          {review.status.replace(/_/g, " ").toLowerCase()}
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div
+                          className="h-full bg-[#7B61FF] rounded-full"
+                          style={{ width: `${Math.max(rating * 20, review.status === "MANAGER_REVIEW" ? 80 : 4)}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-1">{review.cycle.name}</p>
+                    </div>
+                  </Link>
+                );
+              })
             ) : (
-              <p className="text-sm text-gray-500">No performance reviews yet for your team.</p>
+              <p className="text-sm text-gray-500">No appraisals for your team yet.</p>
             )}
           </div>
         </WidgetCard>
@@ -507,6 +537,47 @@ export function EmployeeDashboard({
 
         <UpcomingScheduleWidget events={upcomingEvents} />
       </div>
+    </div>
+  );
+}
+
+export function CompanyAdminDashboard({
+  data,
+  userName,
+  upcomingEvents = [],
+}: {
+  userName: string;
+  upcomingEvents?: UpcomingCalendarEvent[];
+  data: Awaited<ReturnType<typeof import("@/lib/dashboard-data").getCompanyAdminDashboardData>>;
+}) {
+  return (
+    <div className="w-full">
+      <div className="py-[1em] mb-4">
+        <h2 className="text-[22px] font-bold text-gray-900 tracking-tight">
+          Company overview, {userName}
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Organization-wide HR, payroll, and performance — live from your database.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        {[
+          { label: "Reviews awaiting manager", value: data.pendingManagerReviews, color: "text-violet-600" },
+          { label: "Active review cycles", value: data.activeCycles, color: "text-blue-600" },
+          { label: "Connected integrations", value: data.connectedIntegrations, color: "text-emerald-600" },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="bg-white rounded-2xl border border-gray-100 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+          >
+            <p className="text-[12px] text-gray-500">{stat.label}</p>
+            <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <HrDashboard data={data} userName={userName} upcomingEvents={upcomingEvents} hideGreeting />
     </div>
   );
 }

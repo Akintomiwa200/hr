@@ -9,6 +9,7 @@ import {
   canViewPayrollRecord,
 } from "@/lib/payroll-access";
 import { legacyBreakdownFromRecord } from "@/lib/payroll-engine";
+import { getPayslipViewerContext } from "@/lib/payslip-viewer";
 
 export default async function PayslipPage({
   params,
@@ -32,15 +33,23 @@ export default async function PayslipPage({
 
   const canManage = await canManagePayrollRecord(session, record);
   const breakdown = legacyBreakdownFromRecord(record);
+  const viewer = getPayslipViewerContext(session, record, canManage);
 
   return (
     <div>
-      <PageHeader
-        title="Payslip breakdown"
-        description="View earnings, deductions, and download your payslip"
-        action={<ModulePageActions helpSlug="payroll" />}
+      <div className="print:hidden">
+        <PageHeader
+          title={viewer.pageTitle}
+          description={viewer.pageDescription}
+          action={<ModulePageActions helpSlug="payroll" />}
+        />
+      </div>
+      <PayslipDetailModule
+        record={record}
+        breakdown={breakdown}
+        canManage={canManage}
+        viewer={viewer}
       />
-      <PayslipDetailModule record={record} breakdown={breakdown} canManage={canManage} />
     </div>
   );
 }

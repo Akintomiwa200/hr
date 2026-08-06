@@ -19,6 +19,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { PayrollSettingsPanel } from "@/components/payroll/payroll-settings-panel";
 import { notify, readApiError } from "@/lib/toast";
 import { formatCurrency, formatDate, fullName, cn } from "@/lib/utils";
+import type { PayrollLineItem, PayrollSettingsData } from "@/lib/payroll-types";
 
 type PayrollRow = {
   id: string;

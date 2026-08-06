@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleHelp, ChevronsUpDown, LogOut, Settings } from "lucide-react";
+import { CircleHelp, ChevronsUpDown, LogOut, Settings, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@prisma/client";
 import {
@@ -150,6 +150,7 @@ export function Sidebar({
   collapsed,
   mobileOpen = false,
   onCloseMobile,
+  employeeId,
 }: {
   role: Role;
   userName: string;
@@ -157,6 +158,7 @@ export function Sidebar({
   collapsed?: boolean;
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
+  employeeId?: string | null;
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -171,6 +173,7 @@ export function Sidebar({
   const visibleItems = getAllNavItems(role);
   const activeId = getActiveNavId(pathname, visibleItems);
   const BrandIcon = brandIcon;
+  const profileHref = employeeId ? `/employees/${employeeId}` : "/settings";
 
   return (
     <aside
@@ -269,6 +272,17 @@ export function Sidebar({
                 collapsed ? "left-full bottom-0 ml-2 w-44" : "bottom-full left-0 right-0 mb-1"
               )}
             >
+              <Link
+                href={profileHref}
+                className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-gray-600 hover:bg-gray-50"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onCloseMobile?.();
+                }}
+              >
+                <UserRound className="w-4 h-4" />
+                Profile
+              </Link>
               <Link
                 href="/settings"
                 className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-gray-600 hover:bg-gray-50"

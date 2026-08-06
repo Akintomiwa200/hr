@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { activateAppraisalCycle } from "@/lib/performance/cycles";
 import { isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function GET(
   _request: NextRequest,
@@ -44,6 +45,8 @@ export async function PATCH(
     try {
       const cycle = await activateAppraisalCycle(id);
       revalidatePath("/performance");
+      broadcastAppEvent("appraisal_updated", { id, action: "activated" });
+      broadcastAppEvent("performance_updated", { id, action: "activated" });
       return NextResponse.json(cycle);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to activate";
@@ -58,6 +61,8 @@ export async function PATCH(
       include: { kpis: { include: { kpi: true } } },
     });
     revalidatePath("/performance");
+    broadcastAppEvent("appraisal_updated", { id, action: "closed" });
+    broadcastAppEvent("performance_updated", { id, action: "closed" });
     return NextResponse.json(cycle);
   }
 
@@ -72,5 +77,7 @@ export async function PATCH(
   });
 
   revalidatePath("/performance");
+  broadcastAppEvent("appraisal_updated", { id });
+  broadcastAppEvent("performance_updated", { id });
   return NextResponse.json(cycle);
 }

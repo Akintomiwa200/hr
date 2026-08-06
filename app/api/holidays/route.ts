@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageOrgContent } from "@/lib/roles";
 import { isHolidayDbEnabled } from "@/lib/holidays-data";
+import { getCompanyScope, holidayCompanyWhere, requireOrgCompanyId } from "@/lib/company-scope";
 
 export async function GET() {
   const session = await requireSession();
@@ -17,7 +18,12 @@ export async function GET() {
     );
   }
 
-  const holidays = await prisma.holiday.findMany({ orderBy: { date: "asc" } });
+  const scope = getCompanyScope(session);
+
+  const holidays = await prisma.holiday.findMany({
+    where: holidayCompanyWhere(scope),
+    orderBy: { date: "asc" },
+  });
   return NextResponse.json(holidays);
 }
 
@@ -35,11 +41,13 @@ export async function POST(request: NextRequest) {
   const { name, date, type = "Public" } = await request.json();
   if (!name?.trim() || !date) return badRequest("Name and date are required");
 
+  const companyId = requireOrgCompanyId(getCompanyScope(session));
+
   const holiday = await prisma.holiday.create({
-    data: { name: name.trim(), date: new Date(date), type },
+    data: { name: name.trim(), date: new Date(date), type, companyId },
   });
 
-  broadcastEvent("holiday_updated", { id: holiday.id });
+  broadcastAppEvent("holiday_updated", { id: holiday.id });
   revalidatePath("/holidays");
   return NextResponse.json(holiday);
 }

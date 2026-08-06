@@ -31,6 +31,7 @@ export async function GET(
 
   const items = legacyBreakdownFromRecord(record);
   const html = renderPayslipHtml({
+    id: record.id,
     companyName: "Smart HR",
     employee: {
       firstName: record.employee.firstName,
@@ -44,9 +45,11 @@ export async function GET(
     status: record.status,
     items,
     grossPay: record.grossPay || record.baseSalary + record.bonus,
-    deductions: record.deductions,
+    totalDeductions: record.deductions,
     netPay: record.netPay,
     notes: record.notes,
+    paidAt: record.paidAt,
+    createdAt: record.createdAt,
   });
 
   const filename = `payslip-${record.employee.employeeCode}-${record.periodStart.toISOString().slice(0, 7)}.html`;

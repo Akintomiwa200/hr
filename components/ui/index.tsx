@@ -1,5 +1,6 @@
 import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FieldErrorToast } from "@/components/ui/field-error-toast";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "danger" | "ghost";
@@ -167,9 +168,10 @@ export function Input({
           error && "border-red-300 focus:ring-red-500",
           className
         )}
+        aria-invalid={error ? true : undefined}
         {...props}
       />
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error ? <FieldErrorToast error={error} /> : null}
     </div>
   );
 }
@@ -197,11 +199,12 @@ export function Select({
           error && "border-red-300",
           className
         )}
+        aria-invalid={error ? true : undefined}
         {...props}
       >
         {children}
       </select>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error ? <FieldErrorToast error={error} /> : null}
     </div>
   );
 }
@@ -228,9 +231,10 @@ export function Textarea({
           error && "border-red-300",
           className
         )}
+        aria-invalid={error ? true : undefined}
         {...props}
       />
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error ? <FieldErrorToast error={error} /> : null}
     </div>
   );
 }

@@ -24,7 +24,6 @@ export const PEOPLE_VIEW_ROLES: Role[] = [
   "HR",
   "MANAGER",
   "SUPERVISOR",
-  "EMPLOYEE",
 ];
 export const PEOPLE_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "MANAGER"];
 export const ORG_CHART_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "MANAGER"];
@@ -38,17 +37,25 @@ export const PAYROLL_VIEW_ROLES: Role[] = [
   "COMPANY_ADMIN",
   "HR",
   "MANAGER",
+  "SUPERVISOR",
   "EMPLOYEE",
 ];
 export const PAYROLL_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
 export const RECRUITMENT_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "MANAGER"];
 export const DEVICE_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
+export const SUBSCRIPTION_ADMIN_ROLES: Role[] = ["SUPER_ADMIN", "COMPANY_ADMIN"];
 export const INTEGRATION_ADMIN_ROLES: Role[] = ["SUPER_ADMIN", "COMPANY_ADMIN", "HR"];
 export const ONBOARDING_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "MANAGER"];
 export const PERFORMANCE_ADMIN_ROLES: Role[] = [
   "COMPANY_ADMIN",
   "HR",
   "MANAGER",
+];
+/** Roles that can open the Performance module (reviews, cycles, appraisals). */
+export const PERFORMANCE_VIEW_ROLES: Role[] = [
+  ...PERFORMANCE_ADMIN_ROLES,
+  "SUPERVISOR",
+  "EMPLOYEE",
 ];
 export const CONTENT_ADMIN_ROLES: Role[] = [
   "COMPANY_ADMIN",

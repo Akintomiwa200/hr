@@ -19,6 +19,14 @@ const inputClass =
 
 const labelClass = "block text-[13px] font-medium text-gray-700 mb-1.5";
 
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-[15px] font-semibold text-gray-900 border-b border-gray-100 pb-2.5">
+      {children}
+    </h2>
+  );
+}
+
 export function NewEmployeeForm({
   departments,
   managers,
@@ -76,90 +84,91 @@ export function NewEmployeeForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
+    <form onSubmit={handleSubmit} className="w-full space-y-8">
       <OnboardingPasswordNotice />
 
-      {success && <OnboardingSuccessMessage result={success} />}
+      {success ? <OnboardingSuccessMessage result={success} /> : null}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className={labelClass}>First name</label>
-          <input name="firstName" required className={inputClass} placeholder="Alex" />
+      <section className="space-y-4">
+        <SectionTitle>Personal details</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div>
+            <label className={labelClass}>First name</label>
+            <input name="firstName" required className={inputClass} placeholder="Alex" />
+          </div>
+          <div>
+            <label className={labelClass}>Last name</label>
+            <input name="lastName" required className={inputClass} placeholder="Johnson" />
+          </div>
+          <div className="sm:col-span-2 xl:col-span-1">
+            <label className={labelClass}>Work email</label>
+            <input
+              name="email"
+              type="email"
+              required
+              className={inputClass}
+              placeholder="alex@company.com"
+            />
+            <p className="text-[12px] text-gray-500 mt-1.5">
+              Login credentials are emailed to this address immediately.
+            </p>
+          </div>
         </div>
-        <div>
-          <label className={labelClass}>Last name</label>
-          <input name="lastName" required className={inputClass} placeholder="Johnson" />
-        </div>
-      </div>
+      </section>
 
-      <div>
-        <label className={labelClass}>Work email</label>
-        <input
-          name="email"
-          type="email"
-          required
-          className={inputClass}
-          placeholder="alex@company.com"
-        />
-        <p className="text-[12px] text-gray-500 mt-1.5">
-          Login credentials are emailed to this address immediately.
-        </p>
-      </div>
+      <section className="space-y-4">
+        <SectionTitle>Job &amp; access</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="sm:col-span-2 xl:col-span-3">
+            <label className={labelClass}>Job title</label>
+            <input name="jobTitle" required className={inputClass} placeholder="Software Engineer" />
+          </div>
+          <div>
+            <label className={labelClass}>Department</label>
+            <select name="departmentId" required className={inputClass}>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Manager</label>
+            <select name="managerId" className={inputClass}>
+              <option value="">None</option>
+              {managers.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.firstName} {m.lastName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Employment</label>
+            <select name="employmentType" className={inputClass}>
+              <option value="FULL_TIME">Full-time</option>
+              <option value="FREELANCE">Freelance</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Role</label>
+            <select name="role" className={inputClass}>
+              {ORG_ROLES.map((role) => (
+                <option key={role} value={role}>
+                  {roleLabel(role)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Salary</label>
+            <input name="salary" type="number" min="0" className={inputClass} placeholder="85000" />
+          </div>
+        </div>
+      </section>
 
-      <div>
-        <label className={labelClass}>Job title</label>
-        <input name="jobTitle" required className={inputClass} placeholder="Software Engineer" />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className={labelClass}>Department</label>
-          <select name="departmentId" required className={inputClass}>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className={labelClass}>Manager</label>
-          <select name="managerId" className={inputClass}>
-            <option value="">None</option>
-            {managers.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.firstName} {m.lastName}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label className={labelClass}>Employment</label>
-          <select name="employmentType" className={inputClass}>
-            <option value="FULL_TIME">Full-time</option>
-            <option value="FREELANCE">Freelance</option>
-          </select>
-        </div>
-        <div>
-          <label className={labelClass}>Role</label>
-          <select name="role" className={inputClass}>
-            {ORG_ROLES.map((role) => (
-              <option key={role} value={role}>
-                {roleLabel(role)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className={labelClass}>Salary</label>
-          <input name="salary" type="number" min="0" className={inputClass} placeholder="85000" />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 pt-2">
+      <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 pt-6">
         <button
           type="submit"
           disabled={loading || !!success}

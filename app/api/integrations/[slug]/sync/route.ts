@@ -3,6 +3,7 @@ import { requireRoles, unauthorized } from "@/lib/api-auth";
 import { slugToProvider } from "@/lib/integrations/providers";
 import { runIntegrationSync } from "@/lib/integrations/sync";
 import { INTEGRATION_ADMIN_ROLES } from "@/lib/roles";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function POST(
   _request: Request,
@@ -19,6 +20,7 @@ export async function POST(
 
   try {
     const result = await runIntegrationSync(provider, session.companyId ?? null);
+    broadcastAppEvent("integration_sync", { provider });
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed";

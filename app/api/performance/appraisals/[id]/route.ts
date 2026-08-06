@@ -8,6 +8,7 @@ import {
   computeOverallRating,
 } from "@/lib/performance/access";
 import { forbidden, notFound, requireSession, unauthorized } from "@/lib/api-auth";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function GET(
   _request: NextRequest,
@@ -134,6 +135,10 @@ export async function PATCH(
 
   revalidatePath("/performance");
   revalidatePath(`/performance/appraisals/${id}`);
+
+  broadcastAppEvent("appraisal_updated", { id });
+  broadcastAppEvent("performance_updated", { id });
+  broadcastAppEvent("notification_updated", { id });
 
   const appraisal = await prisma.performanceAppraisal.findUnique({
     where: { id },

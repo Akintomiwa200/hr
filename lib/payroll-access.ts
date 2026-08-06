@@ -4,6 +4,7 @@ import {
   canManagePayroll,
   isCompanyAdmin,
   isHrRole,
+  isSuperAdmin,
   normalizeRole,
 } from "@/lib/roles";
 
@@ -12,7 +13,7 @@ export async function canViewPayrollRecord(
   record: { employeeId: string }
 ) {
   const role = normalizeRole(session.role);
-  if (isCompanyAdmin(role) || isHrRole(role)) return true;
+  if (isSuperAdmin(role) || isCompanyAdmin(role) || isHrRole(role)) return true;
   if (role === "EMPLOYEE" && session.employeeId === record.employeeId) {
     return true;
   }
@@ -31,7 +32,7 @@ export async function canManagePayrollRecord(
   session: SessionUser,
   record: { employeeId: string }
 ) {
-  if (canManagePayroll(session.role)) return true;
+  if (canManagePayroll(session.role) || isSuperAdmin(session.role)) return true;
   const role = normalizeRole(session.role);
   if (role === "MANAGER" && session.employeeId) {
     const employee = await prisma.employee.findUnique({

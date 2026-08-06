@@ -16,7 +16,7 @@ import {
 import { Button, Card, CardHeader } from "@/components/ui";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
-import { canManageDevices, hasRole, INTEGRATION_ADMIN_ROLES, roleLabel } from "@/lib/roles";
+import { canManageDevices, hasRole, INTEGRATION_ADMIN_ROLES, SUBSCRIPTION_ADMIN_ROLES, roleLabel } from "@/lib/roles";
 import type { Role } from "@prisma/client";
 
 type EmployeeProfile = {
@@ -286,6 +286,30 @@ export function SettingsModule({
             </Link>
           )}
         </Card>
+
+        {hasRole(role as Role, [...SUBSCRIPTION_ADMIN_ROLES, "HR"]) && (
+          <Card className="p-6 bg-emerald-50/40 border-emerald-100 lg:col-span-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center shrink-0">
+                  <Shield className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Subscription & billing</h3>
+                  <p className="text-xs text-gray-500 leading-relaxed max-w-xl">
+                    View your plan, employee usage, trial status, and upgrade options — updated in real time.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/settings/subscription"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shrink-0"
+              >
+                Manage subscription
+              </Link>
+            </div>
+          </Card>
+        )}
 
         {hasRole(role as Role, INTEGRATION_ADMIN_ROLES) && (
           <Card className="p-6 bg-violet-50/40 border-violet-100 lg:col-span-3">

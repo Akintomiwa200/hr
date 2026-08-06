@@ -12,6 +12,7 @@ import {
   Search,
 } from "lucide-react";
 import { Card } from "@/components/ui";
+import { ModulesDirectory } from "@/components/help/modules-directory";
 import {
   getHelpArticlesForRole,
   globalHelpFaqs,
@@ -198,6 +199,8 @@ export function HelpHub({ role }: { role: Role }) {
               </div>
             </Card>
           </section>
+
+          <ModulesDirectory role={role} />
         </>
       )}
     </div>

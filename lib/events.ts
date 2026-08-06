@@ -7,12 +7,18 @@ export type RealtimeEventType =
   | "announcement_created"
   | "payroll_updated"
   | "performance_updated"
+  | "appraisal_updated"
   | "department_updated"
   | "job_updated"
+  | "interview_updated"
   | "document_updated"
   | "holiday_updated"
   | "integration_sync"
-  | "integration_webhook";
+  | "integration_webhook"
+  | "integration_updated"
+  | "settings_updated"
+  | "subscription_updated"
+  | "notification_updated";
 
 export type RealtimeEvent = {
   type: RealtimeEventType;

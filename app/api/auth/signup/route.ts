@@ -3,10 +3,26 @@ import bcrypt from "bcryptjs";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createSession } from "@/lib/auth";
+import { defaultTrialCompanyData } from "@/lib/subscription";
+import { getPlan, type SubscriptionPlanId } from "@/lib/subscription-plans";
+import { defaultPayrollSettings } from "@/lib/payroll-types";
+
+function slugFromEmail(email: string) {
+  const base = email.split("@")[0].replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  return `${base}-${Date.now().toString(36)}`;
+}
+
+function resolveSignupPlan(plan?: string): SubscriptionPlanId {
+  const valid = ["basic", "pro", "advanced", "trial"] as const;
+  if (plan && valid.includes(plan as (typeof valid)[number])) {
+    return plan as SubscriptionPlanId;
+  }
+  return "trial";
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { firstName, lastName, email, password } = await request.json();
+    const { firstName, lastName, email, password, plan: planParam } = await request.json();
 
     if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !password) {
       return NextResponse.json(
@@ -23,6 +39,8 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const planId = resolveSignupPlan(planParam);
+    const plan = getPlan(planId);
 
     const existing = await prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -35,38 +53,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let department = await prisma.department.findFirst({
-      orderBy: { name: "asc" },
-    });
-
-    if (!department) {
-      department = await prisma.department.create({
-        data: { name: "General", description: "Default department" },
-      });
-    }
-
-    const employeeCount = await prisma.employee.count();
-    const employeeCode = `EMP${String(employeeCount + 1).padStart(3, "0")}`;
     const passwordHash = await bcrypt.hash(password, 10);
+    const trial = defaultTrialCompanyData();
+    const companyName = `${firstName.trim()}'s Organization`;
 
     const user = await prisma.$transaction(async (tx) => {
+      const company = await tx.company.create({
+        data: {
+          name: companyName,
+          slug: slugFromEmail(normalizedEmail),
+          plan: planId === "trial" ? "trial" : planId,
+          subscriptionStatus: trial.subscriptionStatus,
+          trialEndsAt: trial.trialEndsAt,
+          currentPeriodEnd: trial.currentPeriodEnd,
+          billingEmail: normalizedEmail,
+          isActive: true,
+        },
+      });
+
+      const department = await tx.department.create({
+        data: {
+          name: "General",
+          description: "Default department",
+          companyId: company.id,
+        },
+      });
+
+      await tx.payrollSettings.create({
+        data: { companyId: company.id, ...defaultPayrollSettings },
+      });
+
       const createdUser = await tx.user.create({
         data: {
           email: normalizedEmail,
           passwordHash,
-          role: Role.EMPLOYEE,
+          role: Role.COMPANY_ADMIN,
+          companyId: company.id,
         },
       });
 
       await tx.employee.create({
         data: {
           userId: createdUser.id,
-          employeeCode,
+          employeeCode: "EMP001",
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           email: normalizedEmail,
-          jobTitle: "Team Member",
-          departmentId: department!.id,
+          jobTitle: plan.name === "Enterprise" ? "Administrator" : "Company Admin",
+          departmentId: department.id,
           hireDate: new Date(),
         },
       });
@@ -82,13 +116,15 @@ export async function POST(request: NextRequest) {
       id: user.id,
       email: user.email,
       role: user.role,
+      companyId: user.companyId,
       employeeId: employee?.id,
       firstName: employee?.firstName,
       lastName: employee?.lastName,
     });
 
-    return NextResponse.json({ success: true });
-  } catch {
+    return NextResponse.json({ success: true, plan: planId });
+  } catch (error) {
+    console.error("[signup]", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

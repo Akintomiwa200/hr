@@ -41,7 +41,7 @@ export default async function NewEmployeePage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 lg:p-8 shadow-[0_1px_3px_rgba(0,0,0,0.04)] w-full">
         <NewEmployeeForm departments={departments} managers={managers} />
       </div>
     </div>

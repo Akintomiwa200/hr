@@ -27,6 +27,7 @@ export function LoginForm({ initialEmail = "" }: { initialEmail?: string }) {
         return;
       }
 
+      notify.success("Welcome back!");
       router.push("/dashboard");
       router.refresh();
     } catch {

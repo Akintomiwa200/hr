@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 
 export async function DELETE(
@@ -16,7 +16,7 @@ export async function DELETE(
   if (!existing) return notFound();
 
   await prisma.document.delete({ where: { id } });
-  broadcastEvent("document_updated", { id });
+  broadcastAppEvent("document_updated", { id });
   revalidatePath("/documents");
   return NextResponse.json({ success: true });
 }

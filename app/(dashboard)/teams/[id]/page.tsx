@@ -11,6 +11,7 @@ export default async function TeamDetailPage({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "EMPLOYEE") redirect("/dashboard");
 
   const { id } = await params;
 
@@ -22,7 +23,6 @@ export default async function TeamDetailPage({
   if (!department) notFound();
 
   const departmentTree = getDepartmentOrgTree(orgData, id);
-  const isEmployee = session.role === "EMPLOYEE";
   const isMyTeam = session.employeeId
     ? department.employees.some((emp) => emp.id === session.employeeId)
     : false;
@@ -51,7 +51,7 @@ export default async function TeamDetailPage({
       }))}
       backHref="/teams"
       backLabel="Back to teams"
-      showOrgChartLink={!isEmployee}
+      showOrgChartLink
       orgChartHref={`/departments?dept=${department.id}`}
       hierarchyTitle="Team hierarchy"
       isMyTeam={isMyTeam}

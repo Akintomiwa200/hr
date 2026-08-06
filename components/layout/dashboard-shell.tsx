@@ -27,6 +27,8 @@ export function DashboardShell({
   userEmail,
   firstName,
   lastName,
+  employeeId,
+  avatarUrl,
   children,
 }: {
   role: Role;
@@ -34,6 +36,8 @@ export function DashboardShell({
   userEmail: string;
   firstName: string;
   lastName: string;
+  employeeId?: string | null;
+  avatarUrl?: string | null;
   children: React.ReactNode;
 }) {
   const isMobile = useIsMobile();
@@ -93,6 +97,7 @@ export function DashboardShell({
         collapsed={!isMobile && sidebarCollapsed}
         mobileOpen={mobileOpen}
         onCloseMobile={closeMobile}
+        employeeId={employeeId}
       />
 
       <div
@@ -102,7 +107,10 @@ export function DashboardShell({
         <TopBar
           firstName={firstName}
           lastName={lastName}
+          userEmail={userEmail}
           role={role}
+          employeeId={employeeId}
+          avatarUrl={avatarUrl}
           sidebarCollapsed={isMobile ? !mobileOpen : sidebarCollapsed}
           onToggleSidebar={toggleSidebar}
           isMobile={isMobile}

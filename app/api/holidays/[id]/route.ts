@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageOrgContent } from "@/lib/roles";
 import { isHolidayDbEnabled } from "@/lib/holidays-data";
@@ -35,7 +35,7 @@ export async function PATCH(
     },
   });
 
-  broadcastEvent("holiday_updated", { id });
+  broadcastAppEvent("holiday_updated", { id });
   revalidatePath("/holidays");
   return NextResponse.json(holiday);
 }
@@ -59,7 +59,7 @@ export async function DELETE(
   if (!existing) return notFound();
 
   await prisma.holiday.delete({ where: { id } });
-  broadcastEvent("holiday_updated", { id });
+  broadcastAppEvent("holiday_updated", { id });
   revalidatePath("/holidays");
   return NextResponse.json({ success: true });
 }

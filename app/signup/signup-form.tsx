@@ -5,7 +5,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { notify, readApiError } from "@/lib/toast";
 
-export function SignupForm({ initialEmail = "" }: { initialEmail?: string }) {
+export function SignupForm({
+  initialEmail = "",
+  selectedPlanName,
+  planId,
+}: {
+  initialEmail?: string;
+  selectedPlanName?: string;
+  planId?: string;
+}) {
   const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -33,7 +41,7 @@ export function SignupForm({ initialEmail = "" }: { initialEmail?: string }) {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, lastName, email, password }),
+        body: JSON.stringify({ firstName, lastName, email, password, plan: planId }),
       });
 
       if (!res.ok) {
@@ -41,6 +49,7 @@ export function SignupForm({ initialEmail = "" }: { initialEmail?: string }) {
         return;
       }
 
+      notify.success("Account created successfully. Welcome to Smart HR!");
       router.push("/dashboard");
       router.refresh();
     } catch {
@@ -52,6 +61,11 @@ export function SignupForm({ initialEmail = "" }: { initialEmail?: string }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {selectedPlanName ? (
+        <p className="text-[13px] text-violet-700 bg-violet-50 border border-violet-100 rounded-xl px-4 py-3">
+          Selected plan: <strong>{selectedPlanName}</strong> — pricing syncs with your dashboard after signup.
+        </p>
+      ) : null}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <label htmlFor="firstName" className="block text-[13px] font-medium text-gray-700">

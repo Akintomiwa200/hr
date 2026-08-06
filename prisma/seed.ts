@@ -1,5 +1,6 @@
 import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { companyHolidays2026 } from "../lib/holidays";
 
 const prisma = new PrismaClient();
 
@@ -17,6 +18,7 @@ async function main() {
   await prisma.document.deleteMany();
   await prisma.payrollRecord.deleteMany();
   await prisma.payrollSettings.deleteMany();
+  await prisma.notification.deleteMany();
   await prisma.attendance.deleteMany();
   await prisma.attendanceDevice.deleteMany();
   await prisma.leaveRequest.deleteMany();
@@ -33,16 +35,19 @@ async function main() {
       name: "Smart HR Demo",
       slug: "smarthr-demo",
       plan: "enterprise",
+      subscriptionStatus: "ACTIVE",
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      billingEmail: "billing@smarthr.com",
       isActive: true,
     },
   });
 
   const departments = await Promise.all([
-    prisma.department.create({ data: { name: "Human Resources", description: "HR and people operations" } }),
-    prisma.department.create({ data: { name: "Engineering", description: "Software development" } }),
-    prisma.department.create({ data: { name: "Marketing", description: "Brand and growth" } }),
-    prisma.department.create({ data: { name: "Finance", description: "Accounting and finance" } }),
-    prisma.department.create({ data: { name: "Operations", description: "Business operations" } }),
+    prisma.department.create({ data: { name: "Human Resources", description: "HR and people operations", companyId: company.id } }),
+    prisma.department.create({ data: { name: "Engineering", description: "Software development", companyId: company.id } }),
+    prisma.department.create({ data: { name: "Marketing", description: "Brand and growth", companyId: company.id } }),
+    prisma.department.create({ data: { name: "Finance", description: "Accounting and finance", companyId: company.id } }),
+    prisma.department.create({ data: { name: "Operations", description: "Business operations", companyId: company.id } }),
   ]);
 
   const [hrDept, engDept, mktDept, finDept, opsDept] = departments;
@@ -254,6 +259,7 @@ async function main() {
       location: "Main lobby",
       apiKey: "dev-device-key-reception-kiosk",
       isActive: true,
+      companyId: company.id,
     },
   });
 
@@ -315,7 +321,7 @@ async function main() {
 
   await prisma.payrollSettings.create({
     data: {
-      id: "default",
+      companyId: company.id,
       holidayAllowanceEnabled: true,
       holidayAllowanceAmount: 150,
       latenessDeductionPerDay: 25,
@@ -556,18 +562,56 @@ async function main() {
         content: "Join us for our quarterly town hall meeting. All employees are encouraged to attend.",
         author: "Alex Johnson",
         priority: "HIGH",
+        companyId: company.id,
       },
       {
         title: "New Benefits Enrollment Period",
         content: "Open enrollment for health and dental benefits starts September 1. Review your options in the HR portal.",
         author: "Alex Johnson",
         priority: "NORMAL",
+        companyId: company.id,
       },
       {
         title: "Office Closure — Labor Day",
         content: "The office will be closed on September 1 for Labor Day. Enjoy the long weekend!",
         author: "HR Team",
         priority: "NORMAL",
+        companyId: company.id,
+      },
+    ],
+  });
+
+  await prisma.holiday.createMany({
+    data: companyHolidays2026.map((holiday) => ({
+      name: holiday.name,
+      date: new Date(holiday.date),
+      type: holiday.type,
+      companyId: company.id,
+    })),
+  });
+
+  await prisma.notification.createMany({
+    data: [
+      {
+        userId: managerUser.id,
+        type: "leave",
+        title: "Leave approval needed",
+        message: "Mike Chen requested personal leave",
+        href: "/leave",
+      },
+      {
+        userId: employeeUser.id,
+        type: "payroll",
+        title: "Payslip available",
+        message: "Your latest payroll is ready to view",
+        href: "/payroll",
+      },
+      {
+        userId: hrUser.id,
+        type: "performance",
+        title: "Review pending",
+        message: "Alex Employee — Mid-Year 2026 Review awaits manager review",
+        href: "/performance",
       },
     ],
   });

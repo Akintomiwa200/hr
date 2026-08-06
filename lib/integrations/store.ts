@@ -10,13 +10,8 @@ export async function getIntegration(
   provider: IntegrationProvider,
   companyId?: string | null
 ) {
-  return prisma.integration.findUnique({
-    where: {
-      companyId_provider: {
-        companyId: companyId ?? null,
-        provider,
-      },
-    },
+  return prisma.integration.findFirst({
+    where: { companyId: companyId ?? null, provider },
   });
 }
 
@@ -48,23 +43,21 @@ export async function upsertIntegration(
     >
   >
 ) {
-  const existing = await getIntegration(provider, companyId);
+  const resolvedCompanyId = companyId ?? null;
+  const existing = await getIntegration(provider, resolvedCompanyId);
   const webhookSecret = existing?.webhookSecret ?? generateWebhookSecret();
 
-  return prisma.integration.upsert({
-    where: {
-      companyId_provider: {
-        companyId: companyId ?? null,
-        provider,
-      },
-    },
-    create: {
-      companyId: companyId ?? null,
+  if (existing) {
+    return prisma.integration.update({
+      where: { id: existing.id },
+      data: { webhookSecret, ...data },
+    });
+  }
+
+  return prisma.integration.create({
+    data: {
+      companyId: resolvedCompanyId,
       provider,
-      webhookSecret,
-      ...data,
-    },
-    update: {
       webhookSecret,
       ...data,
     },

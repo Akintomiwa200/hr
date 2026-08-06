@@ -8,11 +8,12 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import type { NavSummary } from "@/lib/nav-summary";
+import type { NavSummary } from "@/lib/nav-summary-types";
 
 type NavContextValue = {
   summary: NavSummary;
   refresh: () => Promise<void>;
+  live: boolean;
 };
 
 const NavContext = createContext<NavContextValue | null>(null);
@@ -34,6 +35,7 @@ export function NavProvider({
 }) {
   const router = useRouter();
   const [summary, setSummary] = useState(initialSummary);
+  const [live, setLive] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -61,11 +63,15 @@ export function NavProvider({
 
     try {
       source = new EventSource("/api/events");
+      source.onopen = () => setLive(true);
       source.onmessage = (event) => {
+        setLive(true);
         try {
-          const payload = JSON.parse(event.data) as { type?: string };
-          if (payload.type && payload.type !== "dashboard_updated") {
-            onUpdate();
+          const payload = JSON.parse(event.data) as {
+            type?: string;
+            data?: { connected?: boolean };
+          };
+          if (payload.type === "dashboard_updated" && payload.data?.connected === true) {
             return;
           }
         } catch {
@@ -74,6 +80,7 @@ export function NavProvider({
         onUpdate();
       };
       source.onerror = () => {
+        setLive(false);
         source?.close();
         source = null;
       };
@@ -90,7 +97,7 @@ export function NavProvider({
   }, [refresh, router]);
 
   return (
-    <NavContext.Provider value={{ summary, refresh }}>
+    <NavContext.Provider value={{ summary, refresh, live }}>
       {children}
     </NavContext.Provider>
   );

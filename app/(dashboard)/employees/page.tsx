@@ -9,6 +9,7 @@ import { EmployeesModule } from "@/components/employees/employees-module";
 export default async function EmployeesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "EMPLOYEE") redirect("/dashboard");
 
   const [employees, departments, managers] = await Promise.all([
     prisma.employee.findMany({

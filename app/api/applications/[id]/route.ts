@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 
 export async function GET(
@@ -44,7 +44,7 @@ export async function PATCH(
     include: { job: { include: { department: true } }, reviewer: true },
   });
 
-  broadcastEvent("job_updated", { id: application.jobId });
+  broadcastAppEvent("job_updated", { id: application.jobId });
   revalidatePath("/recruitment/candidates");
   revalidatePath(`/recruitment/candidates/${id}`);
   return NextResponse.json(application);

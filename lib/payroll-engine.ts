@@ -10,25 +10,57 @@ function lineId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-export async function getPayrollSettings(): Promise<PayrollSettingsData> {
-  const settings = await prisma.payrollSettings.findUnique({ where: { id: "default" } });
-  if (!settings) return defaultPayrollSettings;
-
+function mapSettings(row: {
+  holidayAllowanceEnabled: boolean;
+  holidayAllowanceAmount: number;
+  latenessDeductionPerDay: number;
+  absenceDeductionPerDay: number;
+  damageDeductionEnabled: boolean;
+  taxRatePercent: number;
+}): PayrollSettingsData {
   return {
-    holidayAllowanceEnabled: settings.holidayAllowanceEnabled,
-    holidayAllowanceAmount: settings.holidayAllowanceAmount,
-    latenessDeductionPerDay: settings.latenessDeductionPerDay,
-    absenceDeductionPerDay: settings.absenceDeductionPerDay,
-    damageDeductionEnabled: settings.damageDeductionEnabled,
-    taxRatePercent: settings.taxRatePercent,
+    holidayAllowanceEnabled: row.holidayAllowanceEnabled,
+    holidayAllowanceAmount: row.holidayAllowanceAmount,
+    latenessDeductionPerDay: row.latenessDeductionPerDay,
+    absenceDeductionPerDay: row.absenceDeductionPerDay,
+    damageDeductionEnabled: row.damageDeductionEnabled,
+    taxRatePercent: row.taxRatePercent,
   };
 }
 
-export async function ensurePayrollSettings() {
-  return prisma.payrollSettings.upsert({
-    where: { id: "default" },
-    create: { id: "default", ...defaultPayrollSettings },
-    update: {},
+export async function getPayrollSettings(
+  companyId?: string | null
+): Promise<PayrollSettingsData> {
+  if (companyId) {
+    const settings = await prisma.payrollSettings.findUnique({ where: { companyId } });
+    if (settings) return mapSettings(settings);
+  }
+  const fallback = await prisma.payrollSettings.findFirst();
+  if (fallback) return mapSettings(fallback);
+  return defaultPayrollSettings;
+}
+
+export async function ensurePayrollSettings(companyId?: string | null) {
+  if (companyId) {
+    const existing = await prisma.payrollSettings.findUnique({ where: { companyId } });
+    if (existing) return existing;
+    return prisma.payrollSettings.create({
+      data: { companyId, ...defaultPayrollSettings },
+    });
+  }
+  const existing = await prisma.payrollSettings.findFirst();
+  if (existing) return existing;
+  return prisma.payrollSettings.create({ data: { ...defaultPayrollSettings } });
+}
+
+export async function updatePayrollSettings(
+  companyId: string | null | undefined,
+  data: Partial<PayrollSettingsData>
+) {
+  const row = await ensurePayrollSettings(companyId);
+  return prisma.payrollSettings.update({
+    where: { id: row.id },
+    data,
   });
 }
 
@@ -62,7 +94,14 @@ export async function buildAutoPayrollBreakdown(input: {
   settings?: PayrollSettingsData;
   manualItems?: PayrollLineItem[];
 }) {
-  const settings = input.settings ?? (await getPayrollSettings());
+  let settings = input.settings;
+  if (!settings) {
+    const employee = await prisma.employee.findUnique({
+      where: { id: input.employeeId },
+      select: { user: { select: { companyId: true } } },
+    });
+    settings = await getPayrollSettings(employee?.user.companyId);
+  }
   const periodStart = new Date(input.periodStart);
   periodStart.setHours(0, 0, 0, 0);
   const periodEnd = new Date(input.periodEnd);

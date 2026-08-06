@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageRecruitment } from "@/lib/roles";
 
@@ -66,7 +66,7 @@ export async function PATCH(
     include: { department: true, applications: true },
   });
 
-  broadcastEvent("job_updated", { id });
+  broadcastAppEvent("job_updated", { id });
   revalidatePath("/recruitment");
   revalidatePath(`/recruitment/${id}`);
   return NextResponse.json(job);
@@ -84,7 +84,7 @@ export async function DELETE(
   if (!existing) return notFound();
 
   await prisma.job.delete({ where: { id } });
-  broadcastEvent("job_updated", { id });
+  broadcastAppEvent("job_updated", { id });
   revalidatePath("/recruitment");
   return NextResponse.json({ success: true });
 }

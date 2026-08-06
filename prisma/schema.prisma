@@ -117,17 +117,49 @@ enum AppraisalStatus {
   COMPLETED
 }
 
-model Company {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  plan      String   @default("trial")
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
 
-  users User[]
-  integrations Integration[]
+model Company {
+  id                 String             @id @default(cuid())
+  name               String
+  slug               String             @unique
+  plan               String             @default("trial")
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  trialEndsAt        DateTime?
+  currentPeriodEnd   DateTime?
+  billingEmail       String?
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  users         User[]
+  integrations  Integration[]
+  departments   Department[]
+  announcements Announcement[]
+  holidays      Holiday[]
+  attendanceDevices AttendanceDevice[]
+  payrollSettings   PayrollSettings[]
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  href      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
 }
 
 model User {
@@ -139,19 +171,25 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  company   Company?  @relation(fields: [companyId], references: [id])
-  employee  Employee?
-  preferences String?
+  company       Company?       @relation(fields: [companyId], references: [id])
+  employee      Employee?
+  preferences   String?
+  notifications Notification[]
 }
 
 model Department {
   id          String     @id @default(cuid())
-  name        String     @unique
+  companyId   String?
+  name        String
   description String?
   createdAt   DateTime   @default(now())
   employees   Employee[]
   jobs        Job[]
   kpis        KpiDefinition[]
+
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name])
 }
 
 model Employee {
@@ -234,6 +272,7 @@ model Attendance {
 
 model AttendanceDevice {
   id         String   @id @default(cuid())
+  companyId  String?
   name       String
   location   String?
   apiKey     String   @unique
@@ -242,6 +281,7 @@ model AttendanceDevice {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  company Company? @relation(fields: [companyId], references: [id])
   records Attendance[]
 }
 
@@ -265,7 +305,8 @@ model PayrollRecord {
 }
 
 model PayrollSettings {
-  id                      String   @id @default("default")
+  id                      String   @id @default(cuid())
+  companyId               String?  @unique
   holidayAllowanceEnabled Boolean  @default(false)
   holidayAllowanceAmount  Float    @default(150)
   latenessDeductionPerDay Float    @default(25)
@@ -273,6 +314,8 @@ model PayrollSettings {
   damageDeductionEnabled  Boolean  @default(true)
   taxRatePercent          Float    @default(10)
   updatedAt               DateTime @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id])
 }
 
 model Job {
@@ -543,17 +586,23 @@ model Document {
 
 model Announcement {
   id        String   @id @default(cuid())
+  companyId String?
   title     String
   content   String
   author    String
   priority  String   @default("NORMAL")
   createdAt DateTime @default(now())
+
+  company Company? @relation(fields: [companyId], references: [id])
 }
 
 model Holiday {
   id        String   @id @default(cuid())
+  companyId String?
   name      String
   date      DateTime
   type      String   @default("Public")
   createdAt DateTime @default(now())
+
+  company Company? @relation(fields: [companyId], references: [id])
 }

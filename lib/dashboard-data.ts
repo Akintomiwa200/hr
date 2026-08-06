@@ -6,6 +6,21 @@ import {
   resolveDashboardRange,
   type DashboardRangeKey,
 } from "@/lib/dashboard-date-range";
+
+function orgEmployeeWhere(companyId?: string | null) {
+  if (!companyId) return {};
+  return { user: { companyId } };
+}
+
+function orgDepartmentWhere(companyId?: string | null) {
+  if (!companyId) return {};
+  return { OR: [{ companyId }, { companyId: null }] };
+}
+
+function orgDeviceWhere(companyId?: string | null) {
+  if (!companyId) return {};
+  return { companyId };
+}
 const CHART_MONTHS = [
   "Jan",
   "Feb",
@@ -52,10 +67,16 @@ async function getAttendanceRateForRange(start: Date, end: Date, employeeIds?: s
   return Math.round((presentCount / totalEmployees) * 100);
 }
 
-export async function getHrDashboardData(rangeInput?: DashboardRangeKey | string) {
+export async function getHrDashboardData(
+  rangeInput?: DashboardRangeKey | string,
+  companyId?: string | null
+) {
   const rangeKey = parseDashboardRangeKey(rangeInput);
   const period = resolveDashboardRange(rangeKey);
   const previousPeriod = getPreviousPeriod(period);
+  const orgEmp = orgEmployeeWhere(companyId);
+  const orgDept = orgDepartmentWhere(companyId);
+  const orgDev = orgDeviceWhere(companyId);
 
   const today = startOfDay();
   const rangeStart = period.start;
@@ -77,36 +98,47 @@ export async function getHrDashboardData(rangeInput?: DashboardRangeKey | string
     deviceUsageToday,
   ] = await Promise.all([
     prisma.employee.findMany({
+      where: orgEmp,
       include: { department: true, user: { select: { role: true } } },
       orderBy: { firstName: "asc" },
     }),
-    prisma.employee.count({ where: { status: "ACTIVE" } }),
-    prisma.leaveRequest.count({ where: { status: "PENDING" } }),
+    prisma.employee.count({ where: { status: "ACTIVE", ...orgEmp } }),
+    prisma.leaveRequest.count({
+      where: { status: "PENDING", employee: orgEmp },
+    }),
     prisma.attendance.groupBy({
       by: ["status"],
       _count: { status: true },
       where: { date: { gte: today } },
     }),
-    prisma.job.count({ where: { status: "OPEN" } }),
+    prisma.job.count({
+      where: {
+        status: "OPEN",
+        department: orgDept,
+      },
+    }),
     prisma.department.findMany({
+      where: orgDept,
       include: { _count: { select: { employees: true } } },
     }),
     prisma.payrollRecord.findMany({
       where: {
         status: { in: ["PROCESSED", "PAID"] },
         periodStart: { gte: rangeStart, lte: rangeEnd },
+        employee: orgEmp,
       },
       orderBy: { periodStart: "desc" },
     }),
-    prisma.performanceReview.findMany({
+    prisma.performanceAppraisal.findMany({
       where: {
         status: "COMPLETED",
-        rating: { not: null },
-        reviewDate: { gte: rangeStart, lte: rangeEnd },
+        overallRating: { not: null },
+        completedAt: { gte: rangeStart, lte: rangeEnd },
+        employee: orgEmp,
       },
-      include: { employee: true },
+      include: { employee: true, cycle: true },
       take: 5,
-      orderBy: { reviewDate: "desc" },
+      orderBy: { completedAt: "desc" },
     }),
     prisma.attendance.groupBy({
       by: ["status"],
@@ -114,12 +146,12 @@ export async function getHrDashboardData(rangeInput?: DashboardRangeKey | string
       where: { date: { gte: rangeStart, lte: rangeEnd } },
     }),
     prisma.employee.findMany({
-      where: { hireDate: { gte: rangeStart, lte: rangeEnd } },
+      where: { hireDate: { gte: rangeStart, lte: rangeEnd }, ...orgEmp },
     }),
     getAttendanceRateForRange(rangeStart, rangeEnd),
     getAttendanceRateForRange(previousPeriod.start, previousPeriod.end),
     prisma.attendanceDevice.findMany({
-      where: { isActive: true },
+      where: { isActive: true, ...orgDev },
       orderBy: { name: "asc" },
     }),
     prisma.attendance.groupBy({
@@ -211,7 +243,7 @@ export async function getHrDashboardData(rangeInput?: DashboardRangeKey | string
   const avgPerformance =
     performanceReviews.length > 0
       ? Math.round(
-          (performanceReviews.reduce((sum, r) => sum + (r.rating ?? 0), 0) /
+          (performanceReviews.reduce((sum, r) => sum + (r.overallRating ?? 0), 0) /
             performanceReviews.length /
             5) *
             100
@@ -243,7 +275,7 @@ export async function getHrDashboardData(rangeInput?: DashboardRangeKey | string
       late: todayLate,
       devices: deviceBreakdown,
     },
-    performanceReviews,
+    performanceAppraisals: performanceReviews,
     avgPerformance,
     incomeChart,
     highlightMonth,
@@ -278,9 +310,10 @@ export async function getManagerDashboardData(
       take: 5,
       orderBy: { createdAt: "desc" },
     }),
-    prisma.performanceReview.findMany({
+    prisma.performanceAppraisal.findMany({
       where: { managerId: managerEmployeeId },
-      include: { employee: true },
+      include: { employee: true, cycle: true },
+      orderBy: { updatedAt: "desc" },
       take: 5,
     }),
     prisma.attendance.count({
@@ -304,6 +337,7 @@ export async function getManagerDashboardData(
     teamSize: team.length,
     pendingLeaves,
     teamReviews,
+    pendingAppraisalReviews: teamReviews.filter((r) => r.status === "MANAGER_REVIEW").length,
     presentToday: teamAttendance,
     attendanceRate: rangeAttendanceRate,
     rangeKey,
@@ -341,10 +375,10 @@ export async function getEmployeeDashboardData(
         orderBy: { periodStart: "desc" },
         take: 1,
       }),
-      prisma.performanceReview.findMany({
+      prisma.performanceAppraisal.findFirst({
         where: { employeeId },
-        orderBy: { createdAt: "desc" },
-        take: 1,
+        include: { cycle: true },
+        orderBy: { updatedAt: "desc" },
       }),
     ]);
 
@@ -357,7 +391,7 @@ export async function getEmployeeDashboardData(
     leaveRequests,
     attendanceRecords,
     latestPayroll: payrollRecords[0] ?? null,
-    latestReview: reviews[0] ?? null,
+    latestAppraisal: reviews,
     presentDays,
     rangeKey,
     dateRange: {
@@ -386,5 +420,27 @@ export async function getSuperAdminDashboardData() {
   };
 }
 
-export const getCompanyAdminDashboardData = getHrDashboardData;
+export async function getCompanyAdminDashboardData(
+  rangeInput?: DashboardRangeKey | string,
+  companyId?: string | null
+) {
+  const hr = await getHrDashboardData(rangeInput, companyId);
+  const orgEmp = orgEmployeeWhere(companyId);
+  const [pendingManagerReviews, connectedIntegrations, activeCycles] = await Promise.all([
+    prisma.performanceAppraisal.count({
+      where: { status: "MANAGER_REVIEW", employee: orgEmp },
+    }),
+    companyId
+      ? prisma.integration.count({ where: { companyId, status: "CONNECTED" } }).catch(() => 0)
+      : prisma.integration.count({ where: { status: "CONNECTED" } }).catch(() => 0),
+    prisma.appraisalCycle.count({ where: { status: "ACTIVE" } }),
+  ]);
+  return {
+    ...hr,
+    pendingManagerReviews,
+    connectedIntegrations,
+    activeCycles,
+  };
+}
+
 export const getSupervisorDashboardData = getManagerDashboardData;

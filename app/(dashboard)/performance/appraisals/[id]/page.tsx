@@ -31,11 +31,16 @@ export default async function AppraisalDetailPage({
   const allowed = await canViewAppraisal(session, appraisal);
   if (!allowed) redirect("/performance");
 
+  const canEditSelf = canEditSelfAppraisal(session, appraisal);
+  const canEditManager = canEditManagerAppraisal(session, appraisal);
+  const viewerIsEmployee = session.employeeId === appraisal.employeeId;
+
   return (
     <AppraisalDetailModule
       appraisal={appraisal}
-      canEditSelf={canEditSelfAppraisal(session, appraisal)}
-      canEditManager={canEditManagerAppraisal(session, appraisal)}
+      canEditSelf={canEditSelf}
+      canEditManager={canEditManager}
+      viewerIsEmployee={viewerIsEmployee}
     />
   );
 }

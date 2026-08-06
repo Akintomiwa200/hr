@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManagePerformance } from "@/lib/roles";
 
@@ -36,7 +36,7 @@ export async function PATCH(
     include: { employee: true, manager: true },
   });
 
-  broadcastEvent("performance_updated", { id });
+  broadcastAppEvent("performance_updated", { id });
   revalidatePath("/performance");
   return NextResponse.json(review);
 }
@@ -53,7 +53,7 @@ export async function DELETE(
   if (!existing) return notFound();
 
   await prisma.performanceReview.delete({ where: { id } });
-  broadcastEvent("performance_updated", { id });
+  broadcastAppEvent("performance_updated", { id });
   revalidatePath("/performance");
   return NextResponse.json({ success: true });
 }

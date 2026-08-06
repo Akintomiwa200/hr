@@ -8,6 +8,7 @@ import { TeamsModule } from "@/components/teams/teams-module";
 export default async function TeamsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "EMPLOYEE") redirect("/dashboard");
 
   const data = await getTeamsPageData(session.employeeId);
 
@@ -20,7 +21,7 @@ export default async function TeamsPage() {
       />
       <TeamsModule
         data={data}
-        canViewOrgChart={session.role !== "EMPLOYEE"}
+        canViewOrgChart
       />
     </div>
   );

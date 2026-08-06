@@ -14,25 +14,31 @@ import {
   Medal,
   GraduationCap,
   Briefcase,
+  UserSearch,
+  CalendarClock,
   Megaphone,
   FileText,
   CircleHelp,
   Settings,
   Activity,
   Building2,
+  Router,
+  Plug2,
+  CreditCard,
 } from "lucide-react";
 import {
   ALL_STAFF,
-  CONTENT_ADMIN_ROLES,
-  DASHBOARD_ROLES,
   DEVICE_ADMIN_ROLES,
+  DASHBOARD_ROLES,
+  INTEGRATION_ADMIN_ROLES,
   ONBOARDING_ROLES,
   ORG_CHART_ROLES,
   PAYROLL_VIEW_ROLES,
   PEOPLE_VIEW_ROLES,
-  PERFORMANCE_ADMIN_ROLES,
+  PERFORMANCE_VIEW_ROLES,
   RECRUITMENT_ROLES,
   SETTINGS_ROLES,
+  SUBSCRIPTION_ADMIN_ROLES,
   SUPER_ADMIN_ONLY,
 } from "@/lib/roles";
 
@@ -150,7 +156,17 @@ export const dashboardNavSections: NavSection[] = [
         icon: Clock,
         roles: ALL_STAFF,
         match: (pathname) =>
-          pathname === "/attendance" || pathname.startsWith("/attendance/"),
+          pathname === "/attendance" ||
+          (pathname.startsWith("/attendance/") &&
+            !pathname.startsWith("/attendance/devices")),
+      },
+      {
+        id: "attendance-devices",
+        href: "/attendance/devices",
+        label: "Devices",
+        pageTitle: "Attendance Devices",
+        icon: Router,
+        roles: DEVICE_ADMIN_ROLES,
       },
       {
         id: "payroll",
@@ -171,7 +187,9 @@ export const dashboardNavSections: NavSection[] = [
         label: "Performance",
         pageTitle: "Performance",
         icon: Medal,
-        roles: [...PERFORMANCE_ADMIN_ROLES, "EMPLOYEE"],
+        roles: PERFORMANCE_VIEW_ROLES,
+        match: (pathname) =>
+          pathname === "/performance" || pathname.startsWith("/performance/"),
       },
       {
         id: "onboarding",
@@ -185,13 +203,32 @@ export const dashboardNavSections: NavSection[] = [
       {
         id: "recruitment",
         href: "/recruitment",
-        label: "Recruitment",
+        label: "Jobs",
         pageTitle: "Recruitment",
         icon: Briefcase,
         roles: RECRUITMENT_ROLES,
         match: (pathname) =>
-          pathname.startsWith("/recruitment") &&
-          !pathname.startsWith("/recruitment/candidates"),
+          pathname === "/recruitment" ||
+          (/^\/recruitment\/[^/]+$/.test(pathname) &&
+            !pathname.startsWith("/recruitment/candidates") &&
+            !pathname.startsWith("/recruitment/interviews")),
+      },
+      {
+        id: "candidates",
+        href: "/recruitment/candidates",
+        label: "Candidates",
+        pageTitle: "Candidates",
+        icon: UserSearch,
+        roles: RECRUITMENT_ROLES,
+        match: (pathname) => pathname.startsWith("/recruitment/candidates"),
+      },
+      {
+        id: "interviews",
+        href: "/recruitment/interviews",
+        label: "Interviews",
+        pageTitle: "Interviews",
+        icon: CalendarClock,
+        roles: RECRUITMENT_ROLES,
       },
     ],
   },
@@ -221,6 +258,22 @@ export const dashboardNavSections: NavSection[] = [
         pageTitle: "Help Center",
         icon: CircleHelp,
         roles: [...ALL_STAFF, ...SUPER_ADMIN_ONLY],
+      },
+      {
+        id: "integrations",
+        href: "/settings/integrations",
+        label: "Integrations",
+        pageTitle: "Integrations",
+        icon: Plug2,
+        roles: INTEGRATION_ADMIN_ROLES,
+      },
+      {
+        id: "subscription",
+        href: "/settings/subscription",
+        label: "Subscription",
+        pageTitle: "Subscription",
+        icon: CreditCard,
+        roles: [...SUBSCRIPTION_ADMIN_ROLES, "HR"],
       },
     ],
   },
@@ -328,7 +381,10 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
     title: "Recruitment",
   },
   {
-    test: (p) => /^\/recruitment\/[^/]+$/.test(p) && !p.startsWith("/recruitment/candidates"),
+    test: (p) =>
+      /^\/recruitment\/[^/]+$/.test(p) &&
+      !p.startsWith("/recruitment/candidates") &&
+      !p.startsWith("/recruitment/interviews"),
     title: "Job Details",
   },
   {
@@ -350,6 +406,18 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
   {
     test: (p) => p.startsWith("/help/") && p !== "/help",
     title: "Help Guide",
+  },
+  {
+    test: (p) => p === "/attendance/devices",
+    title: "Attendance Devices",
+  },
+  {
+    test: (p) => p === "/settings/subscription",
+    title: "Subscription",
+  },
+  {
+    test: (p) => p === "/settings/integrations",
+    title: "Integrations",
   },
   {
     test: (p) => p === "/settings",

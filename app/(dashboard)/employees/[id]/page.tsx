@@ -15,7 +15,7 @@ export default async function EmployeeDetailPage({
   const { id } = await params;
 
   if (!(await canViewEmployee(session, id))) {
-    redirect("/employees");
+    redirect(session.role === "EMPLOYEE" ? "/dashboard" : "/employees");
   }
 
   const employee = await prisma.employee.findUnique({

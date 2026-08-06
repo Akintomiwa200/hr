@@ -3,6 +3,7 @@ import { requireRoles } from "@/lib/api-auth";
 import { DEVICE_ADMIN_ROLES } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { randomBytes } from "crypto";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 function generateDeviceApiKey() {
   return `dev_${randomBytes(24).toString("hex")}`;
@@ -43,6 +44,8 @@ export async function PATCH(
     data,
   });
 
+  broadcastAppEvent("attendance_updated", { id, action: "device_updated" });
+
   return NextResponse.json({
     device: {
       id: device.id,
@@ -64,6 +67,8 @@ export async function DELETE(
 
   const { id } = await params;
   await prisma.attendanceDevice.delete({ where: { id } });
+
+  broadcastAppEvent("attendance_updated", { id, action: "device_deleted" });
 
   return NextResponse.json({ success: true });
 }

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { RecruitmentModule } from "@/components/recruitment/recruitment-module";
+import { RecruitmentTabs } from "@/components/recruitment/recruitment-tabs";
 import { GoogleCalendarConnect } from "@/components/recruitment/google-calendar-connect";
 
 export default async function RecruitmentPage() {
@@ -34,6 +35,7 @@ export default async function RecruitmentPage() {
           />
         }
       />
+      <RecruitmentTabs />
       <div className="mb-6">
         <GoogleCalendarConnect />
       </div>

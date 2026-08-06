@@ -15,7 +15,7 @@ export default async function PayrollPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  await ensurePayrollSettings();
+  await ensurePayrollSettings(session.companyId);
 
   const employeeWhere =
     session.role === "MANAGER" && session.employeeId
@@ -40,7 +40,7 @@ export default async function PayrollPage() {
       select: { id: true, firstName: true, lastName: true, salary: true },
       orderBy: { firstName: "asc" },
     }),
-    getPayrollSettings(),
+    getPayrollSettings(session.companyId),
   ]);
 
   const totalPayroll = records.reduce((sum, r) => sum + r.netPay, 0);

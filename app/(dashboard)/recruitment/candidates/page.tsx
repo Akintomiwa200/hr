@@ -4,6 +4,7 @@ import { canManageRecruitment, RECRUITMENT_ROLES } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
+import { RecruitmentTabs } from "@/components/recruitment/recruitment-tabs";
 import { CandidatesModule } from "@/components/recruitment/candidates-module";
 
 export default async function CandidatesPage() {
@@ -37,6 +38,7 @@ export default async function CandidatesPage() {
           />
         }
       />
+      <RecruitmentTabs />
       <CandidatesModule
         applications={applications}
         reviewers={reviewers}

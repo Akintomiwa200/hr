@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { revalidatePath } from "next/cache";
 import type { AttendanceMethod, AttendanceStatus } from "@prisma/client";
 
@@ -42,7 +42,7 @@ function resolveStatus(timestamp: Date, override?: AttendanceStatus): Attendance
 }
 
 async function notifyAttendanceUpdated(employeeId: string) {
-  broadcastEvent("attendance_updated", {
+  broadcastAppEvent("attendance_updated", {
     employeeId,
     at: Date.now(),
   });

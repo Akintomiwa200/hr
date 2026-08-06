@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { toUserMessage } from "@/lib/user-messages";
 
 export { toast };
 
@@ -7,7 +8,13 @@ export const notify = {
     return toast.success(message, description ? { description } : undefined);
   },
   error(message: string, description?: string) {
-    return toast.error(message, description ? { description } : undefined);
+    return toast.error(
+      toUserMessage(message, message || "Something went wrong. Please try again."),
+      description ? { description } : undefined
+    );
+  },
+  fromError(error: unknown, fallback = "Something went wrong. Please try again.") {
+    return toast.error(toUserMessage(error, fallback));
   },
   info(message: string, description?: string) {
     return toast.info(message, description ? { description } : undefined);
@@ -26,7 +33,13 @@ export const notify = {
       error: string | ((err: unknown) => string);
     }
   ) {
-    return toast.promise(promise, messages);
+    return toast.promise(promise, {
+      ...messages,
+      error: (err) =>
+        typeof messages.error === "function"
+          ? messages.error(err)
+          : toUserMessage(err, messages.error),
+    });
   },
   dismiss(id?: string | number) {
     toast.dismiss(id);
@@ -35,11 +48,11 @@ export const notify = {
 
 export async function readApiError(
   res: Response,
-  fallback = "Something went wrong"
+  fallback = "Something went wrong. Please try again."
 ): Promise<string> {
   try {
     const data = (await res.json()) as { error?: string };
-    return data.error?.trim() || fallback;
+    return toUserMessage(data.error?.trim() || fallback, fallback);
   } catch {
     return fallback;
   }

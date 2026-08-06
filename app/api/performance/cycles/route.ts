@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { badRequest, isHr, requireSession, unauthorized } from "@/lib/api-auth";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function GET() {
   const session = await requireSession();
@@ -61,5 +62,7 @@ export async function POST(request: NextRequest) {
   });
 
   revalidatePath("/performance");
+  broadcastAppEvent("appraisal_updated", { id: cycle.id, action: "created" });
+  broadcastAppEvent("performance_updated", { id: cycle.id, action: "created" });
   return NextResponse.json(cycle);
 }

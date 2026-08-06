@@ -13,6 +13,7 @@ import { getUpcomingCalendarEvents } from "@/lib/calendar-summary";
 import { parseDashboardRangeKey } from "@/lib/dashboard-date-range";
 import {
   HrDashboard,
+  CompanyAdminDashboard,
   ManagerDashboard,
   SupervisorDashboard,
   EmployeeDashboard,
@@ -43,15 +44,15 @@ export default async function DashboardPage({
 
   if (session.role === "COMPANY_ADMIN") {
     const [data, upcomingEvents] = await Promise.all([
-      getCompanyAdminDashboardData(rangeKey),
+      getCompanyAdminDashboardData(rangeKey, session.companyId),
       getUpcomingCalendarEvents(sessionContext),
     ]);
-    return <HrDashboard data={data} userName={userName} upcomingEvents={upcomingEvents} />;
+    return <CompanyAdminDashboard data={data} userName={userName} upcomingEvents={upcomingEvents} />;
   }
 
   if (session.role === "HR") {
     const [data, upcomingEvents] = await Promise.all([
-      getHrDashboardData(rangeKey),
+      getHrDashboardData(rangeKey, session.companyId),
       getUpcomingCalendarEvents(sessionContext),
     ]);
     return <HrDashboard data={data} userName={userName} upcomingEvents={upcomingEvents} />;

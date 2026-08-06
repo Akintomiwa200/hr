@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { isHr, requireSession, unauthorized, badRequest } from "@/lib/api-auth";
 import { scheduleInterview } from "@/lib/recruitment/interviews";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function GET(request: NextRequest) {
   const session = await requireSession();
@@ -55,6 +56,8 @@ export async function POST(request: NextRequest) {
     revalidatePath(`/recruitment/candidates/${applicationId}`);
     revalidatePath("/recruitment/interviews");
     revalidatePath("/holidays");
+
+    broadcastAppEvent("interview_updated", { id: interview.id, action: "scheduled" });
 
     return NextResponse.json(interview);
   } catch (err) {

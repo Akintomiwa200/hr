@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function PATCH(request: NextRequest) {
   const session = await requireSession();
@@ -27,5 +28,6 @@ export async function PATCH(request: NextRequest) {
   }
 
   revalidatePath("/settings");
+  broadcastAppEvent("settings_updated", { userId: session.id });
   return NextResponse.json({ success: true });
 }

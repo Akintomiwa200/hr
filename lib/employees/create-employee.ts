@@ -17,6 +17,7 @@ export type CreateEmployeeInput = {
   role?: Role | string;
   salary?: number | string;
   status?: string;
+  companyId?: string | null;
 };
 
 export type CreateEmployeeResult = {
@@ -51,6 +52,7 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
       email: normalizedEmail,
       passwordHash,
       role: (input.role as Role) || Role.EMPLOYEE,
+      ...(input.companyId ? { companyId: input.companyId } : {}),
       employee: {
         create: {
           employeeCode,

@@ -3,26 +3,28 @@ import { DEFAULT_EMPLOYEE_PASSWORD } from "@/lib/constants/auth";
 
 export function OnboardingPasswordNotice() {
   return (
-    <div className="rounded-xl border border-violet-100 bg-violet-50/50 px-4 py-3 space-y-2">
-      <div className="flex items-start gap-2">
-        <KeyRound className="w-4 h-4 text-violet-600 mt-0.5 shrink-0" />
-        <div>
-          <p className="text-[13px] font-semibold text-gray-900">Default login password</p>
-          <p className="text-[13px] text-gray-600 mt-0.5">
-            New accounts are created with temporary password{" "}
-            <code className="px-1.5 py-0.5 rounded bg-white border border-violet-100 text-violet-700 font-mono text-[12px]">
-              {DEFAULT_EMPLOYEE_PASSWORD}
-            </code>
-            . The employee can sign in immediately after onboarding.
+    <div className="rounded-xl border border-violet-100 bg-violet-50/50 px-4 py-4 lg:px-5 lg:py-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+        <div className="flex items-start gap-2">
+          <KeyRound className="w-4 h-4 text-violet-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-[13px] font-semibold text-gray-900">Default login password</p>
+            <p className="text-[13px] text-gray-600 mt-0.5">
+              New accounts are created with temporary password{" "}
+              <code className="px-1.5 py-0.5 rounded bg-white border border-violet-100 text-violet-700 font-mono text-[12px]">
+                {DEFAULT_EMPLOYEE_PASSWORD}
+              </code>
+              . The employee can sign in immediately after onboarding.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-start gap-2 lg:border-l lg:border-violet-100 lg:pl-6">
+          <Mail className="w-4 h-4 text-violet-600 mt-0.5 shrink-0" />
+          <p className="text-[13px] text-gray-600">
+            A welcome email with sign-in details is sent to the work email address as soon as the
+            account is created.
           </p>
         </div>
-      </div>
-      <div className="flex items-start gap-2 pt-1 border-t border-violet-100/80">
-        <Mail className="w-4 h-4 text-violet-600 mt-0.5 shrink-0" />
-        <p className="text-[13px] text-gray-600">
-          A welcome email with sign-in details is sent to the work email address as soon as the
-          account is created.
-        </p>
       </div>
     </div>
   );

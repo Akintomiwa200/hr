@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession, unauthorized } from "@/lib/api-auth";
 import { getHolidays } from "@/lib/holidays-data";
+import { getCompanyScope, employeeCompanyWhere, announcementCompanyWhere } from "@/lib/company-scope";
 
 export async function GET(request: NextRequest) {
   const session = await requireSession();
@@ -14,10 +15,14 @@ export async function GET(request: NextRequest) {
 
   const contains = { contains: q };
 
+  const scope = getCompanyScope(session);
+  const orgEmployeeFilter = employeeCompanyWhere(scope);
+
   const employeeWhere =
     session.role === "EMPLOYEE" && session.employeeId
       ? {
           id: session.employeeId,
+          ...orgEmployeeFilter,
           OR: [
             { firstName: contains },
             { lastName: contains },
@@ -27,6 +32,7 @@ export async function GET(request: NextRequest) {
           ],
         }
       : {
+          ...orgEmployeeFilter,
           OR: [
             { firstName: contains },
             { lastName: contains },
@@ -70,11 +76,14 @@ export async function GET(request: NextRequest) {
           orderBy: { postedAt: "desc" },
         }),
     prisma.announcement.findMany({
-      where: { OR: [{ title: contains }, { content: contains }] },
+      where: {
+        ...announcementCompanyWhere(scope),
+        OR: [{ title: contains }, { content: contains }],
+      },
       take: 6,
       orderBy: { createdAt: "desc" },
     }),
-    getHolidays(),
+    getHolidays(session.companyId),
   ]);
 
   const holidays = allHolidays

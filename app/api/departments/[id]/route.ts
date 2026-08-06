@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageDepartments } from "@/lib/roles";
 
@@ -53,7 +53,7 @@ export async function PATCH(
 
   if (!department.name) return badRequest("Department name is required");
 
-  broadcastEvent("department_updated", { id });
+  broadcastAppEvent("department_updated", { id });
   revalidatePath("/departments");
   revalidatePath("/teams");
   revalidatePath(`/departments/${id}`);
@@ -79,7 +79,7 @@ export async function DELETE(
   }
 
   await prisma.department.delete({ where: { id } });
-  broadcastEvent("department_updated", { id });
+  broadcastAppEvent("department_updated", { id });
   revalidatePath("/departments");
   revalidatePath("/teams");
   revalidatePath(`/departments/${id}`);

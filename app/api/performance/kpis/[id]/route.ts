@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManagePerformance } from "@/lib/roles";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function PATCH(
   request: NextRequest,
@@ -35,6 +36,7 @@ export async function PATCH(
   });
 
   revalidatePath("/performance");
+  broadcastAppEvent("performance_updated", { id });
   return NextResponse.json(kpi);
 }
 
@@ -48,5 +50,6 @@ export async function DELETE(
   const { id } = await params;
   await prisma.kpiDefinition.update({ where: { id }, data: { isActive: false } });
   revalidatePath("/performance");
+  broadcastAppEvent("performance_updated", { id, action: "deleted" });
   return NextResponse.json({ success: true });
 }

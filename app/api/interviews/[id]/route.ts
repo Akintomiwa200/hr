@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageRecruitment } from "@/lib/roles";
 import { cancelInterview, rescheduleInterview } from "@/lib/recruitment/interviews";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function GET(
   _request: NextRequest,
@@ -53,6 +54,10 @@ export async function PATCH(
     revalidatePath("/recruitment/interviews");
     revalidatePath(`/recruitment/candidates/${interview.applicationId}`);
     revalidatePath("/holidays");
+    broadcastAppEvent("interview_updated", {
+      id,
+      action: body.action === "cancel" ? "cancelled" : "updated",
+    });
     return NextResponse.json(interview);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to update interview";
@@ -69,5 +74,6 @@ export async function DELETE(
 
   const { id } = await params;
   await cancelInterview(id);
+  broadcastAppEvent("interview_updated", { id, action: "deleted" });
   return NextResponse.json({ success: true });
 }
