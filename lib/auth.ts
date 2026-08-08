@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { Role } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import {
   canApproveLeave,
   canManageEmployees,
@@ -52,7 +53,27 @@ export async function getSession(): Promise<SessionUser | null> {
     const { payload } = await jwtVerify(token, secret);
     const user = payload.user as SessionUser;
     if (!user) return null;
-    return { ...user, role: normalizeRole(user.role) };
+
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { companyId: true },
+    });
+
+    // Prefer DB companyId; never revive a stale JWT company after re-seed.
+    let companyId = dbUser ? dbUser.companyId : user.companyId;
+    if (companyId) {
+      const company = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { id: true },
+      });
+      if (!company) companyId = null;
+    }
+
+    return {
+      ...user,
+      role: normalizeRole(user.role),
+      companyId,
+    };
   } catch {
     return null;
   }

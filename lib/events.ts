@@ -12,6 +12,8 @@ export type RealtimeEventType =
   | "job_updated"
   | "interview_updated"
   | "document_updated"
+  | "folder_updated"
+  | "checklist_updated"
   | "holiday_updated"
   | "integration_sync"
   | "integration_webhook"

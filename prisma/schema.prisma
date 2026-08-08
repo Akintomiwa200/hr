@@ -51,6 +51,7 @@ enum JobStatus {
   OPEN
   CLOSED
   DRAFT
+  INACTIVE
 }
 
 enum ApplicationStatus {
@@ -144,6 +145,14 @@ model Company {
   holidays      Holiday[]
   attendanceDevices AttendanceDevice[]
   payrollSettings   PayrollSettings[]
+  recruitmentStages RecruitmentStage[]
+  recruitmentTags   RecruitmentTag[]
+  recruitmentSources RecruitmentSource[]
+  recruitmentEmailTemplates RecruitmentEmailTemplate[]
+  jobs              Job[]
+  documentFolders   DocumentFolder[]
+  checklistTemplates ChecklistTemplate[]
+  checklistInstances ChecklistInstance[]
 }
 
 model Notification {
@@ -208,6 +217,7 @@ model Employee {
   salary       Float     @default(0)
   address      String?
   dateOfBirth  DateTime?
+  gender       String?
   status       String    @default("ACTIVE")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -226,8 +236,12 @@ model Employee {
   jobApplications   JobApplication[]   @relation("ApplicationReviewer")
   interviews        Interview[]        @relation("InterviewInterviewer")
   interviewReviews  InterviewReview[]  @relation("InterviewReviewAuthor")
+  applicationEvaluations ApplicationEvaluation[] @relation("ApplicationEvaluationAuthor")
   appraisalsAsEmployee PerformanceAppraisal[] @relation("AppraisalEmployee")
   appraisalsAsManager  PerformanceAppraisal[] @relation("AppraisalManager")
+  checklistInstances   ChecklistInstance[]
+  assignedChecklistTasks ChecklistTask[] @relation("ChecklistTaskAssignee")
+  completedChecklistTasks ChecklistTask[] @relation("ChecklistTaskCompleter")
 }
 
 model LeaveRequest {
@@ -319,44 +333,58 @@ model PayrollSettings {
 }
 
 model Job {
-  id               String    @id @default(cuid())
-  title            String
-  departmentId     String
-  location         String
-  type             String
-  salaryMin        Float?
-  salaryMax        Float?
-  description      String
-  requirements     String
-  responsibilities String?
-  benefits         String?
-  status           JobStatus @default(OPEN)
-  postedAt         DateTime  @default(now())
-  closedAt         DateTime?
-  createdAt        DateTime  @default(now())
+  id                   String    @id @default(cuid())
+  title                String
+  departmentId         String
+  companyId            String?
+  location             String
+  office               String?
+  type                 String
+  quantity             Int       @default(1)
+  expectedClosingDate  DateTime?
+  salaryMin            Float?
+  salaryMax            Float?
+  description          String
+  requirements         String
+  responsibilities     String?
+  benefits             String?
+  hiringTeam           String?
+  pipelineStages       String?
+  status               JobStatus @default(OPEN)
+  postedAt             DateTime  @default(now())
+  closedAt             DateTime?
+  createdAt            DateTime  @default(now())
 
+  company      Company?         @relation(fields: [companyId], references: [id])
   department   Department       @relation(fields: [departmentId], references: [id])
   applications JobApplication[]
 }
 
 model JobApplication {
-  id          String            @id @default(cuid())
-  jobId       String
-  firstName   String
-  lastName    String
-  email       String
-  phone       String?
-  resumeUrl   String?
-  coverLetter String?
-  status      ApplicationStatus @default(APPLIED)
-  reviewerId  String?
-  notes       String?
-  appliedAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id            String            @id @default(cuid())
+  jobId         String
+  firstName     String
+  lastName      String
+  email         String
+  phone         String?
+  photoUrl      String?
+  resumeUrl     String?
+  coverLetter   String?
+  source        String?
+  pipelineStage String            @default("Applied")
+  status        ApplicationStatus @default(APPLIED)
+  reviewerId    String?
+  tagId         String?
+  notes         String?
+  appliedAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
-  job        Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  reviewer   Employee?   @relation("ApplicationReviewer", fields: [reviewerId], references: [id])
-  interviews Interview[]
+  job          Job                     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  reviewer     Employee?               @relation("ApplicationReviewer", fields: [reviewerId], references: [id])
+  tag          RecruitmentTag?         @relation(fields: [tagId], references: [id])
+  interviews   Interview[]
+  activities   ApplicationActivity[]
+  evaluations  ApplicationEvaluation[]
 }
 
 model Interview {
@@ -393,6 +421,81 @@ model InterviewReview {
 
   interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
   reviewer  Employee  @relation("InterviewReviewAuthor", fields: [reviewerId], references: [id])
+}
+
+model RecruitmentStage {
+  id        String  @id @default(cuid())
+  companyId String?
+  name      String
+  sortOrder Int     @default(0)
+  color     String  @default("blue")
+
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name])
+}
+
+model RecruitmentTag {
+  id        String  @id @default(cuid())
+  companyId String?
+  name      String
+  color     String  @default("violet")
+
+  company      Company?         @relation(fields: [companyId], references: [id])
+  applications JobApplication[]
+
+  @@unique([companyId, name])
+}
+
+model RecruitmentSource {
+  id        String  @id @default(cuid())
+  companyId String?
+  name      String
+
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name])
+}
+
+model RecruitmentEmailTemplate {
+  id        String   @id @default(cuid())
+  companyId String?
+  name      String
+  subject   String
+  body      String
+  stage     String?
+  updatedAt DateTime @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id])
+}
+
+model ApplicationActivity {
+  id            String   @id @default(cuid())
+  applicationId String
+  actorName     String?
+  type          String
+  title         String
+  message       String?
+  metadata      String?
+  createdAt     DateTime @default(now())
+
+  application JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+}
+
+model ApplicationEvaluation {
+  id            String   @id @default(cuid())
+  applicationId String
+  reviewerId    String
+  rating        String
+  feedback      String?
+  createdAt     DateTime @default(now())
+
+  application JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewer    Employee       @relation("ApplicationEvaluationAuthor", fields: [reviewerId], references: [id])
+
+  @@index([applicationId])
 }
 
 model GoogleIntegration {
@@ -572,16 +675,120 @@ model AppraisalKpiScore {
   @@unique([appraisalId, kpiId])
 }
 
+model DocumentFolder {
+  id            String   @id @default(cuid())
+  companyId     String?
+  name          String
+  description   String?
+  createdByName String
+  shareScope    String   @default("EVERYONE")
+  shareTargets  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  company   Company?   @relation(fields: [companyId], references: [id])
+  documents Document[]
+}
+
 model Document {
+  id            String   @id @default(cuid())
+  companyId     String?
+  folderId      String?
+  employeeId    String?
+  title         String
+  category      String
+  fileUrl       String?
+  fileName      String?
+  fileSize      Int?
+  uploadedBy    String
+  shareScope    String   @default("EVERYONE")
+  shareTargets  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  folder   DocumentFolder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  employee Employee?       @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+}
+
+model ChecklistTemplate {
+  id          String   @id @default(cuid())
+  companyId   String?
+  type        String
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company   Company?               @relation(fields: [companyId], references: [id])
+  tasks     ChecklistTemplateTask[]
+  instances ChecklistInstance[]
+}
+
+model ChecklistTemplateTask {
+  id            String  @id @default(cuid())
+  templateId    String
+  title         String
+  description   String?
+  taskType      String  @default("CHECKBOX")
+  assigneeType  String  @default("EMPLOYEE")
+  assigneeId    String?
+  dueDaysOffset Int?
+  sortOrder     Int     @default(0)
+
+  template ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
+model ChecklistInstance {
+  id         String    @id @default(cuid())
+  companyId  String?
+  templateId String?
+  type       String
+  employeeId String
+  startDate  DateTime
+  endDate    DateTime?
+  status     String    @default("IN_PROGRESS")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  company  Company?           @relation(fields: [companyId], references: [id])
+  template ChecklistTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  employee Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  tasks    ChecklistTask[]
+}
+
+model ChecklistTask {
+  id            String    @id @default(cuid())
+  instanceId    String
+  title         String
+  description   String?
+  taskType      String    @default("CHECKBOX")
+  status        String    @default("PENDING")
+  priority      String    @default("MEDIUM")
+  dueDate       DateTime?
+  assigneeId    String?
+  assigneeType  String?
+  sortOrder     Int       @default(0)
+  completedAt   DateTime?
+  completedById String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  instance    ChecklistInstance      @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  assignee    Employee?              @relation("ChecklistTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  completedBy Employee?              @relation("ChecklistTaskCompleter", fields: [completedById], references: [id], onDelete: SetNull)
+  comments    ChecklistTaskComment[]
+}
+
+model ChecklistTaskComment {
   id         String   @id @default(cuid())
-  employeeId String?
-  title      String
-  category   String
-  fileUrl    String?
-  uploadedBy String
+  taskId     String
+  authorId   String?
+  authorName String
+  content    String
   createdAt  DateTime @default(now())
 
-  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  task ChecklistTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 }
 
 model Announcement {

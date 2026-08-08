@@ -3,24 +3,31 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  Bell,
+  BookOpen,
   Briefcase,
   Building2,
   Calendar,
   Check,
+  ChevronRight,
   Clock,
   Copy,
+  CreditCard,
   Medal,
+  Plug,
   Radio,
   Search,
   Shield,
   Users,
   Wallet,
+  Webhook,
   Zap,
-  ChevronRight,
 } from "lucide-react";
 import { notify } from "@/lib/toast";
 import type { ApiCatalog, ApiEndpoint, ApiAuthType } from "@/lib/api-catalog";
 import { cn } from "@/lib/utils";
+import { DocsCodeBlock } from "./docs-code-block";
+import { CategoryGuidePanel } from "./category-guide-panel";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   radio: Radio,
@@ -33,6 +40,10 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   medal: Medal,
   building: Building2,
   search: Search,
+  plug: Plug,
+  bell: Bell,
+  credit: CreditCard,
+  webhook: Webhook,
 };
 
 const METHOD_STYLES: Record<string, string> = {
@@ -57,6 +68,8 @@ const AUTH_LABELS: Record<ApiAuthType, string> = {
   oauth: "OAuth",
 };
 
+type DocsView = "guide" | "reference";
+
 function MethodBadge({ method }: { method: string }) {
   return (
     <span
@@ -78,37 +91,14 @@ function AuthBadge({ auth }: { auth: ApiAuthType }) {
   );
 }
 
-function CodeBlock({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const copy = async () => {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    notify.success("Copied");
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="relative group">
-      <pre className="bg-gray-900 rounded-xl p-4 text-[12px] text-gray-100 overflow-x-auto font-mono leading-relaxed">
-        {code}
-      </pre>
-      <button
-        type="button"
-        onClick={copy}
-        className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/10 opacity-0 group-hover:opacity-100 hover:bg-white/20 transition-all"
-      >
-        {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-white" />}
-      </button>
-    </div>
-  );
-}
-
 function EndpointCard({ endpoint, baseUrl }: { endpoint: ApiEndpoint; baseUrl: string }) {
   const fullUrl = `${baseUrl}${endpoint.path.replace(":id", "{id}")}`;
 
   return (
-    <article className="rounded-2xl border border-gray-100 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:border-brand-100 transition-colors">
+    <article
+      id={endpoint.id}
+      className="rounded-2xl border border-gray-100 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:border-brand-100 transition-colors scroll-mt-28"
+    >
       <div className="p-5 sm:p-6">
         <div className="flex flex-wrap items-start gap-2 mb-3">
           <MethodBadge method={endpoint.method} />
@@ -157,17 +147,31 @@ function EndpointCard({ endpoint, baseUrl }: { endpoint: ApiEndpoint; baseUrl: s
           </div>
         )}
 
+        {endpoint.headers && endpoint.headers.length > 0 && (
+          <div className="mb-4">
+            <p className="text-[11px] font-semibold uppercase text-gray-400 mb-2">Headers</p>
+            <div className="space-y-1.5">
+              {endpoint.headers.map((h) => (
+                <div key={h.name} className="flex gap-2 text-sm">
+                  <code className="text-brand-600 font-mono text-xs">{h.name}</code>
+                  <span className="text-gray-500">{h.description}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {endpoint.body && (
           <div className="mb-4">
             <p className="text-[11px] font-semibold uppercase text-gray-400 mb-2">Request body</p>
-            <CodeBlock code={JSON.stringify(endpoint.body, null, 2)} />
+            <DocsCodeBlock code={JSON.stringify(endpoint.body, null, 2)} />
           </div>
         )}
 
         {endpoint.response && (
           <div>
             <p className="text-[11px] font-semibold uppercase text-gray-400 mb-2">Response example</p>
-            <CodeBlock code={JSON.stringify(endpoint.response, null, 2)} />
+            <DocsCodeBlock code={JSON.stringify(endpoint.response, null, 2)} />
           </div>
         )}
 
@@ -180,12 +184,247 @@ function EndpointCard({ endpoint, baseUrl }: { endpoint: ApiEndpoint; baseUrl: s
             <ChevronRight className="w-3.5 h-3.5" />
           </Link>
         )}
+
+        {endpoint.tags?.includes("integrations") && (
+          <Link
+            href="/settings/integrations"
+            className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700"
+          >
+            Open integrations settings
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+
+        {endpoint.tags?.includes("organization") && (
+          <div className="mt-4 flex flex-wrap gap-3">
+            {[
+              { href: "/departments", label: "Departments" },
+              { href: "/holidays", label: "Holidays" },
+              { href: "/announcements", label: "Announcements" },
+              { href: "/documents", label: "Documents" },
+            ].map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700"
+              >
+                {link.label}
+                <ChevronRight className="w-3 h-3" />
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {endpoint.tags?.includes("leave") && (
+          <Link href="/leave" className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700">
+            Open leave management
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+
+        {endpoint.tags?.includes("employees") && (
+          <Link href="/employees" className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700">
+            Open employee directory
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+
+        {endpoint.tags?.includes("payroll") && (
+          <Link href="/payroll" className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700">
+            Open payroll
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+
+        {endpoint.tags?.includes("recruitment") && (
+          <Link href="/recruitment" className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700">
+            Open recruitment
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+
+        {endpoint.tags?.includes("performance") && (
+          <Link href="/performance" className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700">
+            Open performance
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+
+        {endpoint.tags?.includes("admin") && (
+          <Link href="/settings/subscription" className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700">
+            Open subscription settings
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
       </div>
     </article>
   );
 }
 
-export function ApiDocsModule({ catalog }: { catalog: ApiCatalog }) {
+function GettingStartedPanel({ catalog }: { catalog: ApiCatalog }) {
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-brand-500 flex items-center justify-center">
+            <BookOpen className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Getting started</h2>
+            <p className="text-sm text-gray-500">Connect to Smart HR in minutes</p>
+          </div>
+        </div>
+
+        <div className="prose prose-sm max-w-none text-gray-600 space-y-4">
+          <p>
+            Smart HR exposes a REST JSON API scoped per company (tenant). Most endpoints require a
+            session cookie obtained from login. Device kiosks use API keys. Live dashboard updates
+            stream over Server-Sent Events.
+          </p>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            {
+              title: "Base URL",
+              body: catalog.baseUrl,
+              mono: true,
+            },
+            {
+              title: "Machine-readable catalog",
+              body: `${catalog.baseUrl}/api/catalog`,
+              mono: true,
+            },
+            {
+              title: "In-app API docs",
+              body: "Documentation → API reference (signed-in HR / device admins)",
+              mono: false,
+            },
+            {
+              title: "Device console",
+              body: `${catalog.baseUrl}/attendance/devices`,
+              mono: true,
+            },
+          ].map((item) => (
+            <div key={item.title} className="rounded-xl border border-gray-100 p-4 bg-gray-50/50">
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">{item.title}</p>
+              <p className={cn("text-sm text-gray-900", item.mono && "font-mono text-brand-700 break-all")}>
+                {item.body}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h3 className="text-base font-bold text-gray-900 mb-2">1. Session authentication</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Sign in with email and password. The response sets an HTTP-only cookie{" "}
+          <code className="text-xs bg-gray-100 px-1 rounded">smart-hr-session</code> used on all
+          subsequent requests from the browser or API client.
+        </p>
+        <DocsCodeBlock
+          code={`POST ${catalog.baseUrl}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "hr@smarthr.com",
+  "password": "password"
+}
+
+# Include cookie on later requests:
+Cookie: smart-hr-session=…`}
+        />
+      </div>
+
+      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h3 className="text-base font-bold text-gray-900 mb-2">2. Attendance device keys</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Register a kiosk in the{" "}
+          <Link href="/attendance/devices" className="text-brand-600 font-medium hover:underline">
+            device console
+          </Link>
+          . Send the API key on every punch request. Idempotent replays use{" "}
+          <code className="text-xs bg-gray-100 px-1 rounded">externalId</code>.
+        </p>
+        <DocsCodeBlock
+          code={`POST ${catalog.baseUrl}/api/attendance/device
+X-Device-Key: dev_your_key_here
+Content-Type: application/json
+
+{
+  "action": "toggle",
+  "employeeCode": "EMP001",
+  "externalId": "kiosk-punch-12345"
+}`}
+        />
+      </div>
+
+      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h3 className="text-base font-bold text-gray-900 mb-2">3. Realtime (SSE)</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Subscribe once while logged in. Events include attendance punches, leave updates, payroll
+          changes, recruitment updates, and device heartbeats.
+        </p>
+        <DocsCodeBlock
+          code={`GET ${catalog.baseUrl}/api/events
+Cookie: smart-hr-session=…
+Accept: text/event-stream
+
+# Event types:
+# attendance_updated, device_ping, leave_updated,
+# payroll_updated, job_updated, employee_updated,
+# notification_created, subscription_updated`}
+        />
+      </div>
+
+      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h3 className="text-base font-bold text-gray-900 mb-2">4. OAuth integrations</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Connect Google Workspace or Zoho from{" "}
+          <Link href="/settings/integrations" className="text-brand-600 font-medium hover:underline">
+            Settings → Integrations
+          </Link>
+          . The connect URL redirects through OAuth and stores tokens per company.
+        </p>
+        <DocsCodeBlock
+          code={`GET ${catalog.baseUrl}/api/integrations/google-workspace/connect
+Cookie: smart-hr-session=…
+
+# Redirects to provider → callback → /settings/integrations?connected={slug}`}
+        />
+      </div>
+
+      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h3 className="text-base font-bold text-gray-900 mb-2">5. Errors &amp; limits</h3>
+        <ul className="text-sm text-gray-600 space-y-2 list-disc pl-5">
+          <li>
+            <strong>401</strong> — missing or expired session
+          </li>
+          <li>
+            <strong>403</strong> — role not permitted for this action
+          </li>
+          <li>
+            <strong>402</strong> — subscription limit (employee cap, trial expired)
+          </li>
+          <li>
+            <strong>409</strong> — duplicate email on employee create
+          </li>
+          <li>All JSON errors: <code className="text-xs bg-gray-100 px-1 rounded">{`{ "error": "message" }`}</code></li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+export function ApiDocsModule({
+  catalog,
+  embedded = false,
+}: {
+  catalog: ApiCatalog;
+  embedded?: boolean;
+}) {
+  const [view, setView] = useState<DocsView>("guide");
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState(catalog.categories[0]?.id ?? "");
 
@@ -208,6 +447,20 @@ export function ApiDocsModule({ catalog }: { catalog: ApiCatalog }) {
   }, [catalog, query]);
 
   useEffect(() => {
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    if (hash === "guide") {
+      setView("guide");
+      return;
+    }
+    const cat = catalog.categories.find((c) => c.id === hash);
+    if (cat) {
+      setView("reference");
+      setActiveCategory(cat.id);
+    }
+  }, [catalog.categories]);
+
+  useEffect(() => {
     if (filteredCategories.length === 0) return;
     const stillVisible = filteredCategories.some((c) => c.id === activeCategory);
     if (!stillVisible) {
@@ -215,18 +468,55 @@ export function ApiDocsModule({ catalog }: { catalog: ApiCatalog }) {
     }
   }, [filteredCategories, activeCategory]);
 
+  const selectCategory = (id: string) => {
+    setView("reference");
+    setActiveCategory(id);
+    window.history.replaceState(null, "", `#${id}`);
+  };
+
   const activeCat =
     filteredCategories.find((c) => c.id === activeCategory) ?? filteredCategories[0] ?? null;
 
   const ActiveIcon = activeCat ? (ICONS[activeCat.icon] ?? Radio) : Radio;
 
   return (
-    <div className="space-y-6">
+    <div className={cn("space-y-6", embedded && "-mt-2")}>
       <div className="rounded-2xl border border-brand-100 bg-gradient-to-r from-brand-50/70 via-white to-white p-5 sm:p-6">
-        <div className="flex items-center gap-2 text-brand-600 text-sm font-medium mb-4">
-          <Zap className="w-4 h-4" />
-          REST API v{catalog.version}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+          <div className="flex items-center gap-2 text-brand-600 text-sm font-medium">
+            <Zap className="w-4 h-4" />
+            REST API v{catalog.version}
+          </div>
+          <div className="flex rounded-xl border border-gray-200 bg-white p-1 self-start">
+            <button
+              type="button"
+              onClick={() => {
+                setView("guide");
+                window.history.replaceState(null, "", "#guide");
+              }}
+              className={cn(
+                "px-4 py-2 text-[13px] font-semibold rounded-lg transition-colors",
+                view === "guide" ? "bg-brand-500 text-white" : "text-gray-600 hover:text-gray-900"
+              )}
+            >
+              Getting started
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setView("reference");
+                if (activeCategory) window.history.replaceState(null, "", `#${activeCategory}`);
+              }}
+              className={cn(
+                "px-4 py-2 text-[13px] font-semibold rounded-lg transition-colors",
+                view === "reference" ? "bg-brand-500 text-white" : "text-gray-600 hover:text-gray-900"
+              )}
+            >
+              API reference
+            </button>
+          </div>
         </div>
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
           <div className="rounded-xl bg-white border border-gray-100 px-4 py-3">
             <p className="text-2xl font-bold text-gray-900">{catalog.stats.endpoints}</p>
@@ -241,6 +531,7 @@ export function ApiDocsModule({ catalog }: { catalog: ApiCatalog }) {
             <p className="text-xs text-gray-500">Base URL</p>
           </div>
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {[
             { label: "Session auth", value: catalog.auth.session, icon: Shield },
@@ -258,115 +549,112 @@ export function ApiDocsModule({ catalog }: { catalog: ApiCatalog }) {
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search endpoints by name, path, or method…"
-          className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/25 focus:border-brand-500"
-        />
-      </div>
-
-      <div className="flex flex-col lg:flex-row gap-6">
-        <aside className="lg:w-56 shrink-0">
-          <nav className="lg:sticky lg:top-24 space-y-1 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm">
-            {catalog.categories.map((cat) => {
-              const Icon = ICONS[cat.icon] ?? Radio;
-              const count = filteredCategories.find((c) => c.id === cat.id)?.endpoints.length ?? 0;
-              const hiddenBySearch = query.trim() && count === 0;
-
-              if (hiddenBySearch) return null;
-
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={cn(
-                    "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-[13px] transition-colors",
-                    activeCategory === cat.id
-                      ? "bg-brand-500 text-white"
-                      : "text-gray-600 hover:bg-gray-50"
-                  )}
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span className="flex-1 truncate">{cat.title}</span>
-                  <span
-                    className={cn(
-                      "text-[10px]",
-                      activeCategory === cat.id ? "text-white/70" : "text-gray-400"
-                    )}
-                  >
-                    {query.trim() ? count : cat.endpoints.length}
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="mt-4 p-4 rounded-2xl border border-brand-100 bg-brand-50/50">
-            <p className="text-sm font-semibold text-gray-900 mb-1">Device integration</p>
-            <p className="text-xs text-gray-500 mb-3">Register kiosks and test live punches.</p>
-            <Link
-              href="/attendance/devices"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
-            >
-              Open device console
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
+      {view === "guide" ? (
+        <GettingStartedPanel catalog={catalog} />
+      ) : (
+        <>
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search endpoints by name, path, or method…"
+              className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/25 focus:border-brand-500"
+            />
           </div>
-        </aside>
 
-        <main className="flex-1 min-w-0">
-          {!activeCat ? (
-            <div className="text-center py-16 text-gray-500 rounded-2xl border border-gray-100 bg-white">
-              No endpoints match &ldquo;{query}&rdquo;
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center">
-                  <ActiveIcon className="w-4 h-4 text-white" />
-                </div>
+          <div className="flex flex-col lg:flex-row gap-6">
+            <aside className="lg:w-56 shrink-0">
+              <nav className="lg:sticky lg:top-24 space-y-1 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm max-h-[70vh] overflow-y-auto">
+                {catalog.categories.map((cat) => {
+                  const Icon = ICONS[cat.icon] ?? Radio;
+                  const count = filteredCategories.find((c) => c.id === cat.id)?.endpoints.length ?? 0;
+                  const hiddenBySearch = query.trim() && count === 0;
+
+                  if (hiddenBySearch) return null;
+
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => selectCategory(cat.id)}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-[13px] transition-colors",
+                        activeCategory === cat.id
+                          ? "bg-brand-500 text-white"
+                          : "text-gray-600 hover:bg-gray-50"
+                      )}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="flex-1 truncate">{cat.title}</span>
+                      <span
+                        className={cn(
+                          "text-[10px]",
+                          activeCategory === cat.id ? "text-white/70" : "text-gray-400"
+                        )}
+                      >
+                        {query.trim() ? count : cat.endpoints.length}
+                      </span>
+                    </button>
+                  );
+                })}
+              </nav>
+
+              <div className="mt-4 p-4 rounded-2xl border border-brand-100 bg-brand-50/50 space-y-3">
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">{activeCat.title}</h2>
-                  <p className="text-sm text-gray-500">{activeCat.description}</p>
+                  <p className="text-sm font-semibold text-gray-900 mb-1">Device integration</p>
+                  <p className="text-xs text-gray-500 mb-2">Register kiosks and test live punches.</p>
+                  <Link
+                    href="/attendance/devices"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
+                  >
+                    Open device console
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+                <div className="border-t border-brand-100 pt-3">
+                  <p className="text-sm font-semibold text-gray-900 mb-1">In-app help</p>
+                  <Link
+                    href="/help"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
+                  >
+                    Help center guides
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
               </div>
+            </aside>
 
-              <div className="space-y-3">
-                {activeCat.endpoints.map((ep) => (
-                  <EndpointCard key={ep.id} endpoint={ep} baseUrl={catalog.baseUrl} />
-                ))}
-              </div>
+            <main className="flex-1 min-w-0">
+              {!activeCat ? (
+                <div className="text-center py-16 text-gray-500 rounded-2xl border border-gray-100 bg-white">
+                  No endpoints match &ldquo;{query}&rdquo;
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center">
+                      <ActiveIcon className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-900">{activeCat.title}</h2>
+                      <p className="text-sm text-gray-500">{activeCat.description}</p>
+                    </div>
+                  </div>
 
-              {activeCat.id === "attendance" && !query.trim() && (
-                <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50/80 to-white p-6">
-                  <h3 className="text-base font-bold text-gray-900 mb-2">Quick start — device punch</h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Register a device, copy the API key, then POST a punch. Attendance updates live via SSE.
-                  </p>
-                  <CodeBlock
-                    code={`GET ${catalog.baseUrl}/api/attendance/device
-X-Device-Key: your-device-api-key
+                  <CategoryGuidePanel categoryId={activeCat.id} catalog={catalog} query={query} />
 
-POST ${catalog.baseUrl}/api/attendance/device
-X-Device-Key: your-device-api-key
-Content-Type: application/json
-
-{
-  "action": "toggle",
-  "employeeCode": "EMP001",
-  "externalId": "punch-${Date.now()}"
-}`}
-                  />
+                  <div className="space-y-3">
+                    {activeCat.endpoints.map((ep) => (
+                      <EndpointCard key={ep.id} endpoint={ep} baseUrl={catalog.baseUrl} />
+                    ))}
+                  </div>
                 </div>
               )}
-            </div>
-          )}
-        </main>
-      </div>
+            </main>
+          </div>
+        </>
+      )}
     </div>
   );
 }

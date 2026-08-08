@@ -4,28 +4,35 @@ import { canManageRecruitment } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
-import { RecruitmentModule } from "@/components/recruitment/recruitment-module";
+import { JobsListModule } from "@/components/recruitment/jobs-list-module";
 import { RecruitmentTabs } from "@/components/recruitment/recruitment-tabs";
-import { GoogleCalendarConnect } from "@/components/recruitment/google-calendar-connect";
+import { getRecruitmentContextForSession } from "@/lib/recruitment/data";
+import { getCompanyScope, departmentCompanyWhere } from "@/lib/company-scope";
 
 export default async function RecruitmentPage() {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.role === "EMPLOYEE") redirect("/dashboard");
 
-  const [jobs, departments] = await Promise.all([
+  const scope = getCompanyScope(session);
+
+  const [jobs, departments, ctx] = await Promise.all([
     prisma.job.findMany({
       include: { department: true, applications: true },
       orderBy: { postedAt: "desc" },
     }),
-    prisma.department.findMany({ orderBy: { name: "asc" } }),
+    prisma.department.findMany({
+      where: departmentCompanyWhere(scope),
+      orderBy: { name: "asc" },
+    }),
+    getRecruitmentContextForSession(session),
   ]);
 
   return (
     <div>
       <PageHeader
         title="Recruitment"
-        description="Manage jobs, candidates, Google Calendar interviews, and reviews"
+        description="Manage all job posts, pipelines, and hiring workflows"
         action={
           <ModulePageActions
             helpSlug="recruitment"
@@ -36,12 +43,10 @@ export default async function RecruitmentPage() {
         }
       />
       <RecruitmentTabs />
-      <div className="mb-6">
-        <GoogleCalendarConnect />
-      </div>
-      <RecruitmentModule
+      <JobsListModule
         jobs={jobs}
         departments={departments}
+        employees={ctx.employees}
         canManage={canManageRecruitment(session.role)}
       />
     </div>

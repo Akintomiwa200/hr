@@ -16,7 +16,11 @@ export async function DELETE(
   if (!existing) return notFound();
 
   await prisma.document.delete({ where: { id } });
-  broadcastAppEvent("document_updated", { id });
+  broadcastAppEvent("document_updated", { id, action: "deleted" });
+  if (existing.folderId) {
+    broadcastAppEvent("folder_updated", { id: existing.folderId, action: "file_removed" });
+    revalidatePath(`/documents/${existing.folderId}`);
+  }
   revalidatePath("/documents");
   return NextResponse.json({ success: true });
 }

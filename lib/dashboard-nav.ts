@@ -25,7 +25,13 @@ import {
   Router,
   Plug2,
   CreditCard,
+  BookOpen,
+  CheckSquare,
+  ListTodo,
+  UserMinus,
+  BarChart3,
 } from "lucide-react";
+import { CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
 import {
   ALL_STAFF,
   DEVICE_ADMIN_ROLES,
@@ -40,6 +46,7 @@ import {
   SETTINGS_ROLES,
   SUBSCRIPTION_ADMIN_ROLES,
   SUPER_ADMIN_ONLY,
+  REPORTS_VIEW_ROLES,
 } from "@/lib/roles";
 
 export type NavItem = {
@@ -179,6 +186,47 @@ export const dashboardNavSections: NavSection[] = [
     ],
   },
   {
+    title: "Checklist",
+    items: [
+      {
+        id: "checklist-todos",
+        href: "/checklist/todos",
+        label: "To-Dos",
+        pageTitle: "Checklist — To-Dos",
+        icon: ListTodo,
+        roles: CHECKLIST_VIEW_ROLES,
+        match: (pathname) => pathname === "/checklist/todos",
+      },
+      {
+        id: "checklist-onboarding",
+        href: "/checklist/onboarding",
+        label: "Onboarding",
+        pageTitle: "Onboarding Checklists",
+        icon: GraduationCap,
+        roles: CHECKLIST_VIEW_ROLES,
+        match: (pathname) => pathname.startsWith("/checklist/onboarding"),
+      },
+      {
+        id: "checklist-offboarding",
+        href: "/checklist/offboarding",
+        label: "Offboarding",
+        pageTitle: "Offboarding Checklists",
+        icon: UserMinus,
+        roles: CHECKLIST_VIEW_ROLES,
+        match: (pathname) => pathname.startsWith("/checklist/offboarding"),
+      },
+      {
+        id: "checklist-settings",
+        href: "/checklist/settings",
+        label: "Settings",
+        pageTitle: "Checklist Settings",
+        icon: CheckSquare,
+        roles: ONBOARDING_ROLES,
+        match: (pathname) => pathname.startsWith("/checklist/settings"),
+      },
+    ],
+  },
+  {
     title: "Talent",
     items: [
       {
@@ -233,6 +281,20 @@ export const dashboardNavSections: NavSection[] = [
     ],
   },
   {
+    title: "Insights",
+    items: [
+      {
+        id: "reports",
+        href: "/reports",
+        label: "Reports",
+        pageTitle: "Reports",
+        icon: BarChart3,
+        roles: REPORTS_VIEW_ROLES,
+        match: (pathname) => pathname.startsWith("/reports"),
+      },
+    ],
+  },
+  {
     title: "More",
     items: [
       {
@@ -266,6 +328,14 @@ export const dashboardNavSections: NavSection[] = [
         pageTitle: "Integrations",
         icon: Plug2,
         roles: INTEGRATION_ADMIN_ROLES,
+      },
+      {
+        id: "docs",
+        href: "/docs",
+        label: "Documentation",
+        pageTitle: "Documentation",
+        icon: BookOpen,
+        roles: [...INTEGRATION_ADMIN_ROLES, ...DEVICE_ADMIN_ROLES],
       },
       {
         id: "subscription",
@@ -377,6 +447,10 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
     title: "Candidate Profile",
   },
   {
+    test: (p) => p === "/recruitment/settings",
+    title: "Recruitment Settings",
+  },
+  {
     test: (p) => p === "/recruitment",
     title: "Recruitment",
   },
@@ -384,7 +458,8 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
     test: (p) =>
       /^\/recruitment\/[^/]+$/.test(p) &&
       !p.startsWith("/recruitment/candidates") &&
-      !p.startsWith("/recruitment/interviews"),
+      !p.startsWith("/recruitment/interviews") &&
+      !p.startsWith("/recruitment/settings"),
     title: "Job Details",
   },
   {
@@ -406,6 +481,22 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
   {
     test: (p) => p.startsWith("/help/") && p !== "/help",
     title: "Help Guide",
+  },
+  {
+    test: (p) => /^\/documents\/[^/]+$/.test(p),
+    title: "Folder Documents",
+  },
+  {
+    test: (p) => p.startsWith("/reports"),
+    title: "Reports",
+  },
+  {
+    test: (p) => p.startsWith("/checklist/"),
+    title: "Checklist",
+  },
+  {
+    test: (p) => p === "/docs",
+    title: "Documentation",
   },
   {
     test: (p) => p === "/attendance/devices",

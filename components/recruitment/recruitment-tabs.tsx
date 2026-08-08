@@ -2,45 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Briefcase, CalendarClock, Settings, UserSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
-  { href: "/recruitment", label: "Jobs", match: (p: string) =>
-      p === "/recruitment" ||
-      (/^\/recruitment\/[^/]+$/.test(p) &&
-        !p.startsWith("/recruitment/candidates") &&
-        !p.startsWith("/recruitment/interviews")) },
-  { href: "/recruitment/candidates", label: "Candidates", match: (p: string) =>
-      p.startsWith("/recruitment/candidates") },
-  { href: "/recruitment/interviews", label: "Interviews", match: (p: string) =>
-      p === "/recruitment/interviews" },
+  { href: "/recruitment", label: "Jobs", icon: Briefcase, match: (p: string) => p === "/recruitment" || (/^\/recruitment\/[^/]+$/.test(p) && !p.includes("candidates") && !p.includes("interviews") && !p.includes("settings")) },
+  { href: "/recruitment/candidates", label: "Candidates", icon: UserSearch, match: (p: string) => p.startsWith("/recruitment/candidates") },
+  { href: "/recruitment/interviews", label: "Interviews", icon: CalendarClock, match: (p: string) => p.startsWith("/recruitment/interviews") },
+  { href: "/recruitment/settings", label: "Settings", icon: Settings, match: (p: string) => p.startsWith("/recruitment/settings") },
 ];
 
 export function RecruitmentTabs() {
   const pathname = usePathname();
 
   return (
-    <nav
-      aria-label="Recruitment sections"
-      className="flex flex-wrap gap-1 p-1 mb-6 bg-gray-100/80 rounded-xl w-fit"
-    >
+    <div className="flex flex-wrap gap-2 mb-6 p-1 bg-gray-100/80 rounded-xl w-fit">
       {tabs.map((tab) => {
         const active = tab.match(pathname);
+        const Icon = tab.icon;
         return (
           <Link
             key={tab.href}
             href={tab.href}
             className={cn(
-              "px-4 py-2 text-[13px] font-medium rounded-lg transition-colors",
+              "inline-flex items-center gap-2 px-4 py-2 text-[13px] font-medium rounded-lg transition-colors",
               active
-                ? "bg-white text-violet-700 shadow-sm"
-                : "text-gray-600 hover:text-gray-900"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-800"
             )}
           >
+            <Icon className="w-4 h-4" />
             {tab.label}
           </Link>
         );
       })}
-    </nav>
+    </div>
   );
 }

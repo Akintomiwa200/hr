@@ -1,34 +1,36 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { canManageRecruitment, RECRUITMENT_ROLES } from "@/lib/roles";
+import { canManageRecruitment } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { RecruitmentTabs } from "@/components/recruitment/recruitment-tabs";
-import { CandidatesModule } from "@/components/recruitment/candidates-module";
+import { CandidatesPageModule } from "@/components/recruitment/candidates-page-module";
+import { getRecruitmentContextForSession } from "@/lib/recruitment/data";
 
 export default async function CandidatesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.role === "EMPLOYEE") redirect("/dashboard");
 
-  const [applications, reviewers] = await Promise.all([
+  const [applications, jobs, ctx] = await Promise.all([
     prisma.jobApplication.findMany({
-      include: { job: true, reviewer: true },
+      include: {
+        job: { select: { id: true, title: true } },
+        tag: true,
+        reviewer: true,
+      },
       orderBy: { appliedAt: "desc" },
     }),
-    prisma.employee.findMany({
-      where: { user: { role: { in: RECRUITMENT_ROLES } } },
-      select: { id: true, firstName: true, lastName: true },
-      orderBy: { firstName: "asc" },
-    }),
+    prisma.job.findMany({ select: { id: true, title: true }, orderBy: { title: "asc" } }),
+    getRecruitmentContextForSession(session),
   ]);
 
   return (
     <div>
       <PageHeader
         title="Candidates"
-        description="Review and manage job applications"
+        description="Browse, filter, and manage all applicants"
         action={
           <ModulePageActions
             helpSlug="recruitment"
@@ -39,9 +41,13 @@ export default async function CandidatesPage() {
         }
       />
       <RecruitmentTabs />
-      <CandidatesModule
+      <CandidatesPageModule
         applications={applications}
-        reviewers={reviewers}
+        jobs={jobs}
+        stages={ctx.stageNames}
+        sources={ctx.sources}
+        tags={ctx.tags}
+        emailTemplates={ctx.templates}
         canManage={canManageRecruitment(session.role)}
       />
     </div>

@@ -8,11 +8,39 @@ function createPrismaClient() {
   });
 }
 
+type PrismaLike = Record<string, { findMany?: unknown; count?: unknown; create?: unknown } | undefined>;
+
+function hasDelegate(client: PrismaClient, key: string, method: "findMany" | "count" | "create") {
+  const delegate = (client as unknown as PrismaLike)[key];
+  return typeof delegate?.[method] === "function";
+}
+
+/** Dev hot-reload can cache an old client missing newly generated models. */
+function isPrismaClientFresh(client: PrismaClient) {
+  return (
+    hasDelegate(client, "notification", "findMany") &&
+    hasDelegate(client, "recruitmentStage", "count") &&
+    hasDelegate(client, "recruitmentTag", "count") &&
+    hasDelegate(client, "recruitmentSource", "count") &&
+    hasDelegate(client, "recruitmentEmailTemplate", "count") &&
+    hasDelegate(client, "applicationActivity", "create") &&
+    hasDelegate(client, "applicationEvaluation", "create") &&
+    hasDelegate(client, "documentFolder", "findMany") &&
+    hasDelegate(client, "checklistTemplate", "findMany") &&
+    hasDelegate(client, "checklistInstance", "findMany") &&
+    hasDelegate(client, "checklistTask", "findMany") &&
+    hasDelegate(client, "checklistTaskComment", "create")
+  );
+}
+
 function getPrismaClient() {
   const cached = globalForPrisma.prisma;
-  // Dev hot-reload can keep an old client missing newly generated models.
-  if (cached && "notification" in cached) {
+  if (cached && isPrismaClientFresh(cached)) {
     return cached;
+  }
+
+  if (cached && process.env.NODE_ENV !== "production") {
+    globalForPrisma.prisma = undefined;
   }
 
   const client = createPrismaClient();
@@ -22,8 +50,43 @@ function getPrismaClient() {
   return client;
 }
 
-export const prisma = getPrismaClient();
+/** Always resolves through getPrismaClient() so hot-reload picks up new models. */
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    const client = getPrismaClient();
+    const value = Reflect.get(client as object, prop, client);
+    return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(client) : value;
+  },
+});
 
-export function isNotificationModelReady(): boolean {
-  return typeof (prisma as { notification?: { findMany: unknown } }).notification?.findMany === "function";
+export function isNotificationModelReady() {
+  return hasDelegate(getPrismaClient(), "notification", "findMany");
+}
+
+export function isRecruitmentModelsReady() {
+  const client = getPrismaClient();
+  return (
+    hasDelegate(client, "recruitmentStage", "count") &&
+    hasDelegate(client, "recruitmentTag", "count") &&
+    hasDelegate(client, "recruitmentSource", "count") &&
+    hasDelegate(client, "recruitmentEmailTemplate", "count")
+  );
+}
+
+export function isApplicationActivityReady() {
+  return hasDelegate(getPrismaClient(), "applicationActivity", "create");
+}
+
+export function isDocumentFolderModelReady() {
+  return hasDelegate(getPrismaClient(), "documentFolder", "findMany");
+}
+
+export function isChecklistModelsReady() {
+  const client = getPrismaClient();
+  return (
+    hasDelegate(client, "checklistTemplate", "findMany") &&
+    hasDelegate(client, "checklistInstance", "findMany") &&
+    hasDelegate(client, "checklistTask", "findMany") &&
+    hasDelegate(client, "checklistTaskComment", "create")
+  );
 }

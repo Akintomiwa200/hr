@@ -54,11 +54,11 @@ export function ModulesDirectory({ role }: { role: Role }) {
 
       <Card className="p-5 bg-gray-50 border-gray-100">
         <p className="text-sm text-gray-600">
-          Public API docs for developers and device integrations are at{" "}
-          <Link href="/api" className="font-medium text-violet-600 hover:text-violet-700">
-            /api
-          </Link>
-          . In-app guides cover each module in detail above.
+          Public API docs for developers and device integrations are in the app under{" "}
+          <Link href="/docs" className="font-medium text-violet-600 hover:text-violet-700">
+            Documentation
+          </Link>{" "}
+          (HR admins and device managers). In-app guides cover each module in detail above.
         </p>
       </Card>
     </section>

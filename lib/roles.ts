@@ -66,6 +66,17 @@ export const SETTINGS_ROLES: Role[] = ALL_ROLES;
 export const SUPER_ADMIN_ONLY: Role[] = ["SUPER_ADMIN"];
 export const SUPERVISOR_ROLES: Role[] = ["SUPERVISOR"];
 
+/** Full org-wide reports (HR analytics). */
+export const REPORTS_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
+/** Team-scoped reports for managers/supervisors. */
+export const REPORTS_TEAM_ROLES: Role[] = ["MANAGER", "SUPERVISOR"];
+/** Anyone who can open the Reports module. */
+export const REPORTS_VIEW_ROLES: Role[] = [
+  ...REPORTS_ADMIN_ROLES,
+  ...REPORTS_TEAM_ROLES,
+  "EMPLOYEE",
+];
+
 export function normalizeRole(role: string): Role {
   if (role === "ADMIN") return "COMPANY_ADMIN";
   return role as Role;

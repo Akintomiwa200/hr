@@ -42,11 +42,17 @@ export async function getPayrollSettings(
 
 export async function ensurePayrollSettings(companyId?: string | null) {
   if (companyId) {
-    const existing = await prisma.payrollSettings.findUnique({ where: { companyId } });
-    if (existing) return existing;
-    return prisma.payrollSettings.create({
-      data: { companyId, ...defaultPayrollSettings },
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
     });
+    if (company) {
+      const existing = await prisma.payrollSettings.findUnique({ where: { companyId } });
+      if (existing) return existing;
+      return prisma.payrollSettings.create({
+        data: { companyId, ...defaultPayrollSettings },
+      });
+    }
   }
   const existing = await prisma.payrollSettings.findFirst();
   if (existing) return existing;

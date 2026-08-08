@@ -274,7 +274,7 @@ export function DeviceIntegrationHub() {
         </Link>
         <div className="flex flex-wrap gap-2">
           <Link
-            href="/api"
+            href="/docs"
             className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-brand-600 bg-brand-50 border border-brand-100 rounded-xl hover:bg-brand-100"
           >
             <BookOpen className="w-4 h-4" />

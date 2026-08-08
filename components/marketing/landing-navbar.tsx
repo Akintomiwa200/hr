@@ -9,7 +9,6 @@ const navLinks = [
   { href: "/features", label: "Features" },
   { href: "/why", label: "Why Smart HR" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/api", label: "API" },
 ];
 
 export function LandingNavbar({ isAuthenticated = false }: { isAuthenticated?: boolean }) {

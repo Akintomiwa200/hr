@@ -190,7 +190,7 @@ export const helpArticles: HelpArticle[] = [
       },
       {
         heading: "Device integration API",
-        body: "Open Attendance → Device API for full REST documentation, register kiosks, ping devices, and test punches. GET /api/attendance/device returns the spec; authenticated devices receive live online status. Punches broadcast attendance_updated and device_ping over SSE.",
+        body: "Open Attendance → Devices for the integration console, or visit /docs for the full REST reference. Register kiosks, ping devices, and test punches. GET /api/attendance/device returns the spec; authenticated devices receive live online status. Punches broadcast attendance_updated and device_ping over SSE.",
       },
       {
         heading: "Device integration",
@@ -264,7 +264,7 @@ export const helpArticles: HelpArticle[] = [
       },
       {
         heading: "Onboarding",
-        body: "Admins and managers add employees from Onboarding (/employees/new). Each new account gets default password password123, works immediately at login, and receives a welcome email with credentials via Nodemailer.",
+        body: "Admins and managers add employees from Onboarding (/employees/new). Each new account gets default password password, works immediately at login, and receives a welcome email with credentials via Nodemailer.",
       },
     ],
     relatedSlugs: ["getting-started", "leave", "attendance"],

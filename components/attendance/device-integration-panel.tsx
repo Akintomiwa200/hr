@@ -103,7 +103,7 @@ export function DeviceIntegrationPanel({ appUrl }: { appUrl: string }) {
           <ArrowRight className="w-4 h-4" />
         </Link>
           <Link
-            href="/api"
+            href="/docs"
             className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-brand-600 bg-white border border-brand-200 rounded-xl hover:bg-brand-50 transition-colors shrink-0"
           >
           API reference

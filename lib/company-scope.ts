@@ -58,3 +58,15 @@ export function requireOrgCompanyId(scope: CompanyScope): string | null {
   if (scope.companyId) return scope.companyId;
   return null;
 }
+
+export function folderCompanyWhere(scope: CompanyScope): Prisma.DocumentFolderWhereInput {
+  if (scope.isPlatformAdmin && !scope.companyId) return {};
+  if (!scope.companyId) return { OR: [{ companyId: null }, { companyId: scope.companyId }] };
+  return { OR: [{ companyId: scope.companyId }, { companyId: null }] };
+}
+
+export function checklistCompanyWhere(scope: CompanyScope): Prisma.ChecklistTemplateWhereInput {
+  if (scope.isPlatformAdmin && !scope.companyId) return {};
+  if (!scope.companyId) return { OR: [{ companyId: null }, { companyId: scope.companyId }] };
+  return { OR: [{ companyId: scope.companyId }, { companyId: null }] };
+}

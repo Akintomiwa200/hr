@@ -377,10 +377,14 @@ export function IntegrationsHub() {
 
       <p className="text-xs text-gray-500">
         Need help? See{" "}
+        <Link href="/docs#integrations" className="text-violet-600 hover:underline">
+          integration API docs
+        </Link>
+        , the{" "}
         <Link href="/help/settings" className="text-violet-600 hover:underline">
           settings guide
-        </Link>{" "}
-        or configure OAuth apps in Google Cloud Console and Zoho API Console.
+        </Link>
+        , or configure OAuth apps in Google Cloud Console and Zoho API Console.
       </p>
     </div>
   );

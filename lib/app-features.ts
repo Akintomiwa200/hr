@@ -286,7 +286,7 @@ export const appFeatures: AppFeature[] = [
     id: "api-docs",
     label: "API Documentation",
     description: "REST endpoints for attendance devices and integrations",
-    href: "/api",
+    href: "/docs",
     section: "Administration",
     icon: BookOpen,
     roles: [...INTEGRATION_ADMIN_ROLES, ...DEVICE_ADMIN_ROLES],
