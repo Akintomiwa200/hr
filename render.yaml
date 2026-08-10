@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: smart-hr
+    runtime: node
+    buildCommand: pnpm install --frozen-lockfile && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
+    startCommand: pnpm start
+    envVars:
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=4096
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
