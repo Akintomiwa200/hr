@@ -9,5 +9,7 @@ services:
         value: --max-old-space-size=4096
       - key: DATABASE_URL
         sync: false
+      - key: DIRECT_URL
+        sync: false
       - key: JWT_SECRET
         generateValue: true
