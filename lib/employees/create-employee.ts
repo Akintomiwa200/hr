@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_EMPLOYEE_PASSWORD } from "@/lib/constants/auth";
 import { sendWelcomeEmail, type SendEmailResult } from "@/lib/email";
+import { nextEmployeeCode } from "@/lib/employees/next-employee-code";
 
 export type CreateEmployeeInput = {
   firstName: string;
@@ -43,8 +44,7 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
     throw new Error("EMAIL_EXISTS");
   }
 
-  const count = await prisma.employee.count();
-  const employeeCode = `EMP${String(count + 1).padStart(3, "0")}`;
+  const employeeCode = await nextEmployeeCode();
   const passwordHash = await bcrypt.hash(DEFAULT_EMPLOYEE_PASSWORD, 10);
 
   const user = await prisma.user.create({

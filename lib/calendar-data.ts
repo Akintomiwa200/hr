@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { employeeCompanyWhere } from "@/lib/company-scope";
+import { isSuperAdmin } from "@/lib/roles";
 import { getHolidays } from "@/lib/holidays-data";
 import { fullName } from "@/lib/utils";
 
@@ -55,8 +57,13 @@ export type CalendarAttendanceRow = {
 export async function getCalendarData(session: {
   role: string;
   employeeId?: string;
+  companyId?: string | null;
 }) {
   const holidays = await getHolidays();
+  const orgEmployee = employeeCompanyWhere({
+    companyId: session.companyId ?? null,
+    isPlatformAdmin: isSuperAdmin(session.role),
+  });
 
   const leaveWhere: Prisma.LeaveRequestWhereInput =
     session.role === "EMPLOYEE" && session.employeeId
@@ -64,7 +71,10 @@ export async function getCalendarData(session: {
           employeeId: session.employeeId,
           status: { in: ["APPROVED", "PENDING"] },
         }
-      : { status: { in: ["APPROVED", "PENDING"] } };
+      : {
+          status: { in: ["APPROVED", "PENDING"] },
+          employee: orgEmployee,
+        };
 
   const [leaveRequests, interviews, payrollRecords, employees, attendanceRecords] =
     await Promise.all([
@@ -76,7 +86,12 @@ export async function getCalendarData(session: {
     session.role === "EMPLOYEE"
       ? Promise.resolve([])
       : prisma.interview.findMany({
-          where: { status: { in: ["SCHEDULED", "COMPLETED"] } },
+          where: {
+            status: { in: ["SCHEDULED", "COMPLETED"] },
+            ...(Object.keys(orgEmployee).length
+              ? { application: { job: { companyId: session.companyId! } } }
+              : {}),
+          },
           include: {
             application: { include: { job: true } },
           },
@@ -91,6 +106,7 @@ export async function getCalendarData(session: {
           take: 12,
         })
       : prisma.payrollRecord.findMany({
+          where: { employee: orgEmployee },
           include: { employee: true },
           orderBy: { periodStart: "desc" },
           take: 24,
@@ -101,39 +117,42 @@ export async function getCalendarData(session: {
           orderBy: { firstName: "asc" },
         })
       : prisma.employee.findMany({
-          where: { status: "ACTIVE" },
+          where: { status: "ACTIVE", ...orgEmployee },
           orderBy: { firstName: "asc" },
         }),
     session.role === "EMPLOYEE" && session.employeeId
       ? prisma.attendance.findMany({
           where: { employeeId: session.employeeId },
+          include: { employee: true },
           orderBy: { date: "desc" },
           take: 60,
         })
       : prisma.attendance.findMany({
+          where: { employee: { status: "ACTIVE", ...orgEmployee } },
+          include: { employee: true },
           orderBy: { date: "desc" },
           take: 200,
         }),
   ]);
 
-  const attendanceRows: CalendarAttendanceRow[] = attendanceRecords.map((record) => {
-    const employee = employees.find((e) => e.id === record.employeeId);
-    if (!employee) {
-      throw new Error(`Missing employee for attendance ${record.id}`);
-    }
-    return {
-      id: record.id,
-      employeeId: employee.id,
-      firstName: employee.firstName,
-      lastName: employee.lastName,
-      avatar: employee.avatar,
-      jobTitle: employee.jobTitle,
-      employeeCode: employee.employeeCode,
-      date: record.date.toISOString(),
-      checkIn: record.checkIn?.toISOString() ?? null,
-      checkOut: record.checkOut?.toISOString() ?? null,
-      status: record.status,
-    };
+  const attendanceRows: CalendarAttendanceRow[] = attendanceRecords.flatMap((record) => {
+    const employee = record.employee;
+    if (!employee) return [];
+    return [
+      {
+        id: record.id,
+        employeeId: employee.id,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        avatar: employee.avatar,
+        jobTitle: employee.jobTitle,
+        employeeCode: employee.employeeCode,
+        date: record.date.toISOString(),
+        checkIn: record.checkIn?.toISOString() ?? null,
+        checkOut: record.checkOut?.toISOString() ?? null,
+        status: record.status,
+      },
+    ];
   });
 
   return {

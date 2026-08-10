@@ -35,6 +35,7 @@ export default async function DashboardPage({
   const sessionContext = {
     role: session.role,
     employeeId: session.employeeId,
+    companyId: session.companyId,
   };
 
   if (session.role === "SUPER_ADMIN") {

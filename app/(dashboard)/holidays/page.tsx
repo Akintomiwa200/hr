@@ -20,6 +20,7 @@ export default async function HolidaysPage({
   const data = await getCalendarData({
     role: session.role,
     employeeId: session.employeeId,
+    companyId: session.companyId,
   });
 
   return (

@@ -6,6 +6,7 @@ import { createSession } from "@/lib/auth";
 import { defaultTrialCompanyData } from "@/lib/subscription";
 import { getPlan, type SubscriptionPlanId } from "@/lib/subscription-plans";
 import { defaultPayrollSettings } from "@/lib/payroll-types";
+import { nextEmployeeCode } from "@/lib/employees/next-employee-code";
 
 function slugFromEmail(email: string) {
   const base = email.split("@")[0].replace(/[^a-z0-9]+/gi, "-").toLowerCase();
@@ -92,10 +93,12 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      const employeeCode = await nextEmployeeCode(tx);
+
       await tx.employee.create({
         data: {
           userId: createdUser.id,
-          employeeCode: "EMP001",
+          employeeCode,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           email: normalizedEmail,
