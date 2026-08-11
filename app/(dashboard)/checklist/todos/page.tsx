@@ -28,7 +28,7 @@ export default async function ChecklistTodosPage() {
       <ChecklistTodosModule
         canManage={canManage}
         employees={employees}
-        currentEmployeeId={session.employeeId}
+        currentEmployeeId={session.employeeId ?? null}
       />
     </div>
   );
