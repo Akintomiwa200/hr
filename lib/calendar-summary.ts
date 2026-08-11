@@ -1,3 +1,4 @@
+import type { Role } from "@prisma/client";
 import { getCalendarData } from "@/lib/calendar-data";
 
 export type UpcomingCalendarEvent = {
@@ -22,7 +23,7 @@ function formatTime(hour: number) {
 }
 
 export async function getUpcomingCalendarEvents(
-  session: { role: string; employeeId?: string; companyId?: string | null },
+  session: { role: Role; employeeId?: string; companyId?: string | null },
   limit = 5
 ): Promise<UpcomingCalendarEvent[]> {
   const data = await getCalendarData(session);

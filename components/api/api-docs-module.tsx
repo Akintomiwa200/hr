@@ -168,12 +168,12 @@ function EndpointCard({ endpoint, baseUrl }: { endpoint: ApiEndpoint; baseUrl: s
           </div>
         )}
 
-        {endpoint.response && (
+        {endpoint.response != null ? (
           <div>
             <p className="text-[11px] font-semibold uppercase text-gray-400 mb-2">Response example</p>
             <DocsCodeBlock code={JSON.stringify(endpoint.response, null, 2)} />
           </div>
-        )}
+        ) : null}
 
         {endpoint.tags?.includes("device") && (
           <Link

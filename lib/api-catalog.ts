@@ -11,7 +11,7 @@ export type ApiEndpoint = {
   query?: { name: string; description: string }[];
   headers?: { name: string; description: string }[];
   body?: Record<string, unknown>;
-  response?: Record<string, unknown>;
+  response?: unknown;
   tags?: string[];
 };
 

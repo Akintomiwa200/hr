@@ -53,9 +53,10 @@ export function Button({
 interface BadgeProps {
   children: React.ReactNode;
   variant?: "success" | "warning" | "error" | "info" | "neutral";
+  className?: string;
 }
 
-export function Badge({ children, variant = "neutral" }: BadgeProps) {
+export function Badge({ children, variant = "neutral", className }: BadgeProps) {
   const variants = {
     success: "bg-emerald-50 text-emerald-700",
     warning: "bg-amber-50 text-amber-700",
@@ -68,7 +69,8 @@ export function Badge({ children, variant = "neutral" }: BadgeProps) {
     <span
       className={cn(
         "inline-flex items-center text-xs font-medium px-2.5 py-0.5 rounded-full",
-        variants[variant]
+        variants[variant],
+        className
       )}
     >
       {children}

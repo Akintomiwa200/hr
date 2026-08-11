@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { ClipboardList, Plus, Trash2 } from "lucide-react";
 import { Button, Card, EmptyState } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
@@ -97,7 +97,11 @@ export function ChecklistSettingsModule({ canManage }: { canManage: boolean }) {
 
       {templates.length === 0 ? (
         <Card>
-          <EmptyState title="No templates" description="Create a checklist template to reuse across employees." />
+          <EmptyState
+            icon={ClipboardList}
+            title="No templates"
+            description="Create a checklist template to reuse across employees."
+          />
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">

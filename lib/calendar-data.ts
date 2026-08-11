@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { employeeCompanyWhere } from "@/lib/company-scope";
 import { isSuperAdmin } from "@/lib/roles";
@@ -55,7 +55,7 @@ export type CalendarAttendanceRow = {
 };
 
 export async function getCalendarData(session: {
-  role: string;
+  role: Role;
   employeeId?: string;
   companyId?: string | null;
 }) {
