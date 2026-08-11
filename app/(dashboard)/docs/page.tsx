@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getSession } from "@/lib/auth";
 import { buildApiCatalog } from "@/lib/api-catalog";
+import { getAppUrlFromHeaders } from "@/lib/app-url";
 import { ApiDocsModule } from "@/components/api/api-docs-module";
 import { PageHeader } from "@/components/ui";
 import Link from "next/link";
@@ -16,10 +17,7 @@ export default async function DocsPage() {
   if (!DOCS_ROLES.includes(session.role)) redirect("/dashboard");
 
   const headersList = await headers();
-  const host = headersList.get("host") ?? "localhost:3000";
-  const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
-  const baseUrl = process.env.APP_URL?.trim() || `${protocol}://${host}`;
-  const catalog = buildApiCatalog(baseUrl);
+  const catalog = buildApiCatalog(getAppUrlFromHeaders(headersList));
 
   return (
     <div>

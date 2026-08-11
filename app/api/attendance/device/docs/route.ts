@@ -2,20 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/api-auth";
 import { DEVICE_ADMIN_ROLES } from "@/lib/roles";
 import { buildAttendanceDeviceSpec, isDeviceOnline } from "@/lib/attendance-device-spec";
+import { getAppUrlFromRequest } from "@/lib/app-url";
 import { prisma } from "@/lib/prisma";
-
-function appUrlFromRequest(request: NextRequest) {
-  return (
-    process.env.APP_URL?.trim() ||
-    `${request.nextUrl.protocol}//${request.nextUrl.host}`
-  );
-}
 
 export async function GET(request: NextRequest) {
   const { error, session } = await requireRoles(DEVICE_ADMIN_ROLES);
   if (error || !session) return error ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const appUrl = appUrlFromRequest(request);
+  const appUrl = getAppUrlFromRequest(request);
   const spec = buildAttendanceDeviceSpec(appUrl);
 
   const devices = await prisma.attendanceDevice.findMany({

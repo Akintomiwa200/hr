@@ -10,6 +10,7 @@ import {
   resolveEmployeeId,
 } from "@/lib/attendance-service";
 import { buildAttendanceDeviceSpec, isDeviceOnline } from "@/lib/attendance-device-spec";
+import { getAppUrlFromRequest } from "@/lib/app-url";
 import { prisma } from "@/lib/prisma";
 
 type DeviceAction = "check_in" | "check_out" | "toggle";
@@ -23,13 +24,6 @@ type DeviceBody = {
   externalId?: string;
   status?: "PRESENT" | "LATE" | "REMOTE" | "ABSENT" | "HALF_DAY";
 };
-
-function appUrlFromRequest(request: NextRequest) {
-  return (
-    process.env.APP_URL?.trim() ||
-    `${request.nextUrl.protocol}//${request.nextUrl.host}`
-  );
-}
 
 function parseTimestamp(value?: string) {
   if (!value) return undefined;
@@ -99,7 +93,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const appUrl = appUrlFromRequest(request);
+  const appUrl = getAppUrlFromRequest(request);
   const spec = buildAttendanceDeviceSpec(appUrl);
   const apiKey = getDeviceApiKeyFromRequest(request);
 

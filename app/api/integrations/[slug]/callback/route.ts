@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { redirect } from "next/navigation";
+import { getAppUrlFromRequest } from "@/lib/app-url";
 import { slugToProvider, decodeOAuthState } from "@/lib/integrations/providers";
 import { exchangeGoogleCode } from "@/lib/integrations/google/workspace";
 import { exchangeZohoCode } from "@/lib/integrations/zoho/oauth";
@@ -16,6 +17,7 @@ export async function GET(
   const code = request.nextUrl.searchParams.get("code");
   const error = request.nextUrl.searchParams.get("error");
   const stateRaw = request.nextUrl.searchParams.get("state");
+  const appUrl = getAppUrlFromRequest(request);
 
   if (error || !code) {
     redirect(`/settings/integrations?error=denied&provider=${slug}`);
@@ -26,9 +28,9 @@ export async function GET(
 
   try {
     if (provider === "GOOGLE_WORKSPACE") {
-      await exchangeGoogleCode(code!, companyId);
+      await exchangeGoogleCode(code!, companyId, appUrl);
     } else {
-      await exchangeZohoCode(provider, code!, companyId);
+      await exchangeZohoCode(provider, code!, companyId, appUrl);
     }
 
     await runIntegrationSync(provider, companyId).catch(() => undefined);

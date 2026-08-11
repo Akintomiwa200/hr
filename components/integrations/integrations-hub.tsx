@@ -245,9 +245,7 @@ export function IntegrationsHub() {
           const Icon = VENDOR_ICONS[item.provider] ?? Link2;
           const busy = busySlug === item.slug;
           const appUrl =
-            typeof window !== "undefined"
-              ? window.location.origin
-              : process.env.NEXT_PUBLIC_APP_URL ?? "";
+            typeof window !== "undefined" ? window.location.origin : "";
 
           return (
             <Card key={item.provider} className="flex flex-col">

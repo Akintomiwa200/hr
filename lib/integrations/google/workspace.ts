@@ -15,17 +15,17 @@ export function isGoogleWorkspaceConfigured() {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
-export function createGoogleOAuthClient() {
+export function createGoogleOAuthClient(appUrl = getAppUrl()) {
   if (!isGoogleWorkspaceConfigured()) return null;
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    `${getAppUrl()}/api/integrations/google-workspace/callback`
+    `${appUrl}/api/integrations/google-workspace/callback`
   );
 }
 
-export function getGoogleAuthUrl(state: string) {
-  const client = createGoogleOAuthClient();
+export function getGoogleAuthUrl(state: string, appUrl = getAppUrl()) {
+  const client = createGoogleOAuthClient(appUrl);
   if (!client) return null;
   const scopes = getCatalogItem(PROVIDER)?.scopes ?? [];
   return client.generateAuthUrl({
@@ -36,8 +36,12 @@ export function getGoogleAuthUrl(state: string) {
   });
 }
 
-export async function exchangeGoogleCode(code: string, companyId?: string | null) {
-  const client = createGoogleOAuthClient();
+export async function exchangeGoogleCode(
+  code: string,
+  companyId?: string | null,
+  appUrl = getAppUrl()
+) {
+  const client = createGoogleOAuthClient(appUrl);
   if (!client) throw new Error("Google OAuth is not configured");
 
   const { tokens } = await client.getToken(code);

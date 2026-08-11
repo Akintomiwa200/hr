@@ -30,12 +30,16 @@ export function getZohoProviderKey(provider: IntegrationProvider) {
   return entry?.[0] ?? "people";
 }
 
-export function getZohoAuthUrl(provider: IntegrationProvider, state: string) {
+export function getZohoAuthUrl(
+  provider: IntegrationProvider,
+  state: string,
+  appUrl = getAppUrl()
+) {
   if (!isZohoConfigured()) return null;
   const item = getCatalogItem(provider);
   if (!item) return null;
 
-  const redirectUri = `${getAppUrl()}/api/integrations/${provider.toLowerCase().replace(/_/g, "-")}/callback`;
+  const redirectUri = `${appUrl}/api/integrations/${provider.toLowerCase().replace(/_/g, "-")}/callback`;
   const params = new URLSearchParams({
     client_id: process.env.ZOHO_CLIENT_ID!,
     response_type: "code",
@@ -52,11 +56,12 @@ export function getZohoAuthUrl(provider: IntegrationProvider, state: string) {
 export async function exchangeZohoCode(
   provider: IntegrationProvider,
   code: string,
-  companyId?: string | null
+  companyId?: string | null,
+  appUrl = getAppUrl()
 ) {
   if (!isZohoConfigured()) throw new Error("Zoho OAuth is not configured");
 
-  const redirectUri = `${getAppUrl()}/api/integrations/${provider.toLowerCase().replace(/_/g, "-")}/callback`;
+  const redirectUri = `${appUrl}/api/integrations/${provider.toLowerCase().replace(/_/g, "-")}/callback`;
   const tokenUrl = `${zohoAccountsUrl()}/oauth/v2/token`;
 
   const body = new URLSearchParams({

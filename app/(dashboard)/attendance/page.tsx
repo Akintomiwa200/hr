@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getSession } from "@/lib/auth";
 import { canManageDevices } from "@/lib/roles";
+import { getAppUrlFromHeaders } from "@/lib/app-url";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
@@ -20,7 +22,7 @@ export default async function AttendancePage() {
 
   const isEmployee = session.role === "EMPLOYEE";
   const showDevicePanel = canManageDevices(session.role);
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrlFromHeaders(await headers());
 
   const [records, todayRecord, presentTodayCount] = await Promise.all([
     prisma.attendance.findMany({
