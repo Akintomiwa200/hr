@@ -3,6 +3,7 @@
 import type { EmployeeFormData, DepartmentOption, ManagerOption } from "./types";
 import type { Role } from "@prisma/client";
 import { ORG_ROLES, isCompanyAdmin, roleLabel } from "@/lib/roles";
+import { useCurrency } from "@/components/providers/currency-provider";
 
 const inputClass =
   "w-full px-4 py-3 text-[14px] border border-gray-200 rounded-xl bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/30 focus:border-[#7B61FF] transition-shadow";
@@ -15,6 +16,7 @@ export function employeeToFormData(employee: {
   email: string;
   phone?: string | null;
   jobTitle: string;
+  employmentType?: string | null;
   departmentId: string;
   managerId?: string | null;
   salary: number;
@@ -22,7 +24,6 @@ export function employeeToFormData(employee: {
   address?: string | null;
   user?: { role: Role } | null;
 }): EmployeeFormData {
-  const isFreelance = employee.jobTitle.toLowerCase().includes("freelance");
   return {
     firstName: employee.firstName,
     lastName: employee.lastName,
@@ -31,7 +32,8 @@ export function employeeToFormData(employee: {
     jobTitle: employee.jobTitle.replace(/\s*\(Freelance\)/i, "").trim(),
     departmentId: employee.departmentId,
     managerId: employee.managerId ?? "",
-    employmentType: isFreelance ? "FREELANCE" : "FULL_TIME",
+    employmentType:
+      employee.employmentType === "FREELANCE" ? "FREELANCE" : "FULL_TIME",
     role: employee.user?.role ?? "EMPLOYEE",
     salary: String(employee.salary),
     status: employee.status,
@@ -45,16 +47,21 @@ export function EmployeeFormFields({
   departments,
   managers,
   isEdit,
+  allowedRoles = ORG_ROLES,
 }: {
   data: EmployeeFormData;
   onChange: (data: EmployeeFormData) => void;
   departments: DepartmentOption[];
   managers: ManagerOption[];
   isEdit?: boolean;
+  allowedRoles?: Role[];
 }) {
+  const { currency } = useCurrency();
   function set(field: keyof EmployeeFormData, value: string) {
     onChange({ ...data, [field]: value });
   }
+
+  const roleOptions = allowedRoles.length > 0 ? allowedRoles : ORG_ROLES;
 
   return (
     <div className="space-y-4">
@@ -164,7 +171,7 @@ export function EmployeeFormFields({
             className={inputClass}
             disabled={isEdit && isCompanyAdmin(data.role as Role)}
           >
-            {ORG_ROLES.map((role) => (
+            {roleOptions.map((role) => (
               <option key={role} value={role}>
                 {roleLabel(role)}
               </option>
@@ -172,7 +179,7 @@ export function EmployeeFormFields({
           </select>
         </div>
         <div>
-          <label className={labelClass}>Salary</label>
+          <label className={labelClass}>Salary ({currency.symbol} {currency.code})</label>
           <input
             type="number"
             min="0"

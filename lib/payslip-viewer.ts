@@ -78,14 +78,10 @@ export function getPayslipViewerContext(
     return {
       ...base,
       pageTitle: "Team payslip",
-      pageDescription: canManage
-        ? `Review and edit the payslip breakdown for ${employeeName}`
-        : `View payslip breakdown for ${employeeName}`,
+      pageDescription: `Preview payslip breakdown for ${employeeName}`,
       backLabel: "Back to team payroll",
       receiptKind: "Team member payslip",
-      documentSubtitle: canManage
-        ? "Manager review — you can edit line items and recalculate"
-        : "Manager view — contact HR to make changes",
+      documentSubtitle: "Manager preview — view and download only; contact HR to edit",
       payeeLabel: employeeName,
       showEmployeeProfileLink: true,
       downloadLabel: "Download payslip",

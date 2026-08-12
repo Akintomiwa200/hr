@@ -1,11 +1,16 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { canManageDepartments } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { getOrgChartData } from "@/lib/org-chart-data";
+import {
+  getCompanyScope,
+} from "@/lib/company-scope";
 import { PageHeader } from "@/components/ui";
 import { HelpLink } from "@/components/help/help-link";
 import { OrgChartModule } from "@/components/departments/org-chart-module";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function DepartmentsPage({
   searchParams,
@@ -14,32 +19,59 @@ export default async function DepartmentsPage({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role === "EMPLOYEE") redirect("/dashboard");
 
   const params = await searchParams;
+  const scope = getCompanyScope(session);
+
+  // Full company org chart for every role (still tenant-scoped by company).
+  const orgDepartment =
+    scope.isPlatformAdmin && !scope.companyId
+      ? {}
+      : scope.companyId
+        ? { companyId: scope.companyId }
+        : { OR: [{ companyId: null }, { companyId: scope.companyId }] };
 
   const [orgData, departments] = await Promise.all([
-    getOrgChartData(),
+    getOrgChartData(scope),
     prisma.department.findMany({
-      include: { _count: { select: { employees: true, jobs: true } } },
+      where: orgDepartment,
+      include: {
+        _count: {
+          select: {
+            employees: {
+              where: {
+                status: "ACTIVE",
+                ...(scope.companyId ? { user: { companyId: scope.companyId } } : {}),
+              },
+            },
+            jobs: true,
+          },
+        },
+      },
       orderBy: { name: "asc" },
     }),
   ]);
 
   return (
     <div>
+      <PageLiveRefresh
+        types={["employee_updated", "department_updated", "job_updated"]}
+        pollIntervalMs={5000}
+      />
       <PageHeader
         title="Org Chart"
-        description="Visual hierarchy, reporting lines, and department structure"
+        description="Full company hierarchy — filter by department only when you need a narrower view"
         action={<HelpLink slug="teams" label="Org chart guide" />}
       />
-      <OrgChartModule
-        data={orgData}
-        departments={departments}
-        canManage={canManageDepartments(session.role)}
-        initialDepartmentId={params.dept}
-        initialView={params.view === "departments" ? "departments" : "chart"}
-      />
+      <Suspense fallback={<div className="p-8 text-sm text-gray-500">Loading org chart…</div>}>
+        <OrgChartModule
+          data={orgData}
+          departments={departments}
+          canManage={canManageDepartments(session.role)}
+          initialDepartmentId={params.dept}
+          initialView={params.view === "departments" ? "departments" : "chart"}
+        />
+      </Suspense>
     </div>
   );
 }

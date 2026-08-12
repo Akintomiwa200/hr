@@ -1,9 +1,11 @@
 import { formatCurrency, formatDate, fullName } from "@/lib/utils";
+import { DEFAULT_CURRENCY, getCurrencyMeta } from "@/lib/currency";
 import type { PayrollLineItem } from "@/lib/payroll-types";
 
 export type PayslipDocumentData = {
   id: string;
   companyName: string;
+  currencyCode?: string;
   employee: {
     firstName: string;
     lastName: string;
@@ -51,6 +53,9 @@ export function categoryTag(category: PayrollLineItem["category"]) {
 }
 
 export function renderPayslipHtml(data: PayslipDocumentData) {
+  const currencyCode = data.currencyCode || DEFAULT_CURRENCY;
+  const currency = getCurrencyMeta(currencyCode);
+  const money = (amount: number) => formatCurrency(amount, currencyCode);
   const { earnings, deductions, grossPay, totalDeductions, netPay } = payslipTotals(data.items);
   const invoiceNo = payslipNumber(data.id);
   const issueDate = data.paidAt ?? data.createdAt ?? new Date();
@@ -63,7 +68,7 @@ export function renderPayslipHtml(data: PayslipDocumentData) {
         <div style="font-size:11px;color:#9ca3af;margin-top:2px;">${categoryTag(item.category)}${item.auto ? " · Auto-calculated" : ""}</div>
       </td>
       <td style="padding:12px 16px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:${item.type === "EARNING" ? "#059669" : "#dc2626"};">
-        ${item.type === "DEDUCTION" ? "−" : "+"}${formatCurrency(item.amount)}
+        ${item.type === "DEDUCTION" ? "−" : "+"}${money(item.amount)}
       </td>
     </tr>`;
 
@@ -174,16 +179,16 @@ export function renderPayslipHtml(data: PayslipDocumentData) {
 
       <div class="totals-wrap">
         <div class="totals">
-          <div class="totals-row"><span>Gross earnings</span><strong>${formatCurrency(grossPay)}</strong></div>
-          <div class="totals-row deduction"><span>Total deductions</span><span>−${formatCurrency(totalDeductions)}</span></div>
-          <div class="totals-row net"><span>Net pay</span><span class="net-amount">${formatCurrency(netPay)}</span></div>
+          <div class="totals-row"><span>Gross earnings</span><strong>${money(grossPay)}</strong></div>
+          <div class="totals-row deduction"><span>Total deductions</span><span>−${money(totalDeductions)}</span></div>
+          <div class="totals-row net"><span>Net pay</span><span class="net-amount">${money(netPay)}</span></div>
         </div>
       </div>
 
       ${data.notes ? `<div class="notes"><strong style="display:block;margin-bottom:6px;color:#92400e;">Notes</strong>${data.notes}</div>` : ""}
 
       <div class="footer">
-        This document is a computer-generated payslip. Amounts in USD. Retain for your records.<br/>
+        This document is a computer-generated payslip. Amounts in ${currency.code} (${currency.label}). Retain for your records.<br/>
         ${invoiceNo} · ${formatDate(new Date())}
       </div>
     </div>

@@ -1,4 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import {
+  departmentCompanyWhere,
+  employeeCompanyWhere,
+  getCompanyScope,
+  type CompanyScope,
+} from "@/lib/company-scope";
+import type { SessionUser } from "@/lib/auth";
 
 export type TeamPreviewMember = {
   id: string;
@@ -26,12 +33,26 @@ export type TeamsPageData = {
   myTeamName: string | null;
 };
 
-export async function getTeamsPageData(employeeId?: string): Promise<TeamsPageData> {
+export async function getTeamsPageData(
+  employeeId?: string,
+  sessionOrScope?: SessionUser | CompanyScope
+): Promise<TeamsPageData> {
+  const scope =
+    sessionOrScope && "isPlatformAdmin" in sessionOrScope
+      ? sessionOrScope
+      : sessionOrScope
+        ? getCompanyScope(sessionOrScope)
+        : { companyId: null, isPlatformAdmin: true };
+
+  const orgEmployee = employeeCompanyWhere(scope);
+  const orgDepartment = departmentCompanyWhere(scope);
+
   const [departments, employee, totalEmployees] = await Promise.all([
     prisma.department.findMany({
+      where: orgDepartment,
       include: {
         employees: {
-          where: { status: "ACTIVE" },
+          where: { status: "ACTIVE", ...orgEmployee },
           select: {
             id: true,
             firstName: true,
@@ -61,7 +82,7 @@ export async function getTeamsPageData(employeeId?: string): Promise<TeamsPageDa
           select: { departmentId: true, department: { select: { name: true } } },
         })
       : null,
-    prisma.employee.count({ where: { status: "ACTIVE" } }),
+    prisma.employee.count({ where: { status: "ACTIVE", ...orgEmployee } }),
   ]);
 
   const teams: TeamSummary[] = departments.map((dept) => ({
@@ -83,12 +104,25 @@ export async function getTeamsPageData(employeeId?: string): Promise<TeamsPageDa
   };
 }
 
-export async function getTeamDetailData(id: string) {
-  const department = await prisma.department.findUnique({
-    where: { id },
+export async function getTeamDetailData(
+  id: string,
+  sessionOrScope?: SessionUser | CompanyScope
+) {
+  const scope =
+    sessionOrScope && "isPlatformAdmin" in sessionOrScope
+      ? sessionOrScope
+      : sessionOrScope
+        ? getCompanyScope(sessionOrScope)
+        : { companyId: null, isPlatformAdmin: true };
+
+  const orgEmployee = employeeCompanyWhere(scope);
+  const orgDepartment = departmentCompanyWhere(scope);
+
+  const department = await prisma.department.findFirst({
+    where: { id, ...orgDepartment },
     include: {
       employees: {
-        where: { status: "ACTIVE" },
+        where: { status: "ACTIVE", ...orgEmployee },
         include: {
           user: { select: { role: true } },
           manager: { select: { firstName: true, lastName: true } },

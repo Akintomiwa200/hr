@@ -17,6 +17,7 @@ import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
+import { useAppEvents } from "@/hooks/use-app-events";
 import { ChecklistTaskDetailSheet } from "./checklist-task-detail-sheet";
 
 export type TodoTask = {
@@ -93,25 +94,30 @@ export function ChecklistTodosModule({
     return q.toString();
   }, [filters]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
-      const res = await fetch(`/api/checklist/tasks?${buildQuery()}`);
+      const res = await fetch(`/api/checklist/tasks?${buildQuery()}`, {
+        cache: "no-store",
+      });
       if (res.ok) setTasks(await res.json());
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [buildQuery]);
 
   useEffect(() => {
-    load();
-    const es = new EventSource("/api/events");
-    es.onmessage = () => {
-      load();
+    void load();
+  }, [load]);
+
+  useAppEvents({
+    types: ["checklist_updated", "dashboard_updated"],
+    pollIntervalMs: 2000,
+    onEvent: () => {
+      void load({ silent: true });
       router.refresh();
-    };
-    return () => es.close();
-  }, [load, router]);
+    },
+  });
 
   const createTask = async () => {
     if (!form.title.trim() || !form.employeeId) return;

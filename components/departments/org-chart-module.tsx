@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Building2,
   GitBranch,
@@ -26,6 +27,14 @@ type DepartmentRecord = {
 
 type ViewMode = "chart" | "departments";
 
+function resolveDepartmentFilter(
+  raw: string | null | undefined,
+  data: OrgChartData
+): string {
+  if (!raw || raw === "all") return "all";
+  return data.departments.some((d) => d.id === raw) ? raw : "all";
+}
+
 export function OrgChartModule({
   data,
   departments,
@@ -39,22 +48,49 @@ export function OrgChartModule({
   initialDepartmentId?: string;
   initialView?: ViewMode;
 }) {
-  const validDeptId =
-    initialDepartmentId &&
-    (initialDepartmentId === "all" ||
-      data.departments.some((d) => d.id === initialDepartmentId))
-      ? initialDepartmentId
-      : "all";
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const deptFromUrl = searchParams.get("dept") ?? initialDepartmentId ?? null;
+  const resolvedFilter = resolveDepartmentFilter(deptFromUrl, data);
 
   const [view, setView] = useState<ViewMode>(initialView);
-  const [departmentFilter, setDepartmentFilter] = useState<string>(validDeptId);
+  const [departmentFilter, setDepartmentFilter] = useState<string>(resolvedFilter);
   const [search, setSearch] = useState("");
 
+  // Keep filter in sync with the URL so "Org Chart" (no ?dept=) always shows the full company.
+  useEffect(() => {
+    setDepartmentFilter(resolvedFilter);
+  }, [resolvedFilter]);
+
+  function selectDepartment(next: string) {
+    setDepartmentFilter(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "all") {
+      params.delete("dept");
+    } else {
+      params.set("dept", next);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
   const filteredTree = useMemo(() => {
-    let nodes =
-      departmentFilter === "all"
-        ? data.companyTree
-        : data.departments.find((d) => d.id === departmentFilter)?.tree ?? [];
+    const isAll = !departmentFilter || departmentFilter === "all";
+    let nodes = isAll
+      ? data.companyTree ?? []
+      : data.departments.find((d) => d.id === departmentFilter)?.tree ?? [];
+
+    // Never blank when people exist: fall back to merging department trees.
+    if (nodes.length === 0 && data.totalEmployees > 0) {
+      if (isAll) {
+        nodes = data.departments.flatMap((d) => d.tree);
+      } else {
+        const dept = data.departments.find((d) => d.id === departmentFilter);
+        nodes = dept?.tree ?? [];
+      }
+    }
 
     const q = search.trim().toLowerCase();
     if (!q) return nodes;
@@ -83,7 +119,7 @@ export function OrgChartModule({
 
   const chartTitle =
     departmentFilter === "all"
-      ? `${data.companyName} — Organization`
+      ? `${data.companyName} — Full organization`
       : activeDepartment?.name ?? "Department";
 
   return (
@@ -148,13 +184,13 @@ export function OrgChartModule({
               </div>
               <select
                 value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
+                onChange={(e) => selectDepartment(e.target.value)}
                 className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25 focus:border-brand-500"
               >
-                <option value="all">All departments</option>
+                <option value="all">All departments (full company)</option>
                 {data.departments.map((dept) => (
                   <option key={dept.id} value={dept.id}>
-                    {dept.name}
+                    {dept.name} only
                   </option>
                 ))}
               </select>
@@ -168,23 +204,34 @@ export function OrgChartModule({
               <div>
                 <h3 className="text-base font-semibold text-gray-900">{chartTitle}</h3>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Reporting lines from manager assignments · click a person for their profile
+                  {departmentFilter === "all"
+                    ? "Full company reporting lines · pick a department below to narrow the view"
+                    : "Department-only view · choose “All departments” for the full company chart"}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <OrgChartLegend />
                 {departmentFilter !== "all" && (
-                  <Link
-                    href={`/departments/${departmentFilter}`}
-                    className="text-xs font-medium text-brand-600 hover:text-brand-700 whitespace-nowrap"
-                  >
-                    Open department →
-                  </Link>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => selectDepartment("all")}
+                      className="text-xs font-medium text-brand-600 hover:text-brand-700 whitespace-nowrap"
+                    >
+                      Show full company
+                    </button>
+                    <Link
+                      href={`/departments/${departmentFilter}`}
+                      className="text-xs font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap"
+                    >
+                      Open department →
+                    </Link>
+                  </>
                 )}
               </div>
             </div>
 
-            <div className="relative min-h-[420px] bg-[radial-gradient(circle_at_top,_rgba(123,97,255,0.06)_0%,_transparent_55%)]">
+            <div className="relative min-h-[420px] overflow-x-auto bg-[radial-gradient(circle_at_top,_rgba(123,97,255,0.06)_0%,_transparent_55%)]">
               <OrgChartTree
                 nodes={filteredTree}
                 emptyMessage={
@@ -198,12 +245,12 @@ export function OrgChartModule({
             {data.departments.length > 0 && (
               <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/50">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-3">
-                  Jump to department
+                  Filter by department
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setDepartmentFilter("all")}
+                    onClick={() => selectDepartment("all")}
                     className={cn(
                       "px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
                       departmentFilter === "all"
@@ -211,13 +258,13 @@ export function OrgChartModule({
                         : "border-gray-200 text-gray-600 hover:border-brand-200 hover:text-brand-700 hover:bg-brand-50/50"
                     )}
                   >
-                    All · {data.totalEmployees}
+                    Full company · {data.totalEmployees}
                   </button>
                   {data.departments.map((dept) => (
                     <button
                       key={dept.id}
                       type="button"
-                      onClick={() => setDepartmentFilter(dept.id)}
+                      onClick={() => selectDepartment(dept.id)}
                       className={cn(
                         "px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
                         departmentFilter === dept.id
@@ -238,7 +285,7 @@ export function OrgChartModule({
               departments={departments}
               canManage={canManage}
               onViewOrgChart={(departmentId) => {
-                setDepartmentFilter(departmentId);
+                selectDepartment(departmentId);
                 setView("chart");
               }}
             />

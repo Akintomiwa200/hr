@@ -114,7 +114,9 @@ export async function PATCH(
       updatedScores.map((s) => ({
         selfScore: s.selfScore,
         managerScore: s.managerScore,
-        weight: existing.cycle.kpis.find((l) => l.kpiId === s.kpiId)?.weight ?? 1,
+        weight: existing.cycle.kpis.find((l) => l.kpiId === s.kpiId)?.weight ?? s.kpi.weight ?? 1,
+        metricType: s.kpi.metricType,
+        targetValue: s.kpi.targetValue,
       }))
     );
 

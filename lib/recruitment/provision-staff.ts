@@ -72,18 +72,26 @@ export async function onboardHiredCandidate(applicationId: string, actorName?: s
     notifyEmployeeChange(employee.id, "created");
 
     try {
-      const { ensureDefaultOnboardingTemplate, createChecklistFromTemplate } = await import(
-        "@/lib/checklist/instantiate"
-      );
-      const template = await ensureDefaultOnboardingTemplate(application.job.companyId);
-      await createChecklistFromTemplate({
-        templateId: template.id,
+      const { startEmployeeOnboarding } = await import("@/lib/checklist/instantiate");
+      await startEmployeeOnboarding({
         employeeId: employee.id,
         companyId: application.job.companyId,
-        type: "ONBOARDING",
       });
-    } catch {
-      // Checklist tables may not be migrated yet
+      await logOnboardingActivity({
+        applicationId,
+        title: "Onboarding checklist started",
+        message: "Default onboarding tasks were created for the new hire.",
+        actorName,
+      });
+    } catch (checklistErr) {
+      const message =
+        checklistErr instanceof Error ? checklistErr.message : "Checklist start failed";
+      await logOnboardingActivity({
+        applicationId,
+        title: "Onboarding checklist not started",
+        message,
+        actorName,
+      });
     }
 
     await logOnboardingActivity({

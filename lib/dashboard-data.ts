@@ -46,25 +46,49 @@ function monthKey(date: Date) {
   return date.toLocaleString("en-US", { month: "short" });
 }
 
-async function getAttendanceRateForRange(start: Date, end: Date, employeeIds?: string[]) {
-  const whereEmployee =
-    employeeIds && employeeIds.length > 0 ? { employeeId: { in: employeeIds } } : {};
+function dayCountInclusive(start: Date, end: Date) {
+  const s = startOfDay(start).getTime();
+  const e = startOfDay(end).getTime();
+  return Math.max(1, Math.floor((e - s) / (24 * 60 * 60 * 1000)) + 1);
+}
 
-  const [presentCount, totalEmployees] = await Promise.all([
-    prisma.attendance.count({
+/**
+ * Attendance rate = present-day records / (active employees × days in range).
+ * Caps at 100% so multi-day totals never produce bogus values like 310%.
+ */
+async function getAttendanceRateForRange(
+  start: Date,
+  end: Date,
+  opts?: { companyId?: string | null; employeeIds?: string[] }
+) {
+  let employeeIds = opts?.employeeIds;
+
+  if (!employeeIds) {
+    const employees = await prisma.employee.findMany({
       where: {
-        ...whereEmployee,
-        date: { gte: start, lte: end },
-        status: { in: ["PRESENT", "REMOTE", "LATE", "HALF_DAY"] },
+        status: "ACTIVE",
+        ...(opts?.companyId ? { user: { companyId: opts.companyId } } : {}),
       },
-    }),
-    employeeIds && employeeIds.length > 0
-      ? employeeIds.length
-      : prisma.employee.count({ where: { status: "ACTIVE" } }),
-  ]);
+      select: { id: true },
+    });
+    employeeIds = employees.map((e) => e.id);
+  }
 
+  const totalEmployees = employeeIds.length;
   if (!totalEmployees) return 0;
-  return Math.round((presentCount / totalEmployees) * 100);
+
+  const days = dayCountInclusive(start, end);
+  const expected = totalEmployees * days;
+
+  const presentCount = await prisma.attendance.count({
+    where: {
+      employeeId: { in: employeeIds },
+      date: { gte: start, lte: end },
+      status: { in: ["PRESENT", "REMOTE", "LATE", "HALF_DAY"] },
+    },
+  });
+
+  return Math.min(100, Math.round((presentCount / expected) * 100));
 }
 
 export async function getHrDashboardData(
@@ -109,7 +133,10 @@ export async function getHrDashboardData(
     prisma.attendance.groupBy({
       by: ["status"],
       _count: { status: true },
-      where: { date: { gte: today } },
+      where: {
+        date: { gte: today },
+        ...(companyId ? { employee: { user: { companyId } } } : {}),
+      },
     }),
     prisma.job.count({
       where: {
@@ -143,13 +170,16 @@ export async function getHrDashboardData(
     prisma.attendance.groupBy({
       by: ["status"],
       _count: { status: true },
-      where: { date: { gte: rangeStart, lte: rangeEnd } },
+      where: {
+        date: { gte: rangeStart, lte: rangeEnd },
+        ...(companyId ? { employee: { user: { companyId } } } : {}),
+      },
     }),
     prisma.employee.findMany({
       where: { hireDate: { gte: rangeStart, lte: rangeEnd }, ...orgEmp },
     }),
-    getAttendanceRateForRange(rangeStart, rangeEnd),
-    getAttendanceRateForRange(previousPeriod.start, previousPeriod.end),
+    getAttendanceRateForRange(rangeStart, rangeEnd, { companyId }),
+    getAttendanceRateForRange(previousPeriod.start, previousPeriod.end, { companyId }),
     prisma.attendanceDevice.findMany({
       where: { isActive: true, ...orgDev },
       orderBy: { name: "asc" },
@@ -157,7 +187,11 @@ export async function getHrDashboardData(
     prisma.attendance.groupBy({
       by: ["deviceId"],
       _count: { deviceId: true },
-      where: { date: { gte: today }, deviceId: { not: null } },
+      where: {
+        date: { gte: today },
+        deviceId: { not: null },
+        ...(companyId ? { employee: { user: { companyId } } } : {}),
+      },
     }),
   ]);
 
@@ -198,15 +232,35 @@ export async function getHrDashboardData(
 
   const attendanceTrend = thisMonthRate - lastMonthRate;
 
-  const sickLeave =
+  // Live today breakdown (not fake stored mins)
+  const todayAbsent =
+    todayAttendanceByStatus.find((s) => s.status === "ABSENT")?._count.status ?? 0;
+  const todayOnTime =
+    (todayAttendanceByStatus.find((s) => s.status === "PRESENT")?._count.status ?? 0) +
+    (todayAttendanceByStatus.find((s) => s.status === "REMOTE")?._count.status ?? 0);
+  const todayLateCount =
+    todayAttendanceByStatus.find((s) => s.status === "LATE")?._count.status ?? 0;
+  const todayHalf =
+    todayAttendanceByStatus.find((s) => s.status === "HALF_DAY")?._count.status ?? 0;
+  const todayLogged = todayAbsent + todayOnTime + todayLateCount + todayHalf;
+  const todayExpected = Math.max(activeEmployees.length, 1);
+  const todayRate = Math.min(
+    100,
+    Math.round(((todayOnTime + todayLateCount + todayHalf) / todayExpected) * 100)
+  );
+
+  // Period composition for the bar (real shares, zeros allowed)
+  const periodAbsent =
     attendanceByStatus.find((s) => s.status === "ABSENT")?._count.status ?? 0;
-  const onTime =
-    attendanceByStatus.find((s) => s.status === "PRESENT")?._count.status ?? 0;
-  const late =
+  const periodOnTime =
+    (attendanceByStatus.find((s) => s.status === "PRESENT")?._count.status ?? 0) +
+    (attendanceByStatus.find((s) => s.status === "REMOTE")?._count.status ?? 0);
+  const periodLate =
     attendanceByStatus.find((s) => s.status === "LATE")?._count.status ?? 0;
-  const remote =
-    attendanceByStatus.find((s) => s.status === "REMOTE")?._count.status ?? 0;
-  const totalStatus = sickLeave + onTime + late + remote || 1;
+  const periodHalf =
+    attendanceByStatus.find((s) => s.status === "HALF_DAY")?._count.status ?? 0;
+  const periodTotal = periodAbsent + periodOnTime + periodLate + periodHalf;
+  const share = (n: number) => (periodTotal > 0 ? Math.round((n / periodTotal) * 100) : 0);
 
   const attendanceRate = thisMonthRate;
 
@@ -263,10 +317,18 @@ export async function getHrDashboardData(
     departmentCounts,
     attendanceRate,
     attendanceTrend,
+    todayAttendanceRate: todayRate,
+    todayLogged,
     attendanceBreakdown: {
-      sick: Math.round((sickLeave / totalStatus) * 100),
-      late: Math.round((late / totalStatus) * 100),
-      onTime: Math.round(((onTime + remote) / totalStatus) * 100),
+      absent: share(periodAbsent),
+      late: share(periodLate),
+      onTime: share(periodOnTime + periodHalf),
+      counts: {
+        absent: periodAbsent,
+        late: periodLate,
+        onTime: periodOnTime + periodHalf,
+        total: periodTotal,
+      },
     },
     deviceStats: {
       total: todayDevicesTotal,
@@ -296,9 +358,42 @@ export async function getManagerDashboardData(
   const period = resolveDashboardRange(rangeKey);
   const today = startOfDay();
 
+  const manager = await prisma.employee.findUnique({
+    where: { id: managerEmployeeId },
+    select: {
+      id: true,
+      departmentId: true,
+      user: { select: { companyId: true, role: true } },
+    },
+  });
+
+  // If this manager has no reports yet, adopt unmanaged employees in their department.
+  if (manager && (manager.user.role === "MANAGER" || manager.user.role === "SUPERVISOR")) {
+    const existingReports = await prisma.employee.count({
+      where: { managerId: managerEmployeeId, status: "ACTIVE" },
+    });
+    if (existingReports === 0) {
+      await prisma.employee.updateMany({
+        where: {
+          departmentId: manager.departmentId,
+          managerId: null,
+          status: "ACTIVE",
+          id: { not: managerEmployeeId },
+          user: {
+            role: "EMPLOYEE",
+            ...(manager.user.companyId
+              ? { companyId: manager.user.companyId }
+              : {}),
+          },
+        },
+        data: { managerId: managerEmployeeId },
+      });
+    }
+  }
+
   const [team, pendingLeaves, teamReviews, teamAttendance] = await Promise.all([
     prisma.employee.findMany({
-      where: { managerId: managerEmployeeId },
+      where: { managerId: managerEmployeeId, status: "ACTIVE" },
       include: { department: true, user: { select: { role: true } } },
     }),
     prisma.leaveRequest.findMany({
@@ -326,11 +421,9 @@ export async function getManagerDashboardData(
   ]);
 
   const teamIds = team.map((member) => member.id);
-  const rangeAttendanceRate = await getAttendanceRateForRange(
-    period.start,
-    period.end,
-    teamIds
-  );
+  const rangeAttendanceRate = await getAttendanceRateForRange(period.start, period.end, {
+    employeeIds: teamIds,
+  });
 
   return {
     team,

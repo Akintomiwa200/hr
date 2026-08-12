@@ -8,8 +8,10 @@ import {
   Building2,
   GitBranch,
   MapPin,
+  Medal,
   Network,
   Search,
+  Target,
   Users,
   X,
 } from "lucide-react";
@@ -17,7 +19,7 @@ import { Avatar, EmptyState, StatCard, statusBadge } from "@/components/ui";
 import { OrgChartLegend, OrgChartTree } from "@/components/departments/org-chart-tree";
 import { useAutoHideScrollbar } from "@/hooks/use-auto-hide-scrollbar";
 import type { OrgChartNode } from "@/lib/org-chart-data";
-import { PEOPLE_ADMIN_ROLES } from "@/lib/roles";
+import { LINE_MANAGER_ROLES } from "@/lib/roles";
 import { cn, fullName } from "@/lib/utils";
 
 type Member = {
@@ -38,6 +40,14 @@ type Job = {
   status: string;
 };
 
+type DepartmentKpi = {
+  id: string;
+  title: string;
+  metricType: string;
+  targetValue: number | null;
+  scopedToDepartment: boolean;
+};
+
 function roleBadgeClass(role: string) {
   if (role === "COMPANY_ADMIN") return "bg-violet-100 text-violet-700";
   if (role === "HR") return "bg-fuchsia-100 text-fuchsia-700";
@@ -52,6 +62,7 @@ export function DepartmentDetailModule({
   description,
   members,
   jobs,
+  kpis = [],
   orgTree,
   backHref = "/departments",
   backLabel = "Back to organization",
@@ -65,6 +76,7 @@ export function DepartmentDetailModule({
   description: string | null;
   members: Member[];
   jobs: Job[];
+  kpis?: DepartmentKpi[];
   orgTree: OrgChartNode[];
   backHref?: string;
   backLabel?: string;
@@ -79,7 +91,7 @@ export function DepartmentDetailModule({
   const jobsScroll = useAutoHideScrollbar();
 
   const managerCount = useMemo(
-    () => members.filter((m) => PEOPLE_ADMIN_ROLES.includes(m.role as (typeof PEOPLE_ADMIN_ROLES)[number])).length,
+    () => members.filter((m) => LINE_MANAGER_ROLES.includes(m.role as (typeof LINE_MANAGER_ROLES)[number])).length,
     [members]
   );
 
@@ -146,13 +158,22 @@ export function DepartmentDetailModule({
               </div>
             </div>
             {showOrgChartLink && (
-              <Link
-                href={orgChartHref ?? `/departments?dept=${departmentId}`}
-                className="inline-flex items-center gap-2 px-3 py-2 text-[13px] font-medium rounded-lg border border-brand-200 text-brand-700 bg-brand-50/50 hover:bg-brand-50 transition-colors shrink-0"
-              >
-                <Network className="w-4 h-4" />
-                Full org chart
-              </Link>
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <Link
+                  href="/performance"
+                  className="inline-flex items-center gap-2 px-3 py-2 text-[13px] font-medium rounded-lg border border-violet-200 text-violet-700 bg-violet-50/50 hover:bg-violet-50 transition-colors"
+                >
+                  <Medal className="w-4 h-4" />
+                  Performance
+                </Link>
+                <Link
+                  href={orgChartHref ?? `/departments?dept=${departmentId}`}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-[13px] font-medium rounded-lg border border-brand-200 text-brand-700 bg-brand-50/50 hover:bg-brand-50 transition-colors"
+                >
+                  <Network className="w-4 h-4" />
+                  Full org chart
+                </Link>
+              </div>
             )}
           </div>
         </div>
@@ -343,6 +364,53 @@ export function DepartmentDetailModule({
               </ul>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+              <Target className="w-4 h-4 text-violet-500" />
+              Performance KPIs
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              KPIs scoped to this department or company-wide
+            </p>
+          </div>
+          <Link
+            href="/performance"
+            className="text-[13px] font-medium text-violet-600 hover:text-violet-700"
+          >
+            Open performance
+          </Link>
+        </div>
+        <div className="p-4">
+          {kpis.length === 0 ? (
+            <EmptyState
+              icon={Target}
+              title="No KPIs yet"
+              description="Create KPIs in Performance and optionally scope them to this department."
+            />
+          ) : (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {kpis.map((kpi) => (
+                <li
+                  key={kpi.id}
+                  className="rounded-xl border border-gray-100 p-4 hover:border-violet-100 transition-colors"
+                >
+                  <p className="text-sm font-semibold text-gray-900">{kpi.title}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {kpi.metricType}
+                    {kpi.targetValue != null ? ` · target ${kpi.targetValue}` : ""}
+                  </p>
+                  <p className="text-[11px] text-violet-600 mt-2 font-medium">
+                    {kpi.scopedToDepartment ? "Department scoped" : "Company-wide"}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>

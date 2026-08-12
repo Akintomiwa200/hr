@@ -41,8 +41,8 @@ export const reportCatalog: ReportCard[] = [
   },
   {
     id: "onboarding",
-    title: "Onboarding",
-    description: "Onboarding employees by month of their Join Date.",
+    title: "New hires",
+    description: "New hires by join-date month and checklist status.",
     href: "/reports/onboarding",
     icon: UserPlus,
     roles: [...REPORTS_ADMIN_ROLES, ...REPORTS_TEAM_ROLES],

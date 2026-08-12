@@ -16,6 +16,8 @@ import { LeaveRequestForm } from "@/components/leave/leave-form";
 import { LeaveActions } from "@/components/leave/leave-actions";
 import { leaveDays, leaveTypeLabel, leaveTypeStyle } from "@/lib/leave-utils";
 import { cn, formatDate, fullName } from "@/lib/utils";
+import { useAppEvents } from "@/hooks/use-app-events";
+import { useRouter } from "next/navigation";
 
 type LeaveRow = {
   id: string;
@@ -49,6 +51,13 @@ export function LeaveModule({
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const router = useRouter();
+
+  useAppEvents({
+    types: ["leave_updated", "employee_updated"],
+    pollIntervalMs: 4000,
+    onEvent: () => router.refresh(),
+  });
 
   const stats = useMemo(() => {
     const pending = leaves.filter((l) => l.status === "PENDING").length;

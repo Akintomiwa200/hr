@@ -25,6 +25,8 @@ import {
   Building2,
   BookOpen,
   CreditCard,
+  ListTodo,
+  UserMinus,
 } from "lucide-react";
 import {
   ALL_STAFF,
@@ -136,11 +138,31 @@ export const appFeatures: AppFeature[] = [
   {
     id: "onboarding",
     label: "Onboarding",
-    description: "Create accounts with default password and welcome email",
-    href: "/employees/new",
+    description: "Track new-hire checklist progress and tasks",
+    href: "/checklist/onboarding",
     section: "People",
     icon: GraduationCap,
     roles: ONBOARDING_ROLES,
+    helpSlug: "employees",
+  },
+  {
+    id: "offboarding",
+    label: "Offboarding",
+    description: "Manage employee exit checklists",
+    href: "/checklist/offboarding",
+    section: "People",
+    icon: UserMinus,
+    roles: ONBOARDING_ROLES,
+    helpSlug: "employees",
+  },
+  {
+    id: "checklist-todos",
+    label: "To-Dos",
+    description: "Onboarding and offboarding task board",
+    href: "/checklist/todos",
+    section: "People",
+    icon: ListTodo,
+    roles: ALL_STAFF,
     helpSlug: "employees",
   },
   {

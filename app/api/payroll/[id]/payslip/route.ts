@@ -9,6 +9,7 @@ import {
 import { canViewPayrollRecord } from "@/lib/payroll-access";
 import { legacyBreakdownFromRecord } from "@/lib/payroll-engine";
 import { renderPayslipHtml } from "@/lib/payslip-template";
+import { getAppCurrencyCode } from "@/lib/currency";
 
 export async function GET(
   _request: NextRequest,
@@ -21,7 +22,12 @@ export async function GET(
   const record = await prisma.payrollRecord.findUnique({
     where: { id },
     include: {
-      employee: { include: { department: true } },
+      employee: {
+        include: {
+          department: true,
+          user: { select: { companyId: true } },
+        },
+      },
     },
   });
   if (!record) return notFound();
@@ -30,9 +36,20 @@ export async function GET(
   if (!allowed) return forbidden();
 
   const items = legacyBreakdownFromRecord(record);
+  const [company, currencyCode] = await Promise.all([
+    record.employee.user?.companyId
+      ? prisma.company.findUnique({
+          where: { id: record.employee.user.companyId },
+          select: { name: true },
+        })
+      : Promise.resolve(null),
+    getAppCurrencyCode(),
+  ]);
+
   const html = renderPayslipHtml({
     id: record.id,
-    companyName: "Smart HR",
+    companyName: company?.name ?? "Organization",
+    currencyCode,
     employee: {
       firstName: record.employee.firstName,
       lastName: record.employee.lastName,

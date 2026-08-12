@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { SettingsModule } from "@/components/settings/settings-module";
 import { ModulePageActions } from "@/components/help/module-page-actions";
+import { APP_CURRENCIES, getAppCurrencyCode } from "@/lib/currency";
+import { isSuperAdmin } from "@/lib/roles";
+
 export default async function SettingsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -29,6 +32,10 @@ export default async function SettingsPage() {
     }
   }
 
+  const currencyCode = isSuperAdmin(session.role)
+    ? await getAppCurrencyCode()
+    : null;
+
   return (
     <div>
       <PageHeader
@@ -41,7 +48,13 @@ export default async function SettingsPage() {
         role={session.role}
         employee={employee}
         preferences={preferences}
+        platformCurrency={
+          currencyCode
+            ? { currencyCode, options: APP_CURRENCIES }
+            : null
+        }
       />
     </div>
   );
 }
+

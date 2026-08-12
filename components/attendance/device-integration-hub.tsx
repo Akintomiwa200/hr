@@ -61,7 +61,7 @@ export function DeviceIntegrationHub() {
   const [newName, setNewName] = useState("");
   const [newLocation, setNewLocation] = useState("");
   const [testKey, setTestKey] = useState("");
-  const [testCode, setTestCode] = useState("EMP001");
+  const [testCode, setTestCode] = useState("");
   const [testAction, setTestAction] = useState<"toggle" | "check_in" | "check_out">("toggle");
   const [testing, setTesting] = useState(false);
 
@@ -82,6 +82,22 @@ export function DeviceIntegrationHub() {
   useEffect(() => {
     loadDocs();
   }, [loadDocs]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const empRes = await fetch("/api/employees");
+      if (!empRes.ok || cancelled) return;
+      const employees = (await empRes.json()) as { employeeCode?: string }[];
+      const code = employees.find((e) => e.employeeCode)?.employeeCode;
+      if (code && !cancelled) {
+        setTestCode((prev) => prev || code);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useDeviceLive(
     useCallback((ping: { deviceId?: string | null; lastSeenAt?: string }) => {

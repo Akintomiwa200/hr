@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Download,
   Eye,
@@ -27,7 +27,11 @@ import type {
 } from "./types";
 import { employmentLabel, employmentVariant, resolveEmploymentType } from "@/lib/employment";
 import { notify, readApiError } from "@/lib/toast";
-import { formatCurrency, formatDate, fullName } from "@/lib/utils";
+import { formatDate, fullName } from "@/lib/utils";
+import { useFormatCurrency } from "@/components/providers/currency-provider";
+import { useAppEvents } from "@/hooks/use-app-events";
+import type { Role } from "@prisma/client";
+import { ORG_ROLES } from "@/lib/roles";
 import {
   OnboardingPasswordNotice,
   OnboardingSuccessMessage,
@@ -59,13 +63,17 @@ export function EmployeesModule({
   departments,
   managers,
   canManage,
+  allowedRoles = ORG_ROLES,
 }: {
   employees: EmployeeRow[];
   departments: DepartmentOption[];
   managers: ManagerOption[];
   canManage: boolean;
+  allowedRoles?: Role[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const formatCurrency = useFormatCurrency();
   const [employees, setEmployees] = useState(initialEmployees);
   const [search, setSearch] = useState("");
   const [employmentFilter, setEmploymentFilter] = useState("ALL");
@@ -90,6 +98,14 @@ export function EmployeesModule({
   useEffect(() => {
     setEmployees(initialEmployees);
   }, [initialEmployees]);
+
+  useAppEvents({
+    types: ["employee_updated", "department_updated", "checklist_updated"],
+    pollIntervalMs: 4000,
+    onEvent: () => {
+      void refreshList();
+    },
+  });
 
   const roles = useMemo(
     () => [...new Set(employees.map((e) => e.user?.role ?? "EMPLOYEE"))],
@@ -150,6 +166,15 @@ export function EmployeesModule({
     setCreateOpen(true);
   }
 
+  useEffect(() => {
+    if (!canManage) return;
+    if (searchParams.get("add") !== "1") return;
+    setFormData(emptyEmployeeForm(departments));
+    setCreateSuccess(null);
+    setCreateOpen(true);
+    router.replace("/employees", { scroll: false });
+  }, [canManage, searchParams, router, departments]);
+
   function openEdit(emp: EmployeeRow) {
     setEditEmployee(emp);
     setFormData(employeeToFormData(emp));
@@ -192,12 +217,18 @@ export function EmployeesModule({
         emailPreviewUrl: data.emailPreviewUrl,
         employeeId: data.employee?.id,
       });
-      notify.success("Employee created successfully");
+      notify.success(
+        data.checklistStarted
+          ? "Employee created — onboarding checklist started"
+          : "Employee created successfully"
+      );
       await refreshList();
       window.setTimeout(() => {
         setCreateOpen(false);
         setCreateSuccess(null);
-      }, 2500);
+        router.push("/checklist/onboarding");
+        router.refresh();
+      }, 1200);
     } catch {
       notify.error("Something went wrong");
     } finally {
@@ -300,11 +331,11 @@ export function EmployeesModule({
         {canManage && (
           <div className="flex flex-wrap gap-2">
             <Link
-              href="/employees/new"
+              href="/checklist/onboarding"
               className="inline-flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium bg-[#7B61FF] text-white rounded-xl hover:bg-violet-600 shadow-sm"
             >
               <Plus className="w-4 h-4" />
-              Onboard employee
+              Add employee
             </Link>
             <button
               type="button"
@@ -650,8 +681,8 @@ export function EmployeesModule({
           setCreateOpen(false);
           setCreateSuccess(null);
         }}
-        title="Onboarding"
-        description="Create account, set default password, and email welcome details"
+        title="Add employee"
+        description="Create account, set default password, email welcome details, and start onboarding"
         size="lg"
       >
         <form onSubmit={handleCreate} className="space-y-4">
@@ -662,6 +693,7 @@ export function EmployeesModule({
             onChange={setFormData}
             departments={departments}
             managers={managers}
+            allowedRoles={allowedRoles}
           />
           <div className="flex gap-3 pt-2">
             <button
@@ -701,6 +733,7 @@ export function EmployeesModule({
             departments={departments}
             managers={managers}
             isEdit
+            allowedRoles={allowedRoles}
           />
           <div className="flex gap-3 pt-2">
             <button

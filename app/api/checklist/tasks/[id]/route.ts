@@ -17,6 +17,10 @@ async function markInstanceCompleteIfNeeded(instanceId: string) {
       where: { id: instanceId },
       data: { status: "COMPLETED", endDate: new Date() },
     });
+    broadcastAppEvent("checklist_updated", {
+      id: instanceId,
+      action: "instance_completed",
+    });
   }
 }
 

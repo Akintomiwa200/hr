@@ -1,16 +1,17 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { DEFAULT_CURRENCY, formatMoney } from "@/lib/currency";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-  }).format(amount);
+/** Formats money using the platform currency (default: Nigerian Naira). */
+export function formatCurrency(
+  amount: number,
+  currencyCode: string = DEFAULT_CURRENCY
+) {
+  return formatMoney(amount, currencyCode);
 }
 
 export function formatDate(date: Date | string) {

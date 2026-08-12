@@ -1,25 +1,39 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { canManagePerformance } from "@/lib/roles";
+import { canManageOrgContent, canManagePerformance } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { PerformanceHub } from "@/components/performance/performance-hub";
 import { appraisalListWhere } from "@/lib/performance/access";
+import { getCompanyScope, departmentCompanyWhere, requireOrgCompanyId } from "@/lib/company-scope";
+import { getPerformanceSettings } from "@/lib/performance/settings";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function PerformancePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
   const canManage = canManagePerformance(session.role);
+  const canManageSettings = canManageOrgContent(session.role);
+  const scope = getCompanyScope(session);
+  const companyId = requireOrgCompanyId(scope);
 
-  const [kpis, cycles, appraisals, departments] = await Promise.all([
+  const companyKpiWhere = companyId
+    ? { OR: [{ companyId }, { companyId: null }] }
+    : {};
+  const companyCycleWhere = companyId
+    ? { OR: [{ companyId }, { companyId: null }] }
+    : {};
+
+  const [kpis, cycles, appraisals, departments, settings] = await Promise.all([
     prisma.kpiDefinition.findMany({
-      where: { isActive: true },
+      where: { isActive: true, ...companyKpiWhere },
       include: { department: true },
       orderBy: { title: "asc" },
     }),
     prisma.appraisalCycle.findMany({
+      where: companyCycleWhere,
       include: {
         kpis: { include: { kpi: true } },
         _count: { select: { appraisals: true } },
@@ -29,13 +43,17 @@ export default async function PerformancePage() {
     prisma.performanceAppraisal.findMany({
       where: await appraisalListWhere(session),
       include: {
-        employee: true,
+        employee: { include: { department: true } },
         manager: true,
         cycle: true,
       },
       orderBy: { updatedAt: "desc" },
     }),
-    prisma.department.findMany({ orderBy: { name: "asc" } }),
+    prisma.department.findMany({
+      where: departmentCompanyWhere(scope),
+      orderBy: { name: "asc" },
+    }),
+    getPerformanceSettings(companyId),
   ]);
 
   const stats = {
@@ -48,12 +66,24 @@ export default async function PerformancePage() {
 
   return (
     <div>
+      <PageLiveRefresh
+        types={[
+          "performance_updated",
+          "appraisal_updated",
+          "announcement_created",
+          "notification_updated",
+          "employee_updated",
+          "department_updated",
+          "settings_updated",
+        ]}
+        pollIntervalMs={4000}
+      />
       <PageHeader
         title="Performance"
         description={
           session.role === "EMPLOYEE"
             ? "Track KPIs, complete your self-appraisal, and view results"
-            : "Define KPIs, run review cycles, and manage team appraisals"
+            : "Define KPIs, run review cycles, score appraisals, and publish live announcements"
         }
         action={<ModulePageActions helpSlug="performance" helpLabel="Performance guide" />}
       />
@@ -63,9 +93,11 @@ export default async function PerformancePage() {
         appraisals={appraisals}
         departments={departments}
         canManage={canManage}
+        canManageSettings={canManageSettings}
         isEmployee={session.role === "EMPLOYEE"}
-        currentEmployeeId={session.employeeId}
+        currentEmployeeId={session.employeeId ?? undefined}
         stats={stats}
+        settings={settings}
       />
     </div>
   );

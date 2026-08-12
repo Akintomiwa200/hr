@@ -1,12 +1,13 @@
 export type EmploymentType = "FULL_TIME" | "FREELANCE";
 
-const FREELANCE_CODES = new Set(["EMP002", "EMP003"]);
-
 export function resolveEmploymentType(employee: {
-  employeeCode: string;
+  employmentType?: string | null;
+  employeeCode?: string;
   jobTitle?: string;
 }): EmploymentType {
-  if (FREELANCE_CODES.has(employee.employeeCode)) return "FREELANCE";
+  if (employee.employmentType === "FREELANCE" || employee.employmentType === "FULL_TIME") {
+    return employee.employmentType;
+  }
   const title = employee.jobTitle?.toLowerCase() ?? "";
   if (title.includes("freelance") || title.includes("contract")) return "FREELANCE";
   return "FULL_TIME";

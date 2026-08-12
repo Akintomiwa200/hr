@@ -18,6 +18,8 @@ import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
 import { canManageDevices, hasRole, INTEGRATION_ADMIN_ROLES, SUBSCRIPTION_ADMIN_ROLES, roleLabel } from "@/lib/roles";
 import type { Role } from "@prisma/client";
+import { PlatformCurrencySettings } from "@/components/settings/platform-currency-settings";
+import type { AppCurrency } from "@/lib/currency";
 
 type EmployeeProfile = {
   id: string;
@@ -85,11 +87,13 @@ export function SettingsModule({
   role,
   employee,
   preferences,
+  platformCurrency,
 }: {
   email: string;
   role: string;
   employee: EmployeeProfile | null;
   preferences: Record<string, boolean>;
+  platformCurrency?: { currencyCode: string; options: AppCurrency[] } | null;
 }) {
   const router = useRouter();
   const [phone, setPhone] = useState(employee?.phone ?? "");
@@ -246,6 +250,13 @@ export function SettingsModule({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {platformCurrency && (
+          <PlatformCurrencySettings
+            currencyCode={platformCurrency.currencyCode}
+            options={platformCurrency.options}
+          />
+        )}
+
         <Card className="p-6">
           <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center mb-4">
             <Shield className="w-5 h-5 text-violet-600" />

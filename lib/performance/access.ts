@@ -6,6 +6,8 @@ import {
   isSuperAdmin,
   normalizeRole,
 } from "@/lib/roles";
+import { computeWeightedOverall } from "@/lib/performance/scoring";
+import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
 
 export function parseJsonArray(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -65,30 +67,46 @@ export function canEditManagerAppraisal(
 
 export async function appraisalListWhere(session: SessionUser) {
   const role = normalizeRole(session.role);
+  const scope = getCompanyScope(session);
+  const companyFilter = {
+    employee: employeeCompanyWhere(scope),
+  };
+
   if (role === "EMPLOYEE" && session.employeeId) {
-    return { employeeId: session.employeeId };
+    return { employeeId: session.employeeId, ...companyFilter };
   }
   if ((role === "MANAGER" || role === "SUPERVISOR") && session.employeeId) {
     return {
-      OR: [
-        { employeeId: session.employeeId },
-        { managerId: session.employeeId },
-        { employee: { managerId: session.employeeId } },
+      AND: [
+        companyFilter,
+        {
+          OR: [
+            { employeeId: session.employeeId },
+            { managerId: session.employeeId },
+            { employee: { managerId: session.employeeId } },
+          ],
+        },
       ],
     };
   }
-  return {};
+  return companyFilter;
 }
 
 export function computeOverallRating(
-  scores: { selfScore: number | null; managerScore: number | null; weight: number }[]
+  scores: {
+    selfScore: number | null;
+    managerScore: number | null;
+    weight: number;
+    metricType?: string;
+    targetValue?: number | null;
+  }[],
+  scaleMax = 5
 ) {
-  const rated = scores.filter((s) => s.managerScore != null || s.selfScore != null);
-  if (rated.length === 0) return null;
-  const totalWeight = rated.reduce((sum, s) => sum + s.weight, 0);
-  const weighted = rated.reduce((sum, s) => {
-    const score = s.managerScore ?? s.selfScore ?? 0;
-    return sum + score * s.weight;
-  }, 0);
-  return Math.round((weighted / totalWeight) * 10) / 10;
+  return computeWeightedOverall(
+    scores.map((s) => ({
+      ...s,
+      metricType: s.metricType ?? "RATING",
+    })),
+    scaleMax
+  );
 }

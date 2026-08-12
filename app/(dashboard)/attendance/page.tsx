@@ -4,6 +4,8 @@ import { getSession } from "@/lib/auth";
 import { canManageDevices } from "@/lib/roles";
 import { getAppUrlFromHeaders } from "@/lib/app-url";
 import { prisma } from "@/lib/prisma";
+import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
+import { teamScopedEmployeeWhere } from "@/lib/employee-access";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { AttendanceModule } from "@/components/attendance/attendance-module";
@@ -15,10 +17,17 @@ export default async function AttendancePage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const scope = getCompanyScope(session);
+  const orgEmployee = employeeCompanyWhere(scope);
+  const teamScope = teamScopedEmployeeWhere(session);
+  const scopedEmployee = teamScope
+    ? { AND: [orgEmployee, teamScope] }
+    : orgEmployee;
+
   const whereClause =
     session.role === "EMPLOYEE" && session.employeeId
       ? { employeeId: session.employeeId }
-      : {};
+      : { employee: scopedEmployee };
 
   const isEmployee = session.role === "EMPLOYEE";
   const showDevicePanel = canManageDevices(session.role);
@@ -46,6 +55,7 @@ export default async function AttendancePage() {
           where: {
             date: today,
             status: { in: ["PRESENT", "REMOTE", "LATE", "HALF_DAY"] },
+            employee: scopedEmployee,
           },
         })
       : Promise.resolve(undefined),
@@ -58,7 +68,9 @@ export default async function AttendancePage() {
         description={
           session.role === "EMPLOYEE"
             ? "Check in, check out, and view your attendance history"
-            : "Monitor daily attendance across the organization"
+            : session.role === "MANAGER" || session.role === "SUPERVISOR"
+              ? "Monitor attendance for your team"
+              : "Monitor daily attendance across the organization"
         }
         action={<ModulePageActions helpSlug="attendance" helpLabel="Attendance guide" />}
       />

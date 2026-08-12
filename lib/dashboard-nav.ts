@@ -31,13 +31,12 @@ import {
   UserMinus,
   BarChart3,
 } from "lucide-react";
-import { CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
+import { CHECKLIST_ADMIN_ROLES, CHECKLIST_TEMPLATE_ROLES, CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
 import {
   ALL_STAFF,
   DEVICE_ADMIN_ROLES,
   DASHBOARD_ROLES,
   INTEGRATION_ADMIN_ROLES,
-  ONBOARDING_ROLES,
   ORG_CHART_ROLES,
   PAYROLL_VIEW_ROLES,
   PEOPLE_VIEW_ROLES,
@@ -142,6 +141,44 @@ export const dashboardNavSections: NavSection[] = [
         icon: UsersRound,
         roles: PEOPLE_VIEW_ROLES,
       },
+      {
+        id: "checklist-onboarding",
+        href: "/checklist/onboarding",
+        label: "Onboarding",
+        pageTitle: "Onboarding",
+        icon: GraduationCap,
+        roles: CHECKLIST_ADMIN_ROLES,
+        match: (pathname) =>
+          pathname === "/checklist/onboarding" || pathname.startsWith("/checklist/onboarding/"),
+      },
+      {
+        id: "checklist-offboarding",
+        href: "/checklist/offboarding",
+        label: "Offboarding",
+        pageTitle: "Offboarding",
+        icon: UserMinus,
+        roles: CHECKLIST_ADMIN_ROLES,
+        match: (pathname) =>
+          pathname === "/checklist/offboarding" || pathname.startsWith("/checklist/offboarding/"),
+      },
+      {
+        id: "checklist-todos",
+        href: "/checklist/todos",
+        label: "To-Dos",
+        pageTitle: "To-Dos",
+        icon: ListTodo,
+        roles: CHECKLIST_VIEW_ROLES,
+        match: (pathname) => pathname === "/checklist/todos",
+      },
+      {
+        id: "checklist-templates",
+        href: "/checklist/settings",
+        label: "Templates",
+        pageTitle: "Onboarding & Offboarding Templates",
+        icon: CheckSquare,
+        roles: CHECKLIST_TEMPLATE_ROLES,
+        match: (pathname) => pathname.startsWith("/checklist/settings"),
+      },
     ],
   },
   {
@@ -186,47 +223,6 @@ export const dashboardNavSections: NavSection[] = [
     ],
   },
   {
-    title: "Checklist",
-    items: [
-      {
-        id: "checklist-todos",
-        href: "/checklist/todos",
-        label: "To-Dos",
-        pageTitle: "Checklist — To-Dos",
-        icon: ListTodo,
-        roles: CHECKLIST_VIEW_ROLES,
-        match: (pathname) => pathname === "/checklist/todos",
-      },
-      {
-        id: "checklist-onboarding",
-        href: "/checklist/onboarding",
-        label: "Onboarding",
-        pageTitle: "Onboarding Checklists",
-        icon: GraduationCap,
-        roles: CHECKLIST_VIEW_ROLES,
-        match: (pathname) => pathname.startsWith("/checklist/onboarding"),
-      },
-      {
-        id: "checklist-offboarding",
-        href: "/checklist/offboarding",
-        label: "Offboarding",
-        pageTitle: "Offboarding Checklists",
-        icon: UserMinus,
-        roles: CHECKLIST_VIEW_ROLES,
-        match: (pathname) => pathname.startsWith("/checklist/offboarding"),
-      },
-      {
-        id: "checklist-settings",
-        href: "/checklist/settings",
-        label: "Settings",
-        pageTitle: "Checklist Settings",
-        icon: CheckSquare,
-        roles: ONBOARDING_ROLES,
-        match: (pathname) => pathname.startsWith("/checklist/settings"),
-      },
-    ],
-  },
-  {
     title: "Talent",
     items: [
       {
@@ -238,15 +234,6 @@ export const dashboardNavSections: NavSection[] = [
         roles: PERFORMANCE_VIEW_ROLES,
         match: (pathname) =>
           pathname === "/performance" || pathname.startsWith("/performance/"),
-      },
-      {
-        id: "onboarding",
-        href: "/employees/new",
-        label: "Onboarding",
-        pageTitle: "Onboarding",
-        icon: GraduationCap,
-        roles: ONBOARDING_ROLES,
-        match: (pathname) => pathname === "/employees/new",
       },
       {
         id: "recruitment",
@@ -403,7 +390,7 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
     title: "Companies",
   },
   {
-    test: (p) => p === "/employees/new",
+    test: (p) => p === "/employees/new" || p === "/checklist/onboarding",
     title: "Onboarding",
   },
   {
@@ -489,6 +476,22 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
   {
     test: (p) => p.startsWith("/reports"),
     title: "Reports",
+  },
+  {
+    test: (p) => p.startsWith("/checklist/onboarding"),
+    title: "Onboarding",
+  },
+  {
+    test: (p) => p.startsWith("/checklist/offboarding"),
+    title: "Offboarding",
+  },
+  {
+    test: (p) => p.startsWith("/checklist/settings"),
+    title: "Checklist Templates",
+  },
+  {
+    test: (p) => p === "/checklist/todos",
+    title: "To-Dos",
   },
   {
     test: (p) => p.startsWith("/checklist/"),

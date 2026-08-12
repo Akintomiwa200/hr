@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatCurrency } from "@/lib/utils";
+import { useFormatCurrency } from "@/components/providers/currency-provider";
 
 export type IncomeChartPoint = {
   month: string;
@@ -19,6 +19,7 @@ export function IncomeChart({
   highlightMonth: string;
   chartYear: number;
 }) {
+  const formatCurrency = useFormatCurrency();
   const [hoveredMonth, setHoveredMonth] = useState<string | null>(null);
 
   const maxVal = Math.max(...data.map((d) => Math.max(d.income, d.expense)), 1);

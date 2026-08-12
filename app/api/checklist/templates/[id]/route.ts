@@ -53,6 +53,29 @@ export async function PATCH(
     return NextResponse.json(task);
   }
 
+  if (body.action === "set_default") {
+    await prisma.checklistTemplate.updateMany({
+      where: {
+        type: existing.type,
+        id: { not: id },
+        ...(existing.companyId
+          ? { OR: [{ companyId: existing.companyId }, { companyId: null }] }
+          : {}),
+      },
+      data: { isActive: false },
+    });
+    const template = await prisma.checklistTemplate.update({
+      where: { id },
+      data: { isActive: true },
+      include: { tasks: { orderBy: { sortOrder: "asc" } } },
+    });
+    broadcastAppEvent("checklist_updated", { id, action: "template_default" });
+    revalidatePath("/checklist/settings");
+    revalidatePath("/checklist/onboarding");
+    revalidatePath("/checklist/offboarding");
+    return NextResponse.json(template);
+  }
+
   const template = await prisma.checklistTemplate.update({
     where: { id },
     data: {

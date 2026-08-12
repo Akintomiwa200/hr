@@ -28,19 +28,23 @@ export async function canViewPayrollRecord(
   return false;
 }
 
+/** Whether the viewer may open an employee's salary / payslip history (read-only for managers). */
+export async function canViewEmployeePayroll(
+  session: SessionUser,
+  employeeId: string
+) {
+  return canViewPayrollRecord(session, { employeeId });
+}
+
+/**
+ * Create / edit / delete payroll — HR and company admins only.
+ * Managers may preview team payslips but cannot change them.
+ */
 export async function canManagePayrollRecord(
   session: SessionUser,
-  record: { employeeId: string }
+  _record: { employeeId: string }
 ) {
   if (canManagePayroll(session.role) || isSuperAdmin(session.role)) return true;
-  const role = normalizeRole(session.role);
-  if (role === "MANAGER" && session.employeeId) {
-    const employee = await prisma.employee.findUnique({
-      where: { id: record.employeeId },
-      select: { managerId: true },
-    });
-    return employee?.managerId === session.employeeId;
-  }
   return false;
 }
 
@@ -61,5 +65,9 @@ export async function payrollListWhere(session: SessionUser) {
       ],
     };
   }
-  return {};
+
+  const companyId = session.companyId ?? null;
+  if (isSuperAdmin(role) && !companyId) return {};
+  if (!companyId) return { employee: { user: { companyId: null } } };
+  return { employee: { user: { companyId } } };
 }

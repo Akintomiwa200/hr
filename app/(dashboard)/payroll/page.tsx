@@ -9,7 +9,10 @@ import {
   payrollListWhere,
 } from "@/lib/payroll-access";
 import { ensurePayrollSettings, getPayrollSettings } from "@/lib/payroll-engine";
-import { isHr } from "@/lib/api-auth";
+import { canManagePayroll } from "@/lib/roles";
+import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
+import { teamScopedEmployeeWhere } from "@/lib/employee-access";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function PayrollPage() {
   const session = await getSession();
@@ -17,17 +20,16 @@ export default async function PayrollPage() {
 
   await ensurePayrollSettings(session.companyId);
 
+  const scope = getCompanyScope(session);
+  const orgEmployee = employeeCompanyWhere(scope);
+  const teamScope = teamScopedEmployeeWhere(session);
+
   const employeeWhere =
-    session.role === "MANAGER" && session.employeeId
-      ? {
-          OR: [
-            { id: session.employeeId },
-            { managerId: session.employeeId, status: "ACTIVE" as const },
-          ],
-        }
-      : session.role === "EMPLOYEE"
-        ? { id: session.employeeId ?? "" }
-        : { status: "ACTIVE" as const };
+    session.role === "EMPLOYEE"
+      ? { id: session.employeeId ?? "" }
+      : teamScope
+        ? { AND: [orgEmployee, teamScope, { status: "ACTIVE" as const }] }
+        : { status: "ACTIVE" as const, ...orgEmployee };
 
   const [records, employees, settings] = await Promise.all([
     prisma.payrollRecord.findMany({
@@ -44,17 +46,22 @@ export default async function PayrollPage() {
   ]);
 
   const totalPayroll = records.reduce((sum, r) => sum + r.netPay, 0);
-  const canManage = isHr(session);
+  const canManage = canManagePayroll(session.role);
   const canManageSettings = canManagePayrollSettings(session);
+  const isManagerView =
+    session.role === "MANAGER" || session.role === "SUPERVISOR";
 
   return (
     <div>
+      <PageLiveRefresh types={["payroll_updated", "employee_updated"]} pollIntervalMs={5000} />
       <PageHeader
         title="Payroll"
         description={
           session.role === "EMPLOYEE"
             ? "View your payslips, breakdown, and download salary slips"
-            : "Manage compensation, auto deductions, and payslips"
+            : isManagerView
+              ? "Preview payslips for yourself and your team — contact HR to make changes"
+              : "Manage compensation, auto deductions, and payslips"
         }
         action={
           <ModulePageActions

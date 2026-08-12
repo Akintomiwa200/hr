@@ -5,7 +5,11 @@ import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
 import { getCompanyScope, requireOrgCompanyId } from "@/lib/company-scope";
 import { canManageChecklists } from "@/lib/checklist/access";
-import { createChecklistFromTemplate } from "@/lib/checklist/instantiate";
+import {
+  createChecklistFromTemplate,
+  ensureDefaultOffboardingTemplate,
+  ensureDefaultOnboardingTemplate,
+} from "@/lib/checklist/instantiate";
 
 export async function GET(request: NextRequest) {
   const session = await requireSession();
@@ -16,10 +20,19 @@ export async function GET(request: NextRequest) {
   const scope = getCompanyScope(session);
 
   const where: Record<string, unknown> = {
-    ...(scope.companyId ? { companyId: scope.companyId } : {}),
     ...(type ? { type } : {}),
     ...(employeeId ? { employeeId } : {}),
   };
+
+  // Include company instances and legacy rows with null companyId for this org
+  if (scope.companyId) {
+    where.OR = [{ companyId: scope.companyId }, { companyId: null }];
+  }
+
+  // Employees only see their own checklists
+  if (!canManageChecklists(session) && session.employeeId) {
+    where.employeeId = session.employeeId;
+  }
 
   const instances = await prisma.checklistInstance.findMany({
     where,
@@ -48,23 +61,59 @@ export async function POST(request: NextRequest) {
   const session = await requireSession();
   if (!session || !canManageChecklists(session)) return unauthorized();
 
-  const { templateId, employeeId, type, startDate } = await request.json();
-  if (!templateId || !employeeId || !type) {
-    return badRequest("templateId, employeeId, and type are required");
+  try {
+    const { templateId, employeeId, type, startDate } = await request.json();
+    if (!employeeId || !type) {
+      return badRequest("employeeId and type are required");
+    }
+    if (type !== "ONBOARDING" && type !== "OFFBOARDING") {
+      return badRequest("type must be ONBOARDING or OFFBOARDING");
+    }
+
+    const companyId = requireOrgCompanyId(getCompanyScope(session));
+
+    const existing = await prisma.checklistInstance.findFirst({
+      where: {
+        employeeId,
+        type,
+        status: { not: "COMPLETED" },
+      },
+    });
+    if (existing) {
+      return NextResponse.json(
+        { error: "An active checklist already exists for this employee", instance: existing },
+        { status: 409 }
+      );
+    }
+
+    let resolvedTemplateId = templateId as string | undefined;
+    if (!resolvedTemplateId) {
+      const template =
+        type === "ONBOARDING"
+          ? await ensureDefaultOnboardingTemplate(companyId)
+          : await ensureDefaultOffboardingTemplate(companyId);
+      resolvedTemplateId = template.id;
+    }
+
+    const instance = await createChecklistFromTemplate({
+      templateId: resolvedTemplateId,
+      employeeId,
+      companyId,
+      type,
+      startDate: startDate ? new Date(startDate) : undefined,
+    });
+
+    broadcastAppEvent("checklist_updated", {
+      id: instance?.id,
+      employeeId,
+      action: "instance_created",
+    });
+    revalidatePath("/checklist/onboarding");
+    revalidatePath("/checklist/offboarding");
+    revalidatePath("/checklist/todos");
+    return NextResponse.json(instance);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to start checklist";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
-
-  const companyId = requireOrgCompanyId(getCompanyScope(session));
-
-  const instance = await createChecklistFromTemplate({
-    templateId,
-    employeeId,
-    companyId,
-    type,
-    startDate: startDate ? new Date(startDate) : undefined,
-  });
-
-  broadcastAppEvent("checklist_updated", { id: instance?.id, action: "instance_created" });
-  revalidatePath("/checklist/onboarding");
-  revalidatePath("/checklist/offboarding");
-  return NextResponse.json(instance);
 }

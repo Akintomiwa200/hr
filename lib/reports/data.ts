@@ -315,8 +315,6 @@ export async function getOffboardingReport(session: SessionUser, filters: Report
   return { chart, rows };
 }
 
-const DEFAULT_ENTITLEMENT = 20;
-
 export async function getTimeOffBalanceReport(session: SessionUser, filters: ReportFilters) {
   const employees = await loadEmployees(session, filters);
   const year = new Date().getFullYear();
@@ -344,10 +342,7 @@ export async function getTimeOffBalanceReport(session: SessionUser, filters: Rep
         employeeCode: emp.employeeCode,
         department: emp.department.name,
         jobTitle: emp.jobTitle,
-        entitlement: DEFAULT_ENTITLEMENT,
-        carryOver: 0,
         used,
-        remaining: Math.max(0, DEFAULT_ENTITLEMENT - used),
         requested,
       };
     })

@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageEmployee, canViewEmployee } from "@/lib/employee-access";
 import { notifyEmployeeChange } from "@/lib/employees/mutations";
+import { canAssignRole, normalizeRole } from "@/lib/roles";
 
 export async function GET(
   _request: NextRequest,
@@ -71,26 +72,17 @@ export async function PATCH(
     status,
   } = body;
 
-  let resolvedJobTitle = jobTitle ?? existing.jobTitle;
-  if (
-    employmentType === "FREELANCE" &&
-    resolvedJobTitle &&
-    !resolvedJobTitle.toLowerCase().includes("freelance")
-  ) {
-    resolvedJobTitle = `${resolvedJobTitle} (Freelance)`;
-  } else if (
-    employmentType === "FULL_TIME" &&
-    resolvedJobTitle?.toLowerCase().includes("(freelance)")
-  ) {
-    resolvedJobTitle = resolvedJobTitle.replace(/\s*\(Freelance\)/i, "").trim();
-  }
-
   if (email && email !== existing.email) {
     const emailTaken = await prisma.user.findUnique({ where: { email } });
     if (emailTaken) {
       return NextResponse.json({ error: "Email already exists" }, { status: 409 });
     }
   }
+
+  const resolvedEmploymentType =
+    employmentType === "FREELANCE" || employmentType === "FULL_TIME"
+      ? employmentType
+      : undefined;
 
   const employee = await prisma.employee.update({
     where: { id },
@@ -100,7 +92,10 @@ export async function PATCH(
       ...(email !== undefined && { email }),
       ...(phone !== undefined && { phone: phone || null }),
       ...(address !== undefined && { address: address || null }),
-      ...(resolvedJobTitle !== undefined && { jobTitle: resolvedJobTitle }),
+      ...(jobTitle !== undefined && { jobTitle }),
+      ...(resolvedEmploymentType !== undefined && {
+        employmentType: resolvedEmploymentType,
+      }),
       ...(departmentId !== undefined && { departmentId }),
       ...(managerId !== undefined && { managerId: managerId || null }),
       ...(salary !== undefined && { salary: Number(salary) || 0 }),
@@ -114,10 +109,17 @@ export async function PATCH(
   });
 
   if (role && existing.user) {
+    const nextRole = normalizeRole(String(role));
+    if (!canAssignRole(session.role, nextRole)) {
+      return NextResponse.json(
+        { error: "You cannot assign that system role" },
+        { status: 403 }
+      );
+    }
     await prisma.user.update({
       where: { id: existing.userId },
       data: {
-        role: role as Role,
+        role: nextRole as Role,
         ...(email !== undefined && { email }),
       },
     });

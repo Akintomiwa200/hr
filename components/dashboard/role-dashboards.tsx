@@ -6,10 +6,12 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { employmentLabel, employmentVariant, resolveEmploymentType } from "@/lib/employment";
-import { formatCurrency, fullName } from "@/lib/utils";
+import { fullName } from "@/lib/utils";
+import { Money } from "@/components/ui/money";
 import { EmployeeTable } from "./employee-table";
 import { GreetingHeader } from "./greeting-header";
 import { IncomeChart } from "./income-chart";
+import { DashboardLiveRefresh } from "./dashboard-live-refresh";
 import { UpcomingScheduleWidget } from "@/components/holidays/upcoming-schedule-widget";
 import type { UpcomingCalendarEvent } from "@/lib/calendar-summary";
 
@@ -64,7 +66,8 @@ function DeviceGauge({
   total: number;
   devices: { label: string; value: number; color: string }[];
 }) {
-  const dashOffset = total > 0 ? Math.max(157 - (total / Math.max(total, 10)) * 140, 20) : 157;
+  // Show activity arc from real check-in count (empty when zero; filled when any).
+  const dashOffset = total > 0 ? 17 : 157;
 
   return (
     <div className="flex items-center gap-6">
@@ -134,6 +137,7 @@ export function HrDashboard({
 
   return (
     <div className="w-full">
+      <DashboardLiveRefresh />
       {!hideGreeting && (
         <Suspense
           fallback={
@@ -174,9 +178,14 @@ export function HrDashboard({
 
         <WidgetCard title="Attendance Overview">
           <div className="flex items-start justify-between mb-4">
-            <p className="text-[32px] font-bold text-gray-900 leading-none">
-              {data.attendanceRate}%
-            </p>
+            <div>
+              <p className="text-[32px] font-bold text-gray-900 leading-none">
+                {data.attendanceRate}%
+              </p>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Period rate · today {data.todayAttendanceRate ?? data.attendanceRate}%
+              </p>
+            </div>
             <span
               className={`text-[11px] font-medium px-2 py-1 rounded-md ${
                 data.attendanceTrend >= 0
@@ -185,34 +194,49 @@ export function HrDashboard({
               }`}
             >
               {data.attendanceTrend >= 0 ? "+" : ""}
-              {data.attendanceTrend}% since last month
+              {data.attendanceTrend}% vs prior period
             </span>
           </div>
-          <div className="flex h-3 rounded-full overflow-hidden bg-gray-100">
-            <div
-              className="bg-amber-400"
-              style={{ width: `${Math.max(data.attendanceBreakdown.sick, 8)}%` }}
-            />
-            <div
-              className="bg-blue-400"
-              style={{ width: `${Math.max(data.attendanceBreakdown.late, 12)}%` }}
-            />
-            <div
-              className="bg-[#7B61FF]"
-              style={{ width: `${Math.max(data.attendanceBreakdown.onTime, 50)}%` }}
-            />
-          </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[11px] text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-400" /> Sick Leave
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-400" /> Day Off
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#7B61FF]" /> On time
-            </span>
-          </div>
+          {data.attendanceBreakdown.counts?.total ? (
+            <>
+              <div className="flex h-3 rounded-full overflow-hidden bg-gray-100">
+                {data.attendanceBreakdown.absent > 0 && (
+                  <div
+                    className="bg-amber-400"
+                    style={{ width: `${data.attendanceBreakdown.absent}%` }}
+                  />
+                )}
+                {data.attendanceBreakdown.late > 0 && (
+                  <div
+                    className="bg-blue-400"
+                    style={{ width: `${data.attendanceBreakdown.late}%` }}
+                  />
+                )}
+                {data.attendanceBreakdown.onTime > 0 && (
+                  <div
+                    className="bg-[#7B61FF]"
+                    style={{ width: `${data.attendanceBreakdown.onTime}%` }}
+                  />
+                )}
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[11px] text-gray-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" /> Absent{" "}
+                  {data.attendanceBreakdown.counts.absent}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-400" /> Late{" "}
+                  {data.attendanceBreakdown.counts.late}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#7B61FF]" /> On time{" "}
+                  {data.attendanceBreakdown.counts.onTime}
+                </span>
+              </div>
+            </>
+          ) : (
+            <p className="text-[13px] text-gray-500">No attendance logged in this period yet.</p>
+          )}
         </WidgetCard>
 
         <WidgetCard title="Today Used Devices">
@@ -313,6 +337,7 @@ export function ManagerDashboard({
 }) {
   return (
     <div className="w-full">
+      <DashboardLiveRefresh />
       <Suspense
         fallback={
           <div className="py-[1em] mb-6">
@@ -345,6 +370,15 @@ export function ManagerDashboard({
           </div>
         ))}
       </div>
+
+      {data.teamSize === 0 && (
+        <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50/70 px-5 py-4 text-sm text-amber-950">
+          No team members report to you yet. When HR adds people, set{" "}
+          <span className="font-semibold">Reports to</span> as you — or create
+          employees in your department without a manager and they&apos;ll be linked
+          automatically.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <WidgetCard
@@ -450,6 +484,7 @@ export function EmployeeDashboard({
 
   return (
     <div className="w-full">
+      <DashboardLiveRefresh />
       <Suspense
         fallback={
           <div className="py-[1em] mb-6">
@@ -480,7 +515,7 @@ export function EmployeeDashboard({
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <p className="text-[12px] text-gray-500">Latest Net Pay</p>
           <p className="text-2xl font-bold text-emerald-600 mt-1">
-            {data.latestPayroll ? formatCurrency(data.latestPayroll.netPay) : "—"}
+            {data.latestPayroll ? <Money amount={data.latestPayroll.netPay} /> : "—"}
           </p>
           <p className="text-[11px] text-gray-400 mt-1">Most recent payslip</p>
         </div>
@@ -552,6 +587,7 @@ export function CompanyAdminDashboard({
 }) {
   return (
     <div className="w-full">
+      <DashboardLiveRefresh />
       <div className="py-[1em] mb-4">
         <h2 className="text-[22px] font-bold text-gray-900 tracking-tight">
           Company overview, {userName}
@@ -591,6 +627,7 @@ export function SuperAdminDashboard({
 }) {
   return (
     <div className="w-full">
+      <DashboardLiveRefresh />
       <div className="py-[1em] mb-6">
         <h2 className="text-[22px] font-bold text-gray-900 tracking-tight">
           Platform overview, {userName}
@@ -667,6 +704,7 @@ export function SupervisorDashboard({
 }) {
   return (
     <div className="w-full">
+      <DashboardLiveRefresh />
       <Suspense
         fallback={
           <div className="py-[1em] mb-6">
@@ -698,6 +736,13 @@ export function SupervisorDashboard({
           </div>
         ))}
       </div>
+
+      {data.teamSize === 0 && (
+        <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50/70 px-5 py-4 text-sm text-amber-950">
+          No team members report to you yet. When HR adds people in your department
+          without a manager, they&apos;ll be linked to you automatically.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <WidgetCard

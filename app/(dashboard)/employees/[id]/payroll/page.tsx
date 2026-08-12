@@ -1,10 +1,11 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession, canManagePayroll } from "@/lib/auth";
-import { isPeopleManager } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { canViewEmployee, getEmployeeOrNull } from "@/lib/employee-access";
+import { canViewEmployeePayroll } from "@/lib/payroll-access";
 import { EmployeeSubpageHeader } from "@/components/employees/employee-subpage-header";
 import { EmployeePayrollModule } from "@/components/payroll/employee-payroll-module";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 import { fullName } from "@/lib/utils";
 
 export default async function EmployeePayrollPage({
@@ -22,11 +23,7 @@ export default async function EmployeePayrollPage({
   const allowed = await canViewEmployee(session, id);
   if (!allowed) redirect("/employees");
 
-  const canViewSalary =
-    canManagePayroll(session.role) ||
-    isPeopleManager(session.role) ||
-    session.employeeId === id;
-
+  const canViewSalary = await canViewEmployeePayroll(session, id);
   if (!canViewSalary) redirect(`/employees/${id}`);
 
   const records = await prisma.payrollRecord.findMany({
@@ -36,10 +33,15 @@ export default async function EmployeePayrollPage({
 
   return (
     <div>
+      <PageLiveRefresh types={["payroll_updated", "employee_updated"]} pollIntervalMs={5000} />
       <EmployeeSubpageHeader
         employee={employee}
         title="Payroll"
-        description="Salary history and payslip records"
+        description={
+          canManagePayroll(session.role)
+            ? "Salary history and payslip records"
+            : "Preview salary history and payslips (view only)"
+        }
       />
       <EmployeePayrollModule
         employeeId={id}

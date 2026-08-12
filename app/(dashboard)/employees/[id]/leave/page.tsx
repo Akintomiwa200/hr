@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { canViewEmployee, getEmployeeOrNull } from "@/lib/employee-access";
 import { EmployeeSubpageHeader } from "@/components/employees/employee-subpage-header";
 import { EmployeeLeaveModule } from "@/components/leave/employee-leave-module";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 import { fullName } from "@/lib/utils";
 
 export default async function EmployeeLeavePage({
@@ -29,6 +30,7 @@ export default async function EmployeeLeavePage({
 
   return (
     <div>
+      <PageLiveRefresh types={["leave_updated", "employee_updated"]} pollIntervalMs={4000} />
       <EmployeeSubpageHeader
         employee={employee}
         title="Leave"

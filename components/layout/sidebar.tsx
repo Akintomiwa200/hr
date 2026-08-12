@@ -13,6 +13,7 @@ import {
   settingsNavItem,
   type NavItem,
 } from "@/lib/dashboard-nav";
+import { roleWorkspaceLabel } from "@/lib/roles";
 import { useEffect, useState } from "react";
 import { useAutoHideScrollbar } from "@/hooks/use-auto-hide-scrollbar";
 import { useNavSummary } from "@/components/layout/nav-provider";
@@ -197,7 +198,7 @@ export function Sidebar({
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-[15px] font-bold text-gray-900 leading-tight">Smart HR</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">HR Dashboard</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">{roleWorkspaceLabel(role)}</p>
             </div>
           )}
         </Link>
@@ -253,7 +254,9 @@ export function Sidebar({
               <>
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-semibold text-gray-900 truncate">{userName}</p>
-                  <p className="text-[11px] text-gray-400 truncate">{userEmail}</p>
+                  <p className="text-[11px] text-gray-400 truncate">
+                    {roleWorkspaceLabel(role)} · {userEmail}
+                  </p>
                 </div>
                 <ChevronsUpDown
                   className={cn(

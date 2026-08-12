@@ -236,11 +236,11 @@ export const helpArticles: HelpArticle[] = [
       },
       {
         heading: "Holiday allowance",
-        body: "Admins and managers can enable a fixed holiday allowance in Payroll settings. When on, it is added automatically to each new payroll run.",
+        body: "HR and company admins can enable a fixed holiday allowance in Payroll settings. When on, it is added automatically to each new payroll run.",
       },
       {
         heading: "Editing breakdowns",
-        body: "HR and managers can edit payslip line items for their team — add damage deductions, overtime, or adjust auto-calculated amounts before marking as paid.",
+        body: "Only HR and company admins can edit payslip line items, create runs, or change payroll settings. Managers can preview and download payslips for their direct reports, but cannot edit them.",
       },
     ],
     relatedSlugs: ["calendar", "employees", "settings"],
@@ -264,7 +264,7 @@ export const helpArticles: HelpArticle[] = [
       },
       {
         heading: "Onboarding",
-        body: "Admins and managers add employees from Onboarding (/employees/new). Each new account gets default password password, works immediately at login, and receives a welcome email with credentials via Nodemailer.",
+        body: "Use People → Onboarding to add someone to the company (account + welcome email + checklist). Use People → Offboarding to remove someone (deactivate access + exit checklist). Task progress lives under To-Dos.",
       },
     ],
     relatedSlugs: ["getting-started", "leave", "attendance"],
@@ -342,19 +342,27 @@ export const helpArticles: HelpArticle[] = [
     sections: [
       {
         heading: "KPI library",
-        body: "HR and managers define KPIs with targets, weights, and conditions (department or role). KPIs are attached to review cycles.",
+        body: "HR and managers define KPIs with targets, weights, and optional department or role scope. Company-wide KPIs apply to everyone; scoped KPIs only attach to matching people when a cycle activates.",
       },
       {
         heading: "Review cycles",
-        body: "Create a cycle with dates, deadlines, enrollment conditions, and linked KPIs. Activate to enroll all eligible employees and their managers.",
+        body: "Create a cycle with dates, deadlines, linked KPIs, and enrollment (all staff or selected departments/roles). Activate to enroll eligible people, notify them, and optionally post a company announcement.",
+      },
+      {
+        heading: "Settings & scoring",
+        body: "HR/admins set rating scale, auto-overall from weighted KPIs, and whether activating a cycle should notify people and publish an announcement. Mixed metric types are normalized onto the rating scale.",
       },
       {
         heading: "Self-appraisal",
-        body: "Employees score each KPI, describe achievements, and submit self-appraisal before the deadline. Status moves to manager review.",
+        body: "Employees score each KPI, describe achievements, and submit before the deadline. Status then moves to manager review.",
       },
       {
         heading: "Manager review",
-        body: "Managers score KPIs, add feedback, and complete the appraisal. Overall rating is calculated from weighted KPI scores.",
+        body: "Managers score KPIs, add feedback, and complete the appraisal. Overall rating is calculated from weighted, normalized KPI scores.",
+      },
+      {
+        heading: "Insights & departments",
+        body: "Use the Insights tab for completion and rating trends. Department pages also list related KPIs and link back to Performance.",
       },
     ],
     relatedSlugs: ["employees", "settings"],

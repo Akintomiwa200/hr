@@ -7,7 +7,8 @@ import { Briefcase, MapPin, Pencil, Plus, Trash2, UserRound } from "lucide-react
 import { Badge, Button, Card, statusBadge } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { useCurrency } from "@/components/providers/currency-provider";
 
 type Department = { id: string; name: string };
 type Job = {
@@ -54,6 +55,7 @@ export function RecruitmentModule({
   canManage: boolean;
 }) {
   const router = useRouter();
+  const { currency } = useCurrency();
   const [createOpen, setCreateOpen] = useState(false);
   const [editJob, setEditJob] = useState<Job | null>(null);
   const [deleteJob, setDeleteJob] = useState<Job | null>(null);
@@ -137,8 +139,8 @@ export function RecruitmentModule({
         <input className={inputClass} placeholder="Type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <input className={inputClass} placeholder="Min salary" value={form.salaryMin} onChange={(e) => setForm({ ...form, salaryMin: e.target.value })} />
-        <input className={inputClass} placeholder="Max salary" value={form.salaryMax} onChange={(e) => setForm({ ...form, salaryMax: e.target.value })} />
+        <input className={inputClass} placeholder={`Min salary (${currency.symbol})`} value={form.salaryMin} onChange={(e) => setForm({ ...form, salaryMin: e.target.value })} />
+        <input className={inputClass} placeholder={`Max salary (${currency.symbol})`} value={form.salaryMax} onChange={(e) => setForm({ ...form, salaryMax: e.target.value })} />
       </div>
       <textarea className={inputClass} rows={3} placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
       <textarea className={inputClass} rows={3} placeholder="Requirements" value={form.requirements} onChange={(e) => setForm({ ...form, requirements: e.target.value })} />

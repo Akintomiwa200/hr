@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { fullName } from "@/lib/utils";
+import {
+  departmentCompanyWhere,
+  employeeCompanyWhere,
+  getCompanyScope,
+  type CompanyScope,
+} from "@/lib/company-scope";
+import type { SessionUser } from "@/lib/auth";
 
 export type OrgChartNode = {
   id: string;
@@ -52,19 +59,8 @@ function roleRank(role: string) {
   return 4;
 }
 
-function buildTreeFromEmployees(
-  employees: EmployeeRow[],
-  filterDepartmentId?: string
-): OrgChartNode[] {
-  const pool = filterDepartmentId
-    ? employees.filter((e) => e.departmentId === filterDepartmentId)
-    : employees;
-
-  if (pool.length === 0) return [];
-
-  const poolIds = new Set(pool.map((e) => e.id));
-
-  const toNode = (emp: EmployeeRow): OrgChartNode => ({
+function toNode(emp: EmployeeRow): OrgChartNode {
+  return {
     id: emp.id,
     name: fullName(emp.firstName, emp.lastName),
     jobTitle: emp.jobTitle,
@@ -74,25 +70,76 @@ function buildTreeFromEmployees(
     role: emp.user.role,
     href: `/employees/${emp.id}`,
     children: [],
-  });
+  };
+}
+
+/**
+ * Build a forest from employees. Breaks self-links and cycles so roots are never empty
+ * when the pool has people.
+ */
+function buildForest(pool: EmployeeRow[]): OrgChartNode[] {
+  if (pool.length === 0) return [];
+
+  const poolIds = new Set(pool.map((e) => e.id));
+
+  // parentId -> child only when manager is in pool; strip self-links
+  const parent = new Map<string, string>();
+  for (const emp of pool) {
+    if (
+      emp.managerId &&
+      emp.managerId !== emp.id &&
+      poolIds.has(emp.managerId)
+    ) {
+      parent.set(emp.id, emp.managerId);
+    }
+  }
+
+  // Break cycles by dropping the edge that closes a loop
+  for (const emp of pool) {
+    const seen = new Set<string>();
+    let cur: string | undefined = emp.id;
+    while (cur && parent.has(cur)) {
+      if (seen.has(cur)) {
+        parent.delete(cur);
+        break;
+      }
+      seen.add(cur);
+      cur = parent.get(cur);
+    }
+  }
 
   const nodeMap = new Map(pool.map((emp) => [emp.id, toNode(emp)]));
-
   const roots: OrgChartNode[] = [];
 
   for (const emp of pool) {
     const node = nodeMap.get(emp.id)!;
-    const managerInPool = emp.managerId && poolIds.has(emp.managerId);
-
-    if (managerInPool) {
-      nodeMap.get(emp.managerId!)!.children.push(node);
+    const managerId = parent.get(emp.id);
+    if (managerId && nodeMap.has(managerId)) {
+      nodeMap.get(managerId)!.children.push(node);
     } else {
       roots.push(node);
     }
   }
 
+  // Safety: anyone not reachable from roots (shouldn't happen) becomes a root
+  const reachable = new Set<string>();
+  const walk = (nodes: OrgChartNode[]) => {
+    for (const n of nodes) {
+      if (reachable.has(n.id)) continue;
+      reachable.add(n.id);
+      walk(n.children);
+    }
+  };
+  walk(roots);
+  for (const emp of pool) {
+    if (!reachable.has(emp.id)) {
+      roots.push(nodeMap.get(emp.id)!);
+      walk([nodeMap.get(emp.id)!]);
+    }
+  }
+
   const sortNodes = (nodes: OrgChartNode[]): OrgChartNode[] =>
-    nodes
+    [...nodes]
       .sort((a, b) => {
         const roleDiff = roleRank(a.role) - roleRank(b.role);
         if (roleDiff !== 0) return roleDiff;
@@ -106,14 +153,72 @@ function buildTreeFromEmployees(
   return sortNodes(roots);
 }
 
-export async function getOrgChartData(): Promise<OrgChartData> {
-  const [departments, employees] = await Promise.all([
+/**
+ * Full company = everyone.
+ * Department view = members of that department + their manager chain (so the chart isn't empty
+ * when managers sit in another department).
+ */
+function buildTreeFromEmployees(
+  employees: EmployeeRow[],
+  filterDepartmentId?: string
+): OrgChartNode[] {
+  if (!filterDepartmentId) {
+    return buildForest(employees);
+  }
+
+  const byId = new Map(employees.map((e) => [e.id, e]));
+  const inDept = employees.filter((e) => e.departmentId === filterDepartmentId);
+  if (inDept.length === 0) return [];
+
+  const poolIds = new Set(inDept.map((e) => e.id));
+  for (const emp of inDept) {
+    let cur = emp.managerId;
+    const guard = new Set<string>();
+    while (cur && byId.has(cur) && !guard.has(cur)) {
+      guard.add(cur);
+      poolIds.add(cur);
+      cur = byId.get(cur)?.managerId ?? null;
+    }
+  }
+
+  const pool = employees.filter((e) => poolIds.has(e.id));
+  return buildForest(pool);
+}
+
+export async function getOrgChartData(
+  sessionOrScope?: SessionUser | CompanyScope
+): Promise<OrgChartData> {
+  const scope =
+    sessionOrScope && "isPlatformAdmin" in sessionOrScope
+      ? sessionOrScope
+      : sessionOrScope
+        ? getCompanyScope(sessionOrScope)
+        : { companyId: null, isPlatformAdmin: true };
+
+  const orgEmployee = employeeCompanyWhere(scope);
+  // Only departments that belong to this company (do not pull other tenants' "General").
+  const orgDepartment =
+    scope.isPlatformAdmin && !scope.companyId
+      ? {}
+      : scope.companyId
+        ? { companyId: scope.companyId }
+        : departmentCompanyWhere(scope);
+
+  const [departments, employees, company] = await Promise.all([
     prisma.department.findMany({
-      include: { _count: { select: { employees: true, jobs: true } } },
+      where: orgDepartment,
+      include: {
+        _count: {
+          select: {
+            employees: { where: { status: "ACTIVE", ...orgEmployee } },
+            jobs: true,
+          },
+        },
+      },
       orderBy: { name: "asc" },
     }),
     prisma.employee.findMany({
-      where: { status: "ACTIVE" },
+      where: { status: "ACTIVE", ...orgEmployee },
       include: {
         department: true,
         user: { select: { role: true } },
@@ -121,6 +226,12 @@ export async function getOrgChartData(): Promise<OrgChartData> {
       },
       orderBy: { firstName: "asc" },
     }),
+    scope.companyId
+      ? prisma.company.findUnique({
+          where: { id: scope.companyId },
+          select: { name: true },
+        })
+      : null,
   ]);
 
   const employeeRows: EmployeeRow[] = employees.map((emp) => ({
@@ -136,9 +247,16 @@ export async function getOrgChartData(): Promise<OrgChartData> {
     directReports: emp.directReports,
   }));
 
-  const managerIds = new Set(
-    employeeRows.filter((e) => e.directReports.length > 0).map((e) => e.id)
-  );
+  const companyTree = buildTreeFromEmployees(employeeRows);
+
+  // Count people with a manager/supervisor role (even before they have reports),
+  // plus anyone who already has direct reports.
+  const totalManagers = employeeRows.filter(
+    (e) =>
+      e.user.role === "MANAGER" ||
+      e.user.role === "SUPERVISOR" ||
+      e.directReports.length > 0
+  ).length;
 
   const departmentCharts: OrgChartDepartment[] = departments.map((dept) => ({
     id: dept.id,
@@ -150,12 +268,15 @@ export async function getOrgChartData(): Promise<OrgChartData> {
   }));
 
   return {
-    companyName: "Smart HR",
+    companyName: company?.name ?? "Organization",
     totalEmployees: employees.length,
     totalDepartments: departments.length,
-    totalManagers: managerIds.size,
+    totalManagers,
     departments: departmentCharts,
-    companyTree: buildTreeFromEmployees(employeeRows),
+    companyTree:
+      companyTree.length > 0
+        ? companyTree
+        : employeeRows.map((e) => toNode(e)),
   };
 }
 

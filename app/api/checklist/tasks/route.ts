@@ -28,8 +28,11 @@ export async function GET(request: NextRequest) {
         : { status };
 
   const instanceWhere: Record<string, unknown> = {};
-  if (scope.companyId) instanceWhere.companyId = scope.companyId;
-  else if (!scope.isPlatformAdmin) instanceWhere.companyId = "__none__";
+  if (scope.companyId) {
+    instanceWhere.OR = [{ companyId: scope.companyId }, { companyId: null }];
+  } else if (!scope.isPlatformAdmin) {
+    instanceWhere.companyId = "__none__";
+  }
   if (type && type !== "ALL") instanceWhere.type = type;
 
   const tasks = await prisma.checklistTask.findMany({

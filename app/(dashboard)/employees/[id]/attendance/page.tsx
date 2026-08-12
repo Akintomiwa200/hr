@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { canViewEmployee, getEmployeeOrNull } from "@/lib/employee-access";
 import { EmployeeSubpageHeader } from "@/components/employees/employee-subpage-header";
 import { EmployeeAttendanceModule } from "@/components/attendance/employee-attendance-module";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 import { fullName } from "@/lib/utils";
 
 export default async function EmployeeAttendancePage({
@@ -51,6 +52,7 @@ export default async function EmployeeAttendancePage({
 
   return (
     <div>
+      <PageLiveRefresh types={["attendance_updated", "device_ping", "employee_updated"]} pollIntervalMs={3000} />
       <EmployeeSubpageHeader
         employee={employee}
         title="Attendance"

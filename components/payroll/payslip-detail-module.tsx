@@ -21,7 +21,8 @@ import {
 } from "lucide-react";
 import { Button, statusBadge } from "@/components/ui";
 import { notify, readApiError } from "@/lib/toast";
-import { formatCurrency, formatDate, fullName } from "@/lib/utils";
+import { formatDate, fullName } from "@/lib/utils";
+import { useCurrency, useFormatCurrency } from "@/components/providers/currency-provider";
 import type { PayrollLineItem } from "@/lib/payroll-types";
 import {
   categoryTag,
@@ -84,6 +85,7 @@ function LineAmount({
   editing: boolean;
   onChange: (amount: number) => void;
 }) {
+  const formatCurrency = useFormatCurrency();
   if (editing) {
     return (
       <input
@@ -232,6 +234,8 @@ export function PayslipDetailModule({
   companyName?: string;
 }) {
   const router = useRouter();
+  const formatCurrency = useFormatCurrency();
+  const { currency } = useCurrency();
   const [editing, setEditing] = useState(false);
   const [items, setItems] = useState(initialBreakdown);
   const [notes, setNotes] = useState(record.notes ?? "");
@@ -564,7 +568,7 @@ export function PayslipDetailModule({
           {/* Footer */}
           <div className="pt-6 border-t border-dashed border-gray-200 text-center">
             <p className="text-[11px] text-gray-400 leading-relaxed">
-              Computer-generated payslip · All amounts in USD · Retain for your records
+              Computer-generated payslip · All amounts in {currency.code} · Retain for your records
               <br />
               <span className="font-mono text-gray-500">{invoiceNo}</span>
               {" · "}

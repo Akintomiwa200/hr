@@ -31,7 +31,7 @@ export default async function TimeOffBalancePage({
           { label: "Balance" },
         ]}
       />
-      <PageHeader title="Time Off Balance" description="Leave entitlement and usage" />
+      <PageHeader title="Time Off Balance" description="Approved and pending leave usage from real requests" />
       <ReportsFiltersBar departments={departments} showType={false} showStatus={false} exportSlug="time-off-balance" />
       <ReportsDataTable
         columns={[
@@ -39,11 +39,8 @@ export default async function TimeOffBalancePage({
           { key: "employeeCode", label: "Employee ID" },
           { key: "department", label: "Department" },
           { key: "jobTitle", label: "Job Title" },
-          { key: "entitlement", label: "Entitlement" },
-          { key: "carryOver", label: "Carry Over" },
-          { key: "used", label: "Used" },
-          { key: "remaining", label: "Remaining" },
-          { key: "requested", label: "Request" },
+          { key: "used", label: "Used (approved)" },
+          { key: "requested", label: "Pending request" },
         ]}
         rows={rows}
       />

@@ -1,8 +1,10 @@
 import { redirect, notFound } from "next/navigation";
-import { getSession, canManagePayroll } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canViewEmployee } from "@/lib/employee-access";
+import { canViewEmployeePayroll } from "@/lib/payroll-access";
 import { EmployeeDetailContent } from "@/components/employees/employee-detail-content";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function EmployeeDetailPage({
   params,
@@ -27,17 +29,33 @@ export default async function EmployeeDetailPage({
       user: { select: { role: true } },
       leaveRequests: { take: 5, orderBy: { createdAt: "desc" } },
       attendanceRecords: { take: 8, orderBy: { date: "desc" } },
-      performanceReviews: { take: 3, orderBy: { createdAt: "desc" } },
+      appraisalsAsEmployee: {
+        take: 5,
+        orderBy: { updatedAt: "desc" },
+        include: { cycle: true },
+      },
       payrollRecords: { take: 1, orderBy: { periodStart: "desc" } },
     },
   });
 
   if (!employee) notFound();
 
-  const canViewSalary =
-    canManagePayroll(session.role) || session.employeeId === employee.id;
+  const canViewSalary = await canViewEmployeePayroll(session, employee.id);
 
   return (
-    <EmployeeDetailContent employee={employee} canViewSalary={canViewSalary} />
+    <div>
+      <PageLiveRefresh
+        types={[
+          "employee_updated",
+          "leave_updated",
+          "attendance_updated",
+          "payroll_updated",
+          "performance_updated",
+          "checklist_updated",
+        ]}
+        pollIntervalMs={4000}
+      />
+      <EmployeeDetailContent employee={employee} canViewSalary={canViewSalary} />
+    </div>
   );
 }

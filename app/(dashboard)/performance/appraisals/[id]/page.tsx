@@ -7,6 +7,7 @@ import {
   canViewAppraisal,
 } from "@/lib/performance/access";
 import { AppraisalDetailModule } from "@/components/performance/appraisal-detail-module";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function AppraisalDetailPage({
   params,
@@ -36,11 +37,17 @@ export default async function AppraisalDetailPage({
   const viewerIsEmployee = session.employeeId === appraisal.employeeId;
 
   return (
-    <AppraisalDetailModule
-      appraisal={appraisal}
-      canEditSelf={canEditSelf}
-      canEditManager={canEditManager}
-      viewerIsEmployee={viewerIsEmployee}
-    />
+    <div>
+      <PageLiveRefresh
+        types={["performance_updated", "appraisal_updated", "notification_updated"]}
+        pollIntervalMs={4000}
+      />
+      <AppraisalDetailModule
+        appraisal={appraisal}
+        canEditSelf={canEditSelf}
+        canEditManager={canEditManager}
+        viewerIsEmployee={viewerIsEmployee}
+      />
+    </div>
   );
 }

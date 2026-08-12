@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Users } from "lucide-react";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { useAppEvents } from "@/hooks/use-app-events";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
 
@@ -33,28 +34,42 @@ export function ChecklistOnboardingModule({
   const [instances, setInstances] = useState<InstanceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
-  const [form, setForm] = useState({ employeeId: "", templateId: templates[0]?.id ?? "" });
+  const [form, setForm] = useState({
+    employeeId: "",
+    templateId: templates[0]?.id ?? "",
+  });
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
+  useEffect(() => {
+    if (!form.templateId && templates[0]?.id) {
+      setForm((f) => ({ ...f, templateId: templates[0].id }));
+    }
+  }, [templates, form.templateId]);
+
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
-      const res = await fetch(`/api/checklist/instances?type=${type}`);
+      const res = await fetch(`/api/checklist/instances?type=${type}`, {
+        cache: "no-store",
+      });
       if (res.ok) setInstances(await res.json());
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
-  };
+  }, [type]);
 
   useEffect(() => {
-    load();
-    const es = new EventSource("/api/events");
-    es.onmessage = () => {
-      load();
+    void load();
+  }, [load]);
+
+  useAppEvents({
+    types: ["checklist_updated", "dashboard_updated", "employee_updated"],
+    pollIntervalMs: 2000,
+    onEvent: () => {
+      void load({ silent: true });
       router.refresh();
-    };
-    return () => es.close();
-  }, [router, type]);
+    },
+  });
 
   const create = async () => {
     setSaving(true);
@@ -62,15 +77,39 @@ export function ChecklistOnboardingModule({
       const res = await fetch("/api/checklist/instances", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, type }),
+        body: JSON.stringify({
+          employeeId: form.employeeId,
+          templateId: form.templateId || undefined,
+          type,
+        }),
       });
       if (!res.ok) {
         notify.error(await readApiError(res, "Failed to start checklist"));
         return;
       }
+      const created = await res.json();
       notify.success("Checklist started");
       setCreateOpen(false);
-      load();
+      setForm((f) => ({ ...f, employeeId: "" }));
+      if (created?.id) {
+        setInstances((prev) => {
+          const row = {
+            id: created.id,
+            type: created.type,
+            startDate: created.startDate,
+            status: created.status,
+            employee: created.employee,
+            progress: {
+              completed: 0,
+              total: created.tasks?.length ?? 0,
+              percent: 0,
+            },
+          };
+          return [row, ...prev.filter((i) => i.id !== created.id)];
+        });
+      }
+      await load({ silent: true });
+      router.refresh();
     } finally {
       setSaving(false);
     }
@@ -90,11 +129,15 @@ export function ChecklistOnboardingModule({
         )}
       </div>
 
-      {loading ? (
+      {loading && instances.length === 0 ? (
         <Card className="p-8 text-center text-gray-500">Loading…</Card>
       ) : instances.length === 0 ? (
         <Card>
-          <EmptyState icon={Users} title={`No ${label.toLowerCase()} records`} description={`Start a ${label.toLowerCase()} checklist for an employee.`} />
+          <EmptyState
+            icon={Users}
+            title={`No ${label.toLowerCase()} records`}
+            description={`Start a ${label.toLowerCase()} checklist for an employee.`}
+          />
         </Card>
       ) : (
         <div className="space-y-3">
@@ -123,7 +166,9 @@ export function ChecklistOnboardingModule({
                     />
                   </div>
                 </div>
-                <Badge variant={inst.status === "COMPLETED" ? "success" : "warning"}>{inst.status}</Badge>
+                <Badge variant={inst.status === "COMPLETED" ? "success" : "warning"}>
+                  {inst.status}
+                </Badge>
                 <Link
                   href={`${href}/${inst.id}`}
                   className="p-2 rounded-lg text-brand-600 hover:bg-brand-50"
@@ -155,17 +200,21 @@ export function ChecklistOnboardingModule({
             value={form.templateId}
             onChange={(e) => setForm({ ...form, templateId: e.target.value })}
           >
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
+            {templates.length === 0 ? (
+              <option value="">Default template (auto)</option>
+            ) : (
+              templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))
+            )}
           </select>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button loading={saving} onClick={create} disabled={!form.employeeId || !form.templateId}>
+            <Button loading={saving} onClick={create} disabled={!form.employeeId}>
               Create
             </Button>
           </div>

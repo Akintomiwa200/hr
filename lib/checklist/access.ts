@@ -2,8 +2,16 @@ import type { Role } from "@prisma/client";
 import type { SessionUser } from "@/lib/auth";
 import { hasRole, normalizeRole } from "@/lib/roles";
 
-export const CHECKLIST_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "MANAGER"];
+/** Can start/manage checklist instances and assign tasks */
+export const CHECKLIST_ADMIN_ROLES: Role[] = [
+  "SUPER_ADMIN",
+  "COMPANY_ADMIN",
+  "HR",
+];
+
+/** Can open checklist modules (own tasks for employees/supervisors) */
 export const CHECKLIST_VIEW_ROLES: Role[] = [
+  "SUPER_ADMIN",
   "COMPANY_ADMIN",
   "HR",
   "MANAGER",
@@ -11,9 +19,15 @@ export const CHECKLIST_VIEW_ROLES: Role[] = [
   "EMPLOYEE",
 ];
 
+/** Can edit onboarding/offboarding templates */
+export const CHECKLIST_TEMPLATE_ROLES: Role[] = [
+  "SUPER_ADMIN",
+  "COMPANY_ADMIN",
+  "HR",
+];
+
 export function canManageChecklists(session: SessionUser): boolean {
-  const role = normalizeRole(session.role);
-  return role === "SUPER_ADMIN" || hasRole(role, CHECKLIST_ADMIN_ROLES);
+  return hasRole(normalizeRole(session.role), CHECKLIST_ADMIN_ROLES);
 }
 
 export function canViewChecklists(session: SessionUser): boolean {
@@ -21,5 +35,5 @@ export function canViewChecklists(session: SessionUser): boolean {
 }
 
 export function canManageTemplates(session: SessionUser): boolean {
-  return hasRole(normalizeRole(session.role), ["COMPANY_ADMIN", "HR"]);
+  return hasRole(normalizeRole(session.role), CHECKLIST_TEMPLATE_ROLES);
 }

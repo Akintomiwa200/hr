@@ -16,6 +16,7 @@ async function main() {
   await prisma.appraisalCycle.deleteMany();
   await prisma.kpiDefinition.deleteMany();
   await prisma.performanceReview.deleteMany();
+  await prisma.performanceSettings.deleteMany();
   await prisma.checklistTaskComment.deleteMany();
   await prisma.checklistTask.deleteMany();
   await prisma.checklistInstance.deleteMany();
@@ -473,106 +474,13 @@ async function main() {
     },
   });
 
-  await prisma.performanceReview.createMany({
-    data: [
-      {
-        employeeId: employee.id,
-        managerId: manager.id,
-        period: "Q1 2026",
-        rating: 4,
-        goals: "Deliver feature X, improve code quality, mentor junior dev",
-        achievements: "Shipped 3 major features, reduced bug count by 30%",
-        feedback: "Strong performer, ready for senior role consideration",
-        status: "COMPLETED",
-        reviewDate: new Date("2026-04-01"),
-      },
-    ],
-  });
-
-  const kpiDelivery = await prisma.kpiDefinition.create({
-    data: {
-      title: "Delivery & quality",
-      description: "On-time delivery and code quality standards",
-      metricType: "RATING",
-      targetValue: 4,
-      weight: 1.5,
-      departmentId: engDept.id,
-    },
-  });
-  const kpiCollaboration = await prisma.kpiDefinition.create({
-    data: {
-      title: "Collaboration",
-      description: "Teamwork, communication, and mentoring",
-      metricType: "RATING",
-      targetValue: 4,
-    },
-  });
-  const kpiAttendance = await prisma.kpiDefinition.create({
-    data: {
-      title: "Attendance & presence",
-      description: "Reliability and punctuality",
-      metricType: "PERCENTAGE",
-      targetValue: 95,
-    },
-  });
-
-  const cycle = await prisma.appraisalCycle.create({
-    data: {
-      name: "Mid-Year 2026 Review",
-      period: "H1 2026",
-      description: "Company-wide mid-year performance and KPI review",
-      startDate: new Date("2026-06-01"),
-      endDate: new Date("2026-07-31"),
-      selfReviewDeadline: new Date("2026-07-15"),
-      managerReviewDeadline: new Date("2026-07-31"),
-      status: "ACTIVE",
-      includeAllEmployees: true,
-      kpis: {
-        create: [
-          { kpiId: kpiDelivery.id },
-          { kpiId: kpiCollaboration.id },
-          { kpiId: kpiAttendance.id },
-        ],
-      },
-    },
-  });
-
-  const appraisalEmployee = await prisma.performanceAppraisal.create({
-    data: {
-      cycleId: cycle.id,
-      employeeId: employee.id,
-      managerId: manager.id,
-      status: "MANAGER_REVIEW",
-      selfRating: 4,
-      selfAchievements: "Delivered payroll module and calendar rewrite on schedule.",
-      selfComments: "Ready for more ownership on architecture decisions.",
-      selfSubmittedAt: new Date(),
-      kpiScores: {
-        create: [
-          { kpiId: kpiDelivery.id, selfScore: 4, selfNotes: "Met sprint commitments" },
-          { kpiId: kpiCollaboration.id, selfScore: 5, selfNotes: "Helped onboard new hire" },
-          { kpiId: kpiAttendance.id, selfScore: 98 },
-        ],
-      },
-    },
-  });
-
-  await prisma.performanceAppraisal.create({
-    data: {
-      cycleId: cycle.id,
-      employeeId: sarah.id,
-      managerId: admin.id,
-      status: "SELF_REVIEW",
-      kpiScores: {
-        create: [
-          { kpiId: kpiCollaboration.id },
-          { kpiId: kpiAttendance.id },
-        ],
-      },
-    },
-  });
-
-  void appraisalEmployee;
+  await prisma.performanceReview.deleteMany();
+  await prisma.appraisalKpiScore.deleteMany();
+  await prisma.performanceAppraisal.deleteMany();
+  await prisma.appraisalCycleKpi.deleteMany();
+  await prisma.appraisalCycle.deleteMany();
+  await prisma.kpiDefinition.deleteMany();
+  // Performance module starts empty — HR defines KPIs, cycles, and scoring rules live.
 
   const taxFolder = await prisma.documentFolder.create({
     data: {
@@ -820,13 +728,6 @@ async function main() {
         title: "Payslip available",
         message: "Your latest payroll is ready to view",
         href: "/payroll",
-      },
-      {
-        userId: hrUser.id,
-        type: "performance",
-        title: "Review pending",
-        message: "Alex Employee — Mid-Year 2026 Review awaits manager review",
-        href: "/performance",
       },
     ],
   });

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Download, Eye, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { EmptyState, StatCard, statusBadge } from "@/components/ui";
 import { EmployeeTimeNav } from "@/components/employees/employee-time-nav";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { useFormatCurrency } from "@/components/providers/currency-provider";
 
 type PayrollRecord = {
   id: string;
@@ -28,6 +29,7 @@ export function EmployeePayrollModule({
   baseSalary: number;
   records: PayrollRecord[];
 }) {
+  const formatCurrency = useFormatCurrency();
   const totalNet = records.reduce((sum, r) => sum + r.netPay, 0);
   const totalDeductions = records.reduce((sum, r) => sum + r.deductions, 0);
   const latest = records[0] ?? null;

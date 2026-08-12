@@ -49,7 +49,15 @@ export async function PATCH(
       broadcastAppEvent("performance_updated", { id, action: "activated" });
       return NextResponse.json(cycle);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to activate";
+      const code = err instanceof Error ? err.message : "Failed to activate";
+      const message =
+        code === "CYCLE_NEEDS_KPIS"
+          ? "Add at least one KPI before activating this cycle."
+          : code === "CYCLE_NO_ELIGIBLE_EMPLOYEES"
+            ? "No eligible employees match this cycle’s enrollment filters."
+            : code === "CYCLE_NOT_FOUND"
+              ? "Review cycle not found."
+              : code;
       return NextResponse.json({ error: message }, { status: 400 });
     }
   }

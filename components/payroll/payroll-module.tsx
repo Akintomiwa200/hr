@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  DollarSign,
   Download,
   Eye,
   Filter,
@@ -12,13 +11,15 @@ import {
   Plus,
   Search,
   Trash2,
+  Wallet,
   X,
 } from "lucide-react";
 import { Button, EmptyState, StatCard, statusBadge } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { PayrollSettingsPanel } from "@/components/payroll/payroll-settings-panel";
 import { notify, readApiError } from "@/lib/toast";
-import { formatCurrency, formatDate, fullName, cn } from "@/lib/utils";
+import { formatDate, fullName, cn } from "@/lib/utils";
+import { useFormatCurrency } from "@/components/providers/currency-provider";
 import type { PayrollLineItem, PayrollSettingsData } from "@/lib/payroll-types";
 
 type PayrollRow = {
@@ -66,6 +67,7 @@ export function PayrollModule({
   settings?: PayrollSettingsData;
 }) {
   const router = useRouter();
+  const formatCurrency = useFormatCurrency();
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteRecord, setDeleteRecord] = useState<PayrollRow | null>(null);
   const [preview, setPreview] = useState<{
@@ -212,9 +214,9 @@ export function PayrollModule({
     <>
       {stats && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <StatCard label="Total payroll" value={formatCurrency(stats.total)} icon={DollarSign} />
-          <StatCard label="Payslips" value={stats.count} icon={DollarSign} />
-          <StatCard label="Average net" value={formatCurrency(stats.avg)} icon={DollarSign} />
+          <StatCard label="Total payroll" value={formatCurrency(stats.total)} icon={Wallet} />
+          <StatCard label="Payslips" value={stats.count} icon={Wallet} />
+          <StatCard label="Average net" value={formatCurrency(stats.avg)} icon={Wallet} />
         </div>
       )}
 
@@ -280,7 +282,7 @@ export function PayrollModule({
         <div className="p-5">
           {filteredRecords.length === 0 ? (
             <EmptyState
-              icon={DollarSign}
+              icon={Wallet}
               title="No payroll records"
               description="Process payroll to generate payslips with automatic attendance deductions."
             />

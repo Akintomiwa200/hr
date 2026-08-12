@@ -6,6 +6,8 @@ import { notifyEmployeeChange } from "@/lib/employees/mutations";
 import { createEmployeeAccount } from "@/lib/employees/create-employee";
 import { assertCanAddEmployee, subscriptionErrorMessage } from "@/lib/subscription";
 import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
+import { peopleDirectoryEmployeeWhere } from "@/lib/employee-access";
+import { canAssignRole, normalizeRole } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -18,24 +20,31 @@ export async function GET(request: NextRequest) {
   const role = request.nextUrl.searchParams.get("role");
 
   const scope = getCompanyScope(session);
+  const directoryScope = await peopleDirectoryEmployeeWhere(session);
+  const orgEmployee = employeeCompanyWhere(scope);
 
   const employees = await prisma.employee.findMany({
     where: {
-      ...employeeCompanyWhere(scope),
-      ...(status && status !== "ALL" ? { status } : {}),
-      ...(role && role !== "ALL"
-        ? { user: { role: role as Role } }
-        : {}),
-      ...(search
-        ? {
-            OR: [
-              { firstName: { contains: search } },
-              { lastName: { contains: search } },
-              { email: { contains: search } },
-              { employeeCode: { contains: search } },
-            ],
-          }
-        : {}),
+      AND: [
+        orgEmployee,
+        ...(directoryScope ? [directoryScope] : []),
+        ...(status && status !== "ALL" ? [{ status }] : []),
+        ...(role && role !== "ALL"
+          ? [{ user: { role: role as Role } }]
+          : []),
+        ...(search
+          ? [
+              {
+                OR: [
+                  { firstName: { contains: search } },
+                  { lastName: { contains: search } },
+                  { email: { contains: search } },
+                  { employeeCode: { contains: search } },
+                ],
+              },
+            ]
+          : []),
+      ],
     },
     include: {
       department: true,
@@ -74,6 +83,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
+  const resolvedRole = normalizeRole(String(role || "EMPLOYEE"));
+  if (!canAssignRole(session.role, resolvedRole)) {
+    return NextResponse.json(
+      { error: "You cannot assign that system role" },
+      { status: 403 }
+    );
+  }
+
   try {
     await assertCanAddEmployee(session.companyId);
 
@@ -87,7 +104,7 @@ export async function POST(request: NextRequest) {
       departmentId,
       managerId,
       employmentType,
-      role,
+      role: resolvedRole,
       salary,
       status,
       companyId: session.companyId,
@@ -95,9 +112,22 @@ export async function POST(request: NextRequest) {
 
     notifyEmployeeChange(employee.id, "created");
 
+    let checklistStarted = false;
+    try {
+      const { startEmployeeOnboarding } = await import("@/lib/checklist/instantiate");
+      const result = await startEmployeeOnboarding({
+        employeeId: employee.id,
+        companyId: session.companyId ?? null,
+      });
+      checklistStarted = result.created;
+    } catch {
+      checklistStarted = false;
+    }
+
     return NextResponse.json({
       success: true,
       employee,
+      checklistStarted,
       emailSent: emailResult.sent,
       emailError: emailResult.sent ? null : emailResult.error,
       emailPreviewUrl:

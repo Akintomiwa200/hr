@@ -52,15 +52,30 @@ export async function getSession(): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, secret);
     const user = payload.user as SessionUser;
-    if (!user) return null;
+    if (!user?.id) return null;
 
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
-      select: { companyId: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        companyId: true,
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            status: true,
+          },
+        },
+      },
     });
 
-    // Prefer DB companyId; never revive a stale JWT company after re-seed.
-    let companyId = dbUser ? dbUser.companyId : user.companyId;
+    // Stale JWT after re-seed / role change — force re-login.
+    if (!dbUser) return null;
+
+    let companyId = dbUser.companyId;
     if (companyId) {
       const company = await prisma.company.findUnique({
         where: { id: companyId },
@@ -70,9 +85,13 @@ export async function getSession(): Promise<SessionUser | null> {
     }
 
     return {
-      ...user,
-      role: normalizeRole(user.role),
+      id: dbUser.id,
+      email: dbUser.email,
+      role: normalizeRole(dbUser.role),
       companyId,
+      employeeId: dbUser.employee?.id,
+      firstName: dbUser.employee?.firstName,
+      lastName: dbUser.employee?.lastName,
     };
   } catch {
     return null;

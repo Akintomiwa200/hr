@@ -59,7 +59,15 @@ export default async function DashboardPage({
     return <HrDashboard data={data} userName={userName} upcomingEvents={upcomingEvents} />;
   }
 
-  if (session.role === "MANAGER" && session.employeeId) {
+  if (session.role === "MANAGER") {
+    if (!session.employeeId) {
+      return (
+        <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-6 text-sm text-amber-900">
+          Your manager account is missing an employee profile. Ask HR to link your user to an
+          employee record, then sign in again.
+        </div>
+      );
+    }
     const [data, upcomingEvents] = await Promise.all([
       getManagerDashboardData(session.employeeId, rangeKey),
       getUpcomingCalendarEvents(sessionContext),
@@ -69,7 +77,15 @@ export default async function DashboardPage({
     );
   }
 
-  if (session.role === "SUPERVISOR" && session.employeeId) {
+  if (session.role === "SUPERVISOR") {
+    if (!session.employeeId) {
+      return (
+        <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-6 text-sm text-amber-900">
+          Your supervisor account is missing an employee profile. Ask HR to link your user to an
+          employee record, then sign in again.
+        </div>
+      );
+    }
     const [data, upcomingEvents] = await Promise.all([
       getSupervisorDashboardData(session.employeeId, rangeKey),
       getUpcomingCalendarEvents(sessionContext),
@@ -79,7 +95,14 @@ export default async function DashboardPage({
     );
   }
 
-  if (session.role === "EMPLOYEE" && session.employeeId) {
+  if (session.role === "EMPLOYEE") {
+    if (!session.employeeId) {
+      return (
+        <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-6 text-sm text-amber-900">
+          Your employee profile could not be loaded. Contact HR for help.
+        </div>
+      );
+    }
     const [data, upcomingEvents] = await Promise.all([
       getEmployeeDashboardData(session.employeeId, rangeKey),
       getUpcomingCalendarEvents(sessionContext),

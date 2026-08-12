@@ -12,19 +12,21 @@ import {
   Wallet,
 } from "lucide-react";
 import { Avatar, statusBadge } from "@/components/ui";
+import { Money } from "@/components/ui/money";
 import {
   employmentLabel,
   employmentVariant,
   resolveEmploymentType,
 } from "@/lib/employment";
-import { formatCurrency, formatDate, fullName } from "@/lib/utils";
+import { formatDate, fullName } from "@/lib/utils";
 import type {
   Attendance,
   Department,
   Employee,
   LeaveRequest,
   PayrollRecord,
-  PerformanceReview,
+  PerformanceAppraisal,
+  AppraisalCycle,
 } from "@prisma/client";
 
 type EmployeeDetail = Employee & {
@@ -33,7 +35,7 @@ type EmployeeDetail = Employee & {
   directReports: Employee[];
   leaveRequests: LeaveRequest[];
   attendanceRecords: Attendance[];
-  performanceReviews: PerformanceReview[];
+  appraisalsAsEmployee: (PerformanceAppraisal & { cycle: AppraisalCycle })[];
   payrollRecords: PayrollRecord[];
   user?: { role: string } | null;
 };
@@ -112,7 +114,7 @@ export function EmployeeDetailContent({
     ["PRESENT", "REMOTE", "LATE"].includes(r.status)
   ).length;
   const latestPayroll = employee.payrollRecords[0] ?? null;
-  const latestReview = employee.performanceReviews[0] ?? null;
+  const latestAppraisal = employee.appraisalsAsEmployee[0] ?? null;
 
   return (
     <div>
@@ -165,13 +167,15 @@ export function EmployeeDetailContent({
             <CalendarDays className="w-4 h-4" />
             Leave
           </Link>
-          <Link
-            href={`/employees/${employee.id}/payroll`}
-            className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-medium bg-[#7B61FF] text-white rounded-xl hover:bg-violet-600 shadow-sm"
-          >
-            <Wallet className="w-4 h-4" />
-            Payroll
-          </Link>
+          {canViewSalary && (
+            <Link
+              href={`/employees/${employee.id}/payroll`}
+              className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-medium bg-[#7B61FF] text-white rounded-xl hover:bg-violet-600 shadow-sm"
+            >
+              <Wallet className="w-4 h-4" />
+              Payroll
+            </Link>
+          )}
         </div>
       </div>
 
@@ -236,20 +240,20 @@ export function EmployeeDetailContent({
             <InfoRow icon={MapPin} label="Address" value={employee.address} />
           )}
           {canViewSalary && (
-            <InfoRow icon={Wallet} label="Salary" value={formatCurrency(employee.salary)} />
+            <InfoRow icon={Wallet} label="Salary" value={<Money amount={employee.salary} />} />
           )}
-          {latestPayroll && (
+          {canViewSalary && latestPayroll && (
             <InfoRow
               icon={Wallet}
               label="Latest Net Pay"
-              value={formatCurrency(latestPayroll.netPay)}
+              value={<Money amount={latestPayroll.netPay} />}
             />
           )}
-          {latestReview && (
+          {latestAppraisal && (
             <InfoRow
               icon={Star}
-              label="Latest Review"
-              value={`${latestReview.rating ?? "—"}/5 · ${latestReview.period}`}
+              label="Latest Appraisal"
+              value={`${latestAppraisal.overallRating ?? "—"}/5 · ${latestAppraisal.cycle.period}`}
             />
           )}
         </WidgetCard>
@@ -379,19 +383,28 @@ export function EmployeeDetailContent({
             </div>
           </WidgetCard>
 
-          {employee.performanceReviews.length > 0 && (
-            <WidgetCard title="Performance Reviews">
+          {employee.appraisalsAsEmployee.length > 0 && (
+            <WidgetCard title="Performance Appraisals">
               <div className="space-y-4">
-                {employee.performanceReviews.map((review) => (
-                  <div key={review.id} className="p-3 rounded-xl bg-gray-50/80">
+                {employee.appraisalsAsEmployee.map((appraisal) => (
+                  <Link
+                    key={appraisal.id}
+                    href={`/performance/appraisals/${appraisal.id}`}
+                    className="block p-3 rounded-xl bg-gray-50/80 hover:bg-violet-50/50 transition-colors"
+                  >
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[13px] font-medium text-gray-900">{review.period}</p>
+                      <p className="text-[13px] font-medium text-gray-900">
+                        {appraisal.cycle.name}
+                      </p>
                       <span className="text-[12px] text-[#7B61FF] font-semibold">
-                        {review.rating ?? "—"}/5
+                        {appraisal.overallRating ?? "—"}/5
                       </span>
                     </div>
-                    <p className="text-[12px] text-gray-600 line-clamp-2">{review.goals}</p>
-                  </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[12px] text-gray-600">{appraisal.cycle.period}</p>
+                      {statusBadge(appraisal.status)}
+                    </div>
+                  </Link>
                 ))}
               </div>
             </WidgetCard>
