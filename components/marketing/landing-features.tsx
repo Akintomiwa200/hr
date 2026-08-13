@@ -405,18 +405,8 @@ const features = [
 
 export function LandingFeatures() {
   return (
-    <section id="features" className="bg-white py-20 lg:py-28 px-4 sm:px-6">
+    <section id="features" className="bg-white py-14 lg:py-20 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-14 lg:mb-16">
-          <h2 className="text-[clamp(1.75rem,4vw,2.5rem)] font-bold text-gray-900 leading-tight tracking-tight">
-            Powerful Features Built for Growing Teams
-          </h2>
-          <p className="mt-4 text-[15px] sm:text-base text-gray-500 leading-relaxed">
-            A unified HR platform that streamlines workflows, empowers managers, and
-            enhances employee experience across the entire organization.
-          </p>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6">
           {features.map((feature) => (
             <FeatureCard

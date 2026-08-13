@@ -1,3 +1,4 @@
+import { MarketingPageHeader } from "@/components/marketing/marketing-page";
 import { LandingPricing } from "@/components/marketing/landing-pricing";
 import { LandingCta } from "@/components/marketing/landing-cta";
 
@@ -8,9 +9,15 @@ export const metadata = {
 
 export default function PricingPage() {
   return (
-    <div className="pt-24">
+    <>
+      <MarketingPageHeader
+        title="Pricing"
+        description="Choose a plan that aligns with your workflow, scales with your organization, and delivers real value without hidden fees."
+        eyebrow="Product"
+        align="center"
+      />
       <LandingPricing />
       <LandingCta />
-    </div>
+    </>
   );
 }

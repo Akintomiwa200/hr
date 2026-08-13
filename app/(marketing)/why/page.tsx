@@ -1,6 +1,7 @@
 import { MarketingPageHeader } from "@/components/marketing/marketing-page";
 import { LandingWhy } from "@/components/marketing/landing-why";
 import { LandingTrusted } from "@/components/marketing/landing-trusted";
+import { LandingCta } from "@/components/marketing/landing-cta";
 
 export const metadata = {
   title: "Why Smart HR — Smart HR",
@@ -13,9 +14,12 @@ export default function WhyPage() {
       <MarketingPageHeader
         title="Why Smart HR"
         description="A platform built for HR teams, managers, and employees — fast to adopt, easy to scale, and designed for real office workflows."
+        eyebrow="Company"
+        align="center"
       />
       <LandingWhy />
       <LandingTrusted />
+      <LandingCta />
     </>
   );
 }

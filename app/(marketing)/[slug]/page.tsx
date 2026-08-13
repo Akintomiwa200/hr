@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { MarketingContentPage } from "@/components/marketing/marketing-page";
-import { marketingPages } from "@/lib/marketing-pages";
+import { LegalDocumentPage } from "@/components/marketing/legal-document-page";
+import { marketingPages, withSectionIds } from "@/lib/marketing-pages";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -23,12 +24,27 @@ export default async function MarketingSlugPage({ params }: Props) {
   const page = marketingPages[slug as keyof typeof marketingPages];
   if (!page) notFound();
 
+  if (page.kind === "legal" && page.updatedAt && page.sibling) {
+    return (
+      <LegalDocumentPage
+        title={page.title}
+        description={page.description}
+        updatedAt={page.updatedAt}
+        sections={withSectionIds(page.sections)}
+        sibling={page.sibling}
+        contactHref={page.cta?.href ?? "/contact"}
+      />
+    );
+  }
+
   return (
     <MarketingContentPage
       title={page.title}
       description={page.description}
-      sections={page.sections}
+      sections={withSectionIds(page.sections)}
       cta={page.cta}
+      category={page.category ?? "Smart HR"}
+      relatedLinks={page.relatedLinks}
     />
   );
 }

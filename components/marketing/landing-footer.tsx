@@ -102,7 +102,7 @@ export function LandingFooter() {
               href="/terms"
               className="text-[13px] text-gray-500 hover:text-[#7B61FF] transition-colors"
             >
-              Terms &amp; Condition
+              Terms &amp; Conditions
             </Link>
           </div>
         </div>
