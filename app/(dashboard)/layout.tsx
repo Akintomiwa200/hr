@@ -5,7 +5,7 @@ import { NavProvider } from "@/components/layout/nav-provider";
 import { CurrencyProvider } from "@/components/providers/currency-provider";
 import { prisma } from "@/lib/prisma";
 import { getNavSummary } from "@/lib/nav-summary";
-import { getAppCurrencyCode } from "@/lib/currency";
+import { getAppCurrencyCode } from "@/lib/currency-server";
 
 export default async function DashboardLayout({
   children,

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getAppCurrencyCode } from "@/lib/currency";
+import { getAppCurrencyCode } from "@/lib/currency-server";
 import { CareersBoard } from "@/components/marketing/careers-board";
 import { MarketingPageHeader } from "@/components/marketing/marketing-page";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";

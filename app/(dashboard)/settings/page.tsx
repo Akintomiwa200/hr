@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { SettingsModule } from "@/components/settings/settings-module";
 import { ModulePageActions } from "@/components/help/module-page-actions";
-import { APP_CURRENCIES, getAppCurrencyCode } from "@/lib/currency";
+import { APP_CURRENCIES } from "@/lib/currency";
+import { getAppCurrencyCode } from "@/lib/currency-server";
 import { isSuperAdmin } from "@/lib/roles";
 
 export default async function SettingsPage() {

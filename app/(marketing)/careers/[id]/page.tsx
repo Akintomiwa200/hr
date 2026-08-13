@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getAppCurrencyCode } from "@/lib/currency";
+import { getAppCurrencyCode } from "@/lib/currency-server";
 import { CareersJobDetail } from "@/components/marketing/careers-job-detail";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 

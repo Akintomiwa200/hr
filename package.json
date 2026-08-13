@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "predev": "node scripts/db-sync.mjs",
-    "dev:clean": "node scripts/clean-dev.mjs && pnpm dev",
-    "dev:fresh": "node scripts/clean-dev.mjs && pnpm dev",
+    "dev:clean": "node scripts/clean-dev.mjs && pnpm exec next dev",
+    "dev:fresh": "node scripts/clean-dev.mjs && node scripts/db-sync.mjs && pnpm exec next dev",
     "build": "NODE_OPTIONS=--max-old-space-size=4096 next build",
     "prebuild": "node scripts/db-sync.mjs",
     "start": "next start",
@@ -21,9 +21,6 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "node scripts/db-sync.mjs && tsx prisma/seed.ts",
     "postinstall": "prisma generate"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

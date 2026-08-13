@@ -9,7 +9,7 @@ import {
 import { canViewPayrollRecord } from "@/lib/payroll-access";
 import { legacyBreakdownFromRecord } from "@/lib/payroll-engine";
 import { renderPayslipHtml } from "@/lib/payslip-template";
-import { getAppCurrencyCode } from "@/lib/currency";
+import { getAppCurrencyCode } from "@/lib/currency-server";
 
 export async function GET(
   _request: NextRequest,

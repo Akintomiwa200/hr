@@ -3,11 +3,13 @@ import { requireSession, unauthorized, forbidden, badRequest } from "@/lib/api-a
 import { isSuperAdmin } from "@/lib/roles";
 import {
   APP_CURRENCIES,
-  getAppCurrencyCode,
   getCurrencyMeta,
   isSupportedCurrency,
-  setAppCurrencyCode,
 } from "@/lib/currency";
+import {
+  getAppCurrencyCode,
+  setAppCurrencyCode,
+} from "@/lib/currency-server";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function GET() {
