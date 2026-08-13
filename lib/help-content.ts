@@ -314,7 +314,11 @@ export const helpArticles: HelpArticle[] = [
     sections: [
       {
         heading: "Job postings",
-        body: "Create roles with description, requirements, responsibilities, and benefits. Add candidates from the job detail page or track them on Candidates.",
+        body: "Create roles with description, requirements, responsibilities, and benefits. Set status to OPEN so the role appears live on the public Careers page (/careers).",
+      },
+      {
+        heading: "Careers → apply → pipeline",
+        body: "Candidates apply on Careers without logging in. Applications land in Recruitment with source “Careers page”; HR gets a notification and can move them through stages, interviews, and hire.",
       },
       {
         heading: "Google Calendar & Meet",

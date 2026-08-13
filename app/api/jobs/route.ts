@@ -11,7 +11,9 @@ export async function GET() {
   const session = await requireSession();
   if (!session) return unauthorized();
 
+  const companyId = await resolveRecruitmentCompanyId(session.id, session.companyId);
   const jobs = await prisma.job.findMany({
+    where: companyId ? { OR: [{ companyId }, { companyId: null }] } : {},
     include: {
       department: true,
       applications: true,
@@ -86,5 +88,6 @@ export async function POST(request: NextRequest) {
 
   broadcastAppEvent("job_updated", { id: job.id });
   revalidatePath("/recruitment");
+  revalidatePath("/careers");
   return NextResponse.json(job);
 }

@@ -94,6 +94,8 @@ export async function PATCH(
   broadcastAppEvent("job_updated", { id });
   revalidatePath("/recruitment");
   revalidatePath(`/recruitment/${id}`);
+  revalidatePath("/careers");
+  revalidatePath(`/careers/${id}`);
   return NextResponse.json(job);
 }
 
@@ -111,5 +113,7 @@ export async function DELETE(
   await prisma.job.delete({ where: { id } });
   broadcastAppEvent("job_updated", { id });
   revalidatePath("/recruitment");
+  revalidatePath("/careers");
+  revalidatePath(`/careers/${id}`);
   return NextResponse.json({ success: true });
 }

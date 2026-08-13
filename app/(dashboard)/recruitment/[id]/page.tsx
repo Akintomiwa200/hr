@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { RecruitmentTabs } from "@/components/recruitment/recruitment-tabs";
 import { JobDetailModule } from "@/components/recruitment/job-detail-module";
 import { getRecruitmentContextForSession } from "@/lib/recruitment/data";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function JobDetailPage({
   params,
@@ -34,6 +35,10 @@ export default async function JobDetailPage({
 
   return (
     <div>
+      <PageLiveRefresh
+        types={["job_updated", "interview_updated", "employee_updated"]}
+        pollIntervalMs={4000}
+      />
       <RecruitmentTabs />
       <JobDetailModule
         job={job}

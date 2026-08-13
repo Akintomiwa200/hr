@@ -10,6 +10,7 @@ import { InterviewPanel } from "@/components/recruitment/interview-panel";
 import { CandidateDetailActions } from "@/components/recruitment/candidate-detail-actions";
 import { formatDate, fullName } from "@/lib/utils";
 import { ArrowLeft, ExternalLink } from "lucide-react";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function CandidateDetailPage({
   params,
@@ -49,6 +50,10 @@ export default async function CandidateDetailPage({
 
   return (
     <div>
+      <PageLiveRefresh
+        types={["job_updated", "interview_updated", "employee_updated"]}
+        pollIntervalMs={4000}
+      />
       <Link href="/recruitment/candidates" className="inline-flex items-center gap-2 text-sm text-violet-600 hover:text-violet-700 mb-4">
         <ArrowLeft className="w-4 h-4" />
         Back to candidates

@@ -128,31 +128,6 @@ export const marketingPages: Record<string, PageConfig> = {
     ],
     cta: { label: "Why Smart HR", href: "/why" },
   },
-  careers: {
-    category: "Company",
-    title: "Careers",
-    description: "Join us in reimagining HR software for growing organizations.",
-    relatedLinks: [
-      { label: "About Us", href: "/about" },
-      { label: "Culture on the blog", href: "/blog" },
-      { label: "Contact", href: "/contact" },
-    ],
-    sections: [
-      {
-        heading: "Open roles",
-        body: "We’re hiring engineers, designers, and customer success specialists who care about building products that make work better for everyone. Share your profile through Contact if you don’t see a perfect match yet.",
-      },
-      {
-        heading: "How we work",
-        body: "Remote-friendly culture, async collaboration, and a focus on shipping useful features fast. We value clarity, ownership, and empathy for HR teams on the ground.",
-      },
-      {
-        heading: "Benefits",
-        body: "Competitive compensation, flexible hours, learning budget, and the chance to shape a product used daily by people ops teams.",
-      },
-    ],
-    cta: { label: "Contact Us", href: "/contact" },
-  },
   blog: {
     category: "Company",
     title: "Blog",
@@ -253,6 +228,7 @@ export const marketingPages: Record<string, PageConfig> = {
     ],
     cta: { label: "Sign in to Help Center", href: "/login" },
   },
+  // Careers is a dedicated live board at /careers (OPEN jobs from Recruitment).
   documentation: {
     category: "Resources",
     title: "Documentation",

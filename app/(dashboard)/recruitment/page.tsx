@@ -8,6 +8,7 @@ import { JobsListModule } from "@/components/recruitment/jobs-list-module";
 import { RecruitmentTabs } from "@/components/recruitment/recruitment-tabs";
 import { getRecruitmentContextForSession } from "@/lib/recruitment/data";
 import { getCompanyScope, departmentCompanyWhere } from "@/lib/company-scope";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function RecruitmentPage() {
   const session = await getSession();
@@ -15,9 +16,13 @@ export default async function RecruitmentPage() {
   if (session.role === "EMPLOYEE") redirect("/dashboard");
 
   const scope = getCompanyScope(session);
+  const companyFilter = scope.companyId
+    ? { OR: [{ companyId: scope.companyId }, { companyId: null }] }
+    : {};
 
   const [jobs, departments, ctx] = await Promise.all([
     prisma.job.findMany({
+      where: companyFilter,
       include: { department: true, applications: true },
       orderBy: { postedAt: "desc" },
     }),
@@ -30,9 +35,13 @@ export default async function RecruitmentPage() {
 
   return (
     <div>
+      <PageLiveRefresh
+        types={["job_updated", "interview_updated", "employee_updated"]}
+        pollIntervalMs={4000}
+      />
       <PageHeader
         title="Recruitment"
-        description="Manage all job posts, pipelines, and hiring workflows"
+        description="Manage job posts — OPEN roles appear live on the public Careers page"
         action={
           <ModulePageActions
             helpSlug="recruitment"
