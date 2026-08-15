@@ -8,12 +8,14 @@ import { PerformanceHub } from "@/components/performance/performance-hub";
 import { appraisalListWhere } from "@/lib/performance/access";
 import { getCompanyScope, departmentCompanyWhere, requireOrgCompanyId } from "@/lib/company-scope";
 import { getPerformanceSettings } from "@/lib/performance/settings";
+import { getPerformanceWorkspace } from "@/lib/role-workspace";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function PerformancePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
+  const workspace = getPerformanceWorkspace(session.role);
   const canManage = canManagePerformance(session.role);
   const canManageSettings = canManageOrgContent(session.role);
   const scope = getCompanyScope(session);
@@ -79,12 +81,8 @@ export default async function PerformancePage() {
         pollIntervalMs={4000}
       />
       <PageHeader
-        title="Performance"
-        description={
-          session.role === "EMPLOYEE"
-            ? "Track KPIs, complete your self-appraisal, and view results"
-            : "Define KPIs, run review cycles, score appraisals, and publish live announcements"
-        }
+        title={workspace.title}
+        description={workspace.description}
         action={<ModulePageActions helpSlug="performance" helpLabel="Performance guide" />}
       />
       <PerformanceHub
@@ -94,7 +92,8 @@ export default async function PerformancePage() {
         departments={departments}
         canManage={canManage}
         canManageSettings={canManageSettings}
-        isEmployee={session.role === "EMPLOYEE"}
+        isEmployee={workspace.mode === "self"}
+        mode={workspace.mode}
         currentEmployeeId={session.employeeId ?? undefined}
         stats={stats}
         settings={settings}

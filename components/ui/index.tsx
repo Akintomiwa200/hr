@@ -1,6 +1,7 @@
 import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FieldErrorToast } from "@/components/ui/field-error-toast";
+export { PasswordInput } from "@/components/ui/password-input";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "danger" | "ghost";

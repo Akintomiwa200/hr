@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { notify, readApiError } from "@/lib/toast";
+import { PasswordInput } from "@/components/ui/password-input";
 
 export function LoginForm({ initialEmail = "" }: { initialEmail?: string }) {
   const router = useRouter();
@@ -55,19 +56,16 @@ export function LoginForm({ initialEmail = "" }: { initialEmail?: string }) {
       </div>
 
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <label htmlFor="password" className="block text-[13px] font-medium text-gray-700">
-            Password
-          </label>
-        </div>
-        <input
+        <label htmlFor="password" className="block text-[13px] font-medium text-gray-700">
+          Password
+        </label>
+        <PasswordInput
           id="password"
-          type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Enter your password"
           required
-          className="w-full px-4 py-3 text-[14px] border border-gray-200 rounded-xl bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/30 focus:border-[#7B61FF] transition-shadow"
+          autoComplete="current-password"
         />
       </div>
 

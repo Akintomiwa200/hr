@@ -26,6 +26,7 @@ import { Avatar, Button, Card, EmptyState, StatCard, statusBadge } from "@/compo
 import { Dialog } from "@/components/ui/dialog";
 import type { Role } from "@prisma/client";
 import { ORG_ROLES, roleLabel } from "@/lib/roles";
+import type { WorkspaceMode } from "@/lib/role-workspace";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
 
@@ -181,6 +182,7 @@ export function PerformanceHub({
   canManage,
   canManageSettings,
   isEmployee,
+  mode = isEmployee ? "self" : canManage ? "org" : "team",
   currentEmployeeId,
   stats,
   settings,
@@ -192,6 +194,7 @@ export function PerformanceHub({
   canManage: boolean;
   canManageSettings: boolean;
   isEmployee: boolean;
+  mode?: WorkspaceMode;
   currentEmployeeId?: string;
   stats: Stats;
   settings: PerformanceSettings;
@@ -239,9 +242,18 @@ export function PerformanceHub({
 
   const ratingMax = settings.ratingScaleMax || 5;
   const activeCycle = cycles.find((c) => c.status === "ACTIVE");
-  const myAppraisal = isEmployee
-    ? appraisals.find((a) => a.employee.id === currentEmployeeId)
-    : null;
+  const myAppraisal =
+    currentEmployeeId
+      ? appraisals.find((a) => a.employee.id === currentEmployeeId)
+      : null;
+  const teamAppraisals = useMemo(
+    () =>
+      currentEmployeeId
+        ? appraisals.filter((a) => a.employee.id !== currentEmployeeId)
+        : appraisals,
+    [appraisals, currentEmployeeId]
+  );
+  const isTeamLeadView = mode === "team" && !canManage;
 
   const filteredAppraisals = useMemo(() => {
     if (statusFilter === "ALL") return appraisals;
@@ -448,7 +460,11 @@ export function PerformanceHub({
   const tabs = [
     {
       id: "appraisals" as const,
-      label: isEmployee ? "My appraisal" : "Appraisals",
+      label: isEmployee
+        ? "My appraisal"
+        : isTeamLeadView
+          ? "Team reviews"
+          : "Appraisals",
       icon: ClipboardCheck,
     },
     ...(canManage
@@ -471,6 +487,25 @@ export function PerformanceHub({
             <StatCard label="Awaiting self-review" value={stats.pendingSelf} icon={UserCheck} />
             <StatCard label="Awaiting manager" value={stats.pendingManager} icon={Users} />
             <StatCard label="Completed" value={stats.completed} icon={CheckCircle2} />
+          </>
+        ) : isTeamLeadView ? (
+          <>
+            <StatCard label="Team reviews" value={teamAppraisals.length} icon={Users} />
+            <StatCard
+              label="Awaiting your score"
+              value={teamAppraisals.filter((a) => a.status === "MANAGER_REVIEW").length}
+              icon={ClipboardCheck}
+            />
+            <StatCard
+              label="In self-review"
+              value={teamAppraisals.filter((a) => a.status === "SELF_REVIEW").length}
+              icon={UserCheck}
+            />
+            <StatCard
+              label="Completed"
+              value={teamAppraisals.filter((a) => a.status === "COMPLETED").length}
+              icon={CheckCircle2}
+            />
           </>
         ) : (
           <>
@@ -566,6 +601,25 @@ export function PerformanceHub({
           {/* Appraisals tab */}
           {tab === "appraisals" && (
             <>
+              {isTeamLeadView && myAppraisal && (
+                <div className="mb-6 rounded-2xl border border-brand-100 bg-brand-50/20 p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide">
+                        Your own appraisal
+                      </p>
+                      <p className="text-sm font-medium text-gray-900 mt-1">
+                        {myAppraisal.cycle.name}
+                      </p>
+                      <div className="mt-2">{statusBadge(myAppraisal.status)}</div>
+                    </div>
+                    <Link href={`/performance/appraisals/${myAppraisal.id}`}>
+                      <Button variant="secondary">Open mine</Button>
+                    </Link>
+                  </div>
+                </div>
+              )}
+
               {isEmployee && myAppraisal && (
                 <div className="mb-6 rounded-2xl border-2 border-[#7B61FF]/20 bg-violet-50/30 p-6">
                   <div className="flex flex-wrap items-start justify-between gap-4">
@@ -608,7 +662,7 @@ export function PerformanceHub({
                 </div>
               )}
 
-              {canManage && !isEmployee && (
+              {(canManage || isTeamLeadView) && !isEmployee && (
                 <div className="flex flex-wrap items-center gap-2 mb-5">
                   <Filter className="w-4 h-4 text-gray-400" />
                   {STATUS_FILTERS.map((f) => (

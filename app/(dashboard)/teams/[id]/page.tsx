@@ -13,7 +13,6 @@ export default async function TeamDetailPage({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role === "EMPLOYEE") redirect("/dashboard");
 
   const { id } = await params;
   const scope = getCompanyScope(session);

@@ -16,7 +16,7 @@ import {
 import { Button, Card, CardHeader } from "@/components/ui";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
-import { canManageDevices, hasRole, INTEGRATION_ADMIN_ROLES, SUBSCRIPTION_ADMIN_ROLES, roleLabel } from "@/lib/roles";
+import { canManageDevices, canManageOrgContent, hasRole, INTEGRATION_ADMIN_ROLES, SUBSCRIPTION_ADMIN_ROLES, roleLabel } from "@/lib/roles";
 import type { Role } from "@prisma/client";
 import { PlatformCurrencySettings } from "@/components/settings/platform-currency-settings";
 import type { AppCurrency } from "@/lib/currency";
@@ -70,7 +70,16 @@ const quickHelpLinks = [
 const inputClass =
   "w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500";
 
-function SectionHelpLink({ href, label = "Learn more" }: { href: string; label?: string }) {
+function SectionHelpLink({
+  href,
+  label = "Learn more",
+  visible,
+}: {
+  href: string;
+  label?: string;
+  visible: boolean;
+}) {
+  if (!visible) return null;
   return (
     <Link
       href={href}
@@ -105,6 +114,7 @@ export function SettingsModule({
     performance: preferences.performance ?? true,
   });
   const [loading, setLoading] = useState(false);
+  const canAccessHelp = canManageOrgContent(role as Role);
 
   const save = async () => {
     setLoading(true);
@@ -134,7 +144,7 @@ export function SettingsModule({
           <CardHeader
             title="Profile information"
             description="Your account and employee details"
-            action={<SectionHelpLink href="/help/settings" />}
+            action={<SectionHelpLink href="/help/settings" visible={canAccessHelp} />}
           />
           <dl className="px-6 pb-2 space-y-0 text-sm">
             <div className="flex justify-between py-3 border-b border-gray-100">
@@ -208,7 +218,7 @@ export function SettingsModule({
           <CardHeader
             title="Notifications"
             description="Choose which updates you receive"
-            action={<SectionHelpLink href="/help/settings" label="Notification help" />}
+            action={<SectionHelpLink href="/help/settings" label="Notification help" visible={canAccessHelp} />}
           />
           <div className="p-6 space-y-1">
             {NOTIFICATION_KEYS.map((item) => (
@@ -219,12 +229,14 @@ export function SettingsModule({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-medium text-gray-900">{item.label}</p>
-                    <Link
-                      href={item.helpHref}
-                      className="text-[11px] text-violet-600 hover:text-violet-700"
-                    >
-                      Guide
-                    </Link>
+                    {canAccessHelp && (
+                      <Link
+                        href={item.helpHref}
+                        className="text-[11px] text-violet-600 hover:text-violet-700"
+                      >
+                        Guide
+                      </Link>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
                 </div>
@@ -265,12 +277,16 @@ export function SettingsModule({
           <p className="text-xs text-gray-500 mb-4 leading-relaxed">
             Email and role changes are handled by your HR administrator. For access issues, contact support.
           </p>
-          <Link
-            href="/help/roles-permissions"
-            className="text-sm font-medium text-violet-600 hover:text-violet-700 inline-flex items-center gap-1"
-          >
-            Roles guide <ExternalLink className="w-3.5 h-3.5" />
-          </Link>
+          {canAccessHelp ? (
+            <Link
+              href="/help/roles-permissions"
+              className="text-sm font-medium text-violet-600 hover:text-violet-700 inline-flex items-center gap-1"
+            >
+              Roles guide <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
+          ) : (
+            <p className="text-xs text-gray-400">Contact your HR administrator for access help.</p>
+          )}
         </Card>
 
         <Card className="p-6">
@@ -288,14 +304,14 @@ export function SettingsModule({
             >
               Open my profile
             </Link>
-          ) : (
+          ) : canAccessHelp ? (
             <Link
               href="/help/employees"
               className="text-sm font-medium text-violet-600 hover:text-violet-700"
             >
               Employees guide
             </Link>
-          )}
+          ) : null}
         </Card>
 
         {hasRole(role as Role, [...SUBSCRIPTION_ADMIN_ROLES, "HR"]) && (
@@ -378,6 +394,7 @@ export function SettingsModule({
           </Card>
         )}
 
+        {canAccessHelp && (
         <Card className="p-6 bg-violet-50/50 border-violet-100">
           <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center mb-4">
             <Bell className="w-5 h-5 text-violet-600" />
@@ -393,8 +410,10 @@ export function SettingsModule({
             Contact support
           </Link>
         </Card>
+        )}
       </div>
 
+      {canAccessHelp && (
       <Card className="overflow-hidden">
         <div className="p-6 sm:p-8 border-b border-gray-100 bg-gradient-to-r from-violet-50/80 to-white">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -438,6 +457,7 @@ export function SettingsModule({
           </a>
         </div>
       </Card>
+      )}
     </div>
   );
 }

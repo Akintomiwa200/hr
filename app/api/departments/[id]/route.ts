@@ -55,6 +55,7 @@ export async function PATCH(
 
   broadcastAppEvent("department_updated", { id });
   revalidatePath("/departments");
+  revalidatePath("/departments/manage");
   revalidatePath("/teams");
   revalidatePath(`/departments/${id}`);
   revalidatePath(`/teams/${id}`);
@@ -81,6 +82,7 @@ export async function DELETE(
   await prisma.department.delete({ where: { id } });
   broadcastAppEvent("department_updated", { id });
   revalidatePath("/departments");
+  revalidatePath("/departments/manage");
   revalidatePath("/teams");
   revalidatePath(`/departments/${id}`);
   revalidatePath(`/teams/${id}`);

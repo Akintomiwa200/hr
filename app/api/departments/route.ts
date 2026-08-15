@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
-import { badRequest, isHr, requireSession, unauthorized } from "@/lib/api-auth";
+import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
+import { canManageDepartments } from "@/lib/roles";
 import { getCompanyScope, departmentCompanyWhere, requireOrgCompanyId } from "@/lib/company-scope";
 
 export async function GET() {
@@ -22,7 +23,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const session = await requireSession();
-  if (!session || !isHr(session)) return unauthorized();
+  if (!session || !canManageDepartments(session.role)) return unauthorized();
 
   const { name, description } = await request.json();
   if (!name?.trim()) return badRequest("Department name is required");
@@ -41,6 +42,8 @@ export async function POST(request: NextRequest) {
 
   broadcastAppEvent("department_updated", { id: department.id });
   revalidatePath("/departments");
+  revalidatePath("/departments/manage");
   revalidatePath("/teams");
+  revalidatePath("/employees");
   return NextResponse.json(department);
 }

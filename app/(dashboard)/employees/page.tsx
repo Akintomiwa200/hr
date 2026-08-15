@@ -9,14 +9,15 @@ import {
   departmentCompanyWhere,
 } from "@/lib/company-scope";
 import { peopleDirectoryEmployeeWhere } from "@/lib/employee-access";
+import { getPeopleWorkspace } from "@/lib/role-workspace";
 import { EmployeesModule } from "@/components/employees/employees-module";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function EmployeesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role === "EMPLOYEE") redirect("/dashboard");
 
+  const workspace = getPeopleWorkspace(session.role);
   const scope = getCompanyScope(session);
   const orgEmployee = employeeCompanyWhere(scope);
   const orgDepartment = departmentCompanyWhere(scope);
@@ -74,6 +75,9 @@ export default async function EmployeesPage() {
           managers={managers}
           canManage={canManageEmployees(session.role)}
           allowedRoles={assignableRolesFor(session.role)}
+          title={workspace.title}
+          description={workspace.description}
+          mode={workspace.mode}
         />
       </>
     </Suspense>

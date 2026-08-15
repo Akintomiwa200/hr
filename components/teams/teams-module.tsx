@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Avatar, EmptyState, StatCard } from "@/components/ui";
 import type { TeamSummary, TeamsPageData } from "@/lib/teams-data";
+import type { WorkspaceMode } from "@/lib/role-workspace";
 import { cn, fullName } from "@/lib/utils";
 
 const TEAM_ACCENTS = [
@@ -130,9 +131,11 @@ function TeamCard({
 export function TeamsModule({
   data,
   canViewOrgChart,
+  mode = "org",
 }: {
   data: TeamsPageData;
   canViewOrgChart: boolean;
+  mode?: WorkspaceMode;
 }) {
   const [search, setSearch] = useState("");
 
@@ -204,9 +207,19 @@ export function TeamsModule({
       <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-brand-50/30 via-white to-white">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">All teams</h2>
+            <h2 className="text-base font-semibold text-gray-900">
+              {mode === "directory"
+                ? "Company teams"
+                : mode === "team"
+                  ? "Teams in your scope"
+                  : "All teams"}
+            </h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Browse departments, see who is on each team, and open reporting structure
+              {mode === "directory"
+                ? "Browse departments and colleagues (view only)"
+                : mode === "team"
+                  ? "Focus on your department first, then other teams"
+                  : "Browse departments, see who is on each team, and open reporting structure"}
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">

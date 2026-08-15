@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { CircleHelp } from "lucide-react";
+import { getSession } from "@/lib/auth";
+import { canManageOrgContent } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
-export function HelpLink({
+/** Help Center links — visible to Company Admin and HR only. */
+export async function HelpLink({
   slug,
   className,
   label = "Help",
@@ -11,6 +14,9 @@ export function HelpLink({
   className?: string;
   label?: string;
 }) {
+  const session = await getSession();
+  if (!session || !canManageOrgContent(session.role)) return null;
+
   const href = slug ? `/help/${slug}` : "/help";
 
   return (

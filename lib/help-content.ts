@@ -1,6 +1,6 @@
 import type { Role } from "@prisma/client";
 import type { LucideIcon } from "lucide-react";
-import { ALL_STAFF, RECRUITMENT_ROLES } from "@/lib/roles";
+import { ALL_STAFF, CONTENT_ADMIN_ROLES, RECRUITMENT_ROLES } from "@/lib/roles";
 import {
   Bell,
   Briefcase,
@@ -130,13 +130,21 @@ export const helpArticles: HelpArticle[] = [
       },
       {
         heading: "Managing holidays",
-        body: "Admins can add, edit, and delete company holidays from the calendar when the holiday database is enabled.",
+        body: "Calendars ship with official Nigeria federal public holidays for the year (Workers’ Day on 1 May, Democracy Day on 12 June, Independence Day on 1 October, and so on). Admins can add, edit, or delete company-specific days on top of that list.",
+      },
+      {
+        heading: "Islamic holidays",
+        body: "Eid dates follow published federal calendars and may shift by one day after official moon-sighting announcements from the Ministry of Interior.",
       },
     ],
     faqs: [
       {
         question: "Why can't I edit a holiday?",
         answer: "Only admins can manage holidays. Static seed holidays also cannot be edited until the database is fully synced.",
+      },
+      {
+        question: "Why is Labor Day not in September?",
+        answer: "Smart HR uses Nigeria’s public calendar by default. Workers’ Day is 1 May — not the US Labor Day in September.",
       },
       {
         question: "How do I jump to a specific date?",
@@ -284,7 +292,7 @@ export const helpArticles: HelpArticle[] = [
         bullets: [
           "Your team is highlighted at the top when you belong to a department",
           "Search by team name or colleague name",
-          "Employees can view teams; managers and admins also get the org chart link",
+          "All staff can browse teams and the company directory",
         ],
       },
       {
@@ -292,12 +300,16 @@ export const helpArticles: HelpArticle[] = [
         body: "Each team page shows the hierarchy for that department, a searchable member list, and open job postings. Click any person to open their profile.",
       },
       {
-        heading: "Visual org chart (HR)",
-        body: "Managers and admins can open Org chart for the full company tree, filter by department, and manage department records.",
+        heading: "Org chart",
+        body: "Org Chart shows the full company tree. Filter by department when you need a narrower view.",
+      },
+      {
+        heading: "Create departments (HR / Admin)",
+        body: "HR and Company Admins open Departments in the sidebar to create, edit, or remove departments. Changes refresh live on Org Chart, Teams, and the employee directory.",
         bullets: [
-          "Switch between Org chart and Departments tabs",
-          "Set managers on employee records to build reporting lines",
-          "Admins create departments and assign people during onboarding",
+          "Use Add department to create a new unit",
+          "Assign people to departments from Employees / onboarding",
+          "Cannot delete a department that still has employees",
         ],
       },
     ],
@@ -377,12 +389,12 @@ export const helpArticles: HelpArticle[] = [
     description: "Store and find company and employee documents.",
     category: "workspace",
     icon: FileText,
-    roles: ALL_STAFF,
+    roles: CONTENT_ADMIN_ROLES,
     moduleHref: "/documents",
     sections: [
       {
         heading: "Document library",
-        body: "Upload and categorize HR documents. Employees see company-wide files plus their own assigned documents.",
+        body: "Upload and categorize HR documents. Company Admins and HR manage shared folders and company files.",
       },
       {
         heading: "Search",

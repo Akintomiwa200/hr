@@ -1,7 +1,7 @@
 import { CalendarLink } from "@/components/holidays/calendar-link";
 import { HelpLink } from "@/components/help/help-link";
 
-export function ModulePageActions({
+export async function ModulePageActions({
   helpSlug,
   helpLabel,
   showCalendar = false,

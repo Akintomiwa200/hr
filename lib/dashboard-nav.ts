@@ -39,13 +39,16 @@ import {
   INTEGRATION_ADMIN_ROLES,
   ORG_CHART_ROLES,
   PAYROLL_VIEW_ROLES,
+  PEOPLE_ADMIN_ROLES,
   PEOPLE_VIEW_ROLES,
   PERFORMANCE_VIEW_ROLES,
+  CONTENT_ADMIN_ROLES,
   RECRUITMENT_ROLES,
   SETTINGS_ROLES,
   SUBSCRIPTION_ADMIN_ROLES,
   SUPER_ADMIN_ONLY,
   REPORTS_VIEW_ROLES,
+  hasRole,
 } from "@/lib/roles";
 
 export type NavItem = {
@@ -132,6 +135,18 @@ export const dashboardNavSections: NavSection[] = [
         pageTitle: "Org Chart",
         icon: Network,
         roles: ORG_CHART_ROLES,
+        match: (pathname) =>
+          (pathname === "/departments" || pathname.startsWith("/departments/")) &&
+          !pathname.startsWith("/departments/manage"),
+      },
+      {
+        id: "departments-manage",
+        href: "/departments/manage",
+        label: "Departments",
+        pageTitle: "Departments",
+        icon: Building2,
+        roles: PEOPLE_ADMIN_ROLES,
+        match: (pathname) => pathname.startsWith("/departments/manage"),
       },
       {
         id: "teams",
@@ -298,7 +313,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Documents",
         pageTitle: "Documents",
         icon: FileText,
-        roles: ALL_STAFF,
+        roles: CONTENT_ADMIN_ROLES,
       },
       {
         id: "help",
@@ -306,7 +321,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Help",
         pageTitle: "Help Center",
         icon: CircleHelp,
-        roles: [...ALL_STAFF, ...SUPER_ADMIN_ONLY],
+        roles: CONTENT_ADMIN_ROLES,
       },
       {
         id: "integrations",
@@ -351,7 +366,7 @@ export function getAllNavItems(role: Role): NavItem[] {
   return [
     ...dashboardNavSections.flatMap((s) => s.items),
     settingsNavItem,
-  ].filter((item) => item.roles.includes(role));
+  ].filter((item) => hasRole(role, item.roles));
 }
 
 export function isNavMatch(pathname: string, item: NavItem): boolean {
@@ -448,6 +463,10 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
       !p.startsWith("/recruitment/interviews") &&
       !p.startsWith("/recruitment/settings"),
     title: "Job Details",
+  },
+  {
+    test: (p) => p === "/departments/manage",
+    title: "Departments",
   },
   {
     test: (p) => /^\/departments\/[^/]+$/.test(p),

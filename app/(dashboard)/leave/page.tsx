@@ -3,6 +3,7 @@ import { getSession, canApproveLeave } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
 import { teamScopedEmployeeWhere } from "@/lib/employee-access";
+import { getLeaveWorkspace } from "@/lib/role-workspace";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { LeaveModule } from "@/components/leave/leave-module";
@@ -12,12 +13,14 @@ export default async function LeavePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
+  const workspace = getLeaveWorkspace(session.role);
   const scope = getCompanyScope(session);
   const orgEmployee = employeeCompanyWhere(scope);
   const teamScope = teamScopedEmployeeWhere(session);
 
+  // Employees: only self. Leads: team + self. HR/Admin: org-wide.
   const whereClause =
-    session.role === "EMPLOYEE" && session.employeeId
+    workspace.mode === "self" && session.employeeId
       ? { employeeId: session.employeeId }
       : {
           employee: teamScope
@@ -31,25 +34,23 @@ export default async function LeavePage() {
     orderBy: { createdAt: "desc" },
   });
 
+  const showRequestForm = Boolean(session.employeeId) && workspace.canActForSelf;
+
   return (
     <div>
       <PageLiveRefresh types={["leave_updated", "employee_updated"]} pollIntervalMs={4000} />
       <PageHeader
-        title="Leave"
-        description={
-          session.role === "EMPLOYEE"
-            ? "Request time off and track approval status"
-            : session.role === "MANAGER" || session.role === "SUPERVISOR"
-              ? "Review and approve leave for your team"
-              : "Review and approve team leave requests"
-        }
+        title={workspace.title}
+        description={workspace.description}
         action={<ModulePageActions helpSlug="leave" showCalendar calendarLabel="Leave calendar" />}
       />
       <LeaveModule
         leaves={leaves}
-        canApprove={canApproveLeave(session.role)}
-        isEmployee={session.role === "EMPLOYEE"}
-        showRequestForm={session.role === "EMPLOYEE"}
+        canApprove={canApproveLeave(session.role) && workspace.canActForTeam}
+        isEmployee={workspace.mode === "self"}
+        showRequestForm={showRequestForm}
+        mode={workspace.mode}
+        currentEmployeeId={session.employeeId}
       />
     </div>
   );

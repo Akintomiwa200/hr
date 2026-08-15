@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { notify, readApiError } from "@/lib/toast";
+import { PasswordInput } from "@/components/ui/password-input";
 
 export function SignupForm({
   initialEmail = "",
@@ -116,15 +117,14 @@ export function SignupForm({
         <label htmlFor="password" className="block text-[13px] font-medium text-gray-700">
           Password
         </label>
-        <input
+        <PasswordInput
           id="password"
-          type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="At least 8 characters"
           required
           minLength={8}
-          className="w-full px-4 py-3 text-[14px] border border-gray-200 rounded-xl bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/30 focus:border-[#7B61FF] transition-shadow"
+          autoComplete="new-password"
         />
       </div>
 
@@ -132,15 +132,14 @@ export function SignupForm({
         <label htmlFor="confirmPassword" className="block text-[13px] font-medium text-gray-700">
           Confirm password
         </label>
-        <input
+        <PasswordInput
           id="confirmPassword"
-          type="password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           placeholder="Re-enter your password"
           required
           minLength={8}
-          className="w-full px-4 py-3 text-[14px] border border-gray-200 rounded-xl bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/30 focus:border-[#7B61FF] transition-shadow"
+          autoComplete="new-password"
         />
       </div>
 

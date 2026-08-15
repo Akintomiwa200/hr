@@ -32,6 +32,7 @@ import { useFormatCurrency } from "@/components/providers/currency-provider";
 import { useAppEvents } from "@/hooks/use-app-events";
 import type { Role } from "@prisma/client";
 import { ORG_ROLES } from "@/lib/roles";
+import type { WorkspaceMode } from "@/lib/role-workspace";
 import {
   OnboardingPasswordNotice,
   OnboardingSuccessMessage,
@@ -64,12 +65,18 @@ export function EmployeesModule({
   managers,
   canManage,
   allowedRoles = ORG_ROLES,
+  title = "Employees",
+  description = "Manage your organization's workforce",
+  mode = canManage ? "admin" : "directory",
 }: {
   employees: EmployeeRow[];
   departments: DepartmentOption[];
   managers: ManagerOption[];
   canManage: boolean;
   allowedRoles?: Role[];
+  title?: string;
+  description?: string;
+  mode?: WorkspaceMode;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -323,10 +330,18 @@ export function EmployeesModule({
     <>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-[1em] mb-6">
         <div>
-          <h1 className="text-[22px] font-bold text-gray-900 tracking-tight">Employees</h1>
-          <p className="text-[14px] text-gray-500 mt-1">
-            Manage your organization&apos;s workforce
-          </p>
+          <h1 className="text-[22px] font-bold text-gray-900 tracking-tight">{title}</h1>
+          <p className="text-[14px] text-gray-500 mt-1">{description}</p>
+          {mode === "directory" && (
+            <p className="text-[12px] text-amber-700 mt-2">
+              View-only directory — ask HR if you need profile changes.
+            </p>
+          )}
+          {mode === "team" && (
+            <p className="text-[12px] text-brand-700 mt-2">
+              Showing people in your reporting line. Open a profile for attendance or leave.
+            </p>
+          )}
         </div>
         {canManage && (
           <div className="flex flex-wrap gap-2">
@@ -390,7 +405,11 @@ export function EmployeesModule({
       <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
           <h3 className="text-[13px] font-semibold text-gray-900">
-            All Employees ({filtered.length})
+            {mode === "team"
+              ? `My team (${filtered.length})`
+              : mode === "directory"
+                ? `Directory (${filtered.length})`
+                : `All employees (${filtered.length})`}
           </h3>
           <div className="flex flex-wrap items-center gap-2">
             <input

@@ -17,10 +17,11 @@ async function getEmployeeContext(session: NonNullable<Awaited<ReturnType<typeof
 export async function GET(request: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
+  if (!canManageDocuments(session)) return unauthorized();
 
   const folderId = request.nextUrl.searchParams.get("folderId");
   const employee = await getEmployeeContext(session);
-  const isAdmin = canManageDocuments(session);
+  const isAdmin = true;
 
   const whereClause = folderId
     ? { folderId }

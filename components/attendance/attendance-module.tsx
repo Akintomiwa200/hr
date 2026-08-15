@@ -17,6 +17,7 @@ import { AttendanceMethodBadge } from "@/components/attendance/attendance-method
 import { DeviceIntegrationPanel } from "@/components/attendance/device-integration-panel";
 import { useAttendanceLive } from "@/hooks/use-attendance-live";
 import { cn, formatDate, fullName } from "@/lib/utils";
+import type { WorkspaceMode } from "@/lib/role-workspace";
 
 type AttendanceRow = {
   id: string;
@@ -63,55 +64,116 @@ export function AttendanceModule({
   records,
   todayRecord,
   isEmployee,
+  mode = isEmployee ? "self" : "org",
   presentTodayCount,
   appUrl,
   showDevicePanel,
+  showCheckIn,
+  currentEmployeeId,
 }: {
   records: AttendanceRow[];
   todayRecord?: TodayRecord;
   isEmployee: boolean;
+  mode?: WorkspaceMode;
   presentTodayCount?: number;
   appUrl?: string;
   showDevicePanel?: boolean;
+  showCheckIn?: boolean;
+  currentEmployeeId?: string | null;
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [tab, setTab] = useState<"roster" | "mine">(mode === "self" ? "mine" : "roster");
   useAttendanceLive();
 
+  const myRecords = useMemo(
+    () =>
+      currentEmployeeId
+        ? records.filter((r) => r.employee.id === currentEmployeeId)
+        : [],
+    [records, currentEmployeeId]
+  );
+
+  const rosterRecords = useMemo(
+    () =>
+      currentEmployeeId && mode !== "self"
+        ? records.filter((r) => r.employee.id !== currentEmployeeId)
+        : records,
+    [records, currentEmployeeId, mode]
+  );
+
+  const activeRecords =
+    mode === "self" ? records : tab === "mine" ? myRecords : rosterRecords;
+
   const stats = useMemo(() => {
-    const present = records.filter((r) =>
+    const present = activeRecords.filter((r) =>
       ["PRESENT", "REMOTE", "LATE", "HALF_DAY"].includes(r.status)
     ).length;
-    const late = records.filter((r) => r.status === "LATE").length;
-    const absent = records.filter((r) => r.status === "ABSENT").length;
-    return { present, late, absent, total: records.length };
-  }, [records]);
+    const late = activeRecords.filter((r) => r.status === "LATE").length;
+    const absent = activeRecords.filter((r) => r.status === "ABSENT").length;
+    return { present, late, absent, total: activeRecords.length };
+  }, [activeRecords]);
 
   const filtered = useMemo(() => {
-    let list = records;
+    let list = activeRecords;
     if (statusFilter !== "ALL") list = list.filter((r) => r.status === statusFilter);
     const q = search.trim().toLowerCase();
     if (!q) return list;
     return list.filter((r) =>
       fullName(r.employee.firstName, r.employee.lastName).toLowerCase().includes(q)
     );
-  }, [records, search, statusFilter]);
+  }, [activeRecords, search, statusFilter]);
+
+  const showPeople = mode !== "self" && tab !== "mine";
+  const canCheckIn = showCheckIn ?? isEmployee;
+
+  const logTitle =
+    mode === "self"
+      ? "Your attendance log"
+      : tab === "mine"
+        ? "Your check-ins"
+        : mode === "team"
+          ? "Team attendance log"
+          : "Organization attendance log";
+
+  const logHint =
+    mode === "self" || tab === "mine"
+      ? "Last 30 days · used for payroll deductions"
+      : mode === "team"
+        ? "Last 30 days for people who report to you"
+        : "Last 30 days across the company · used for payroll deductions";
+
+  const presenceLabel =
+    mode === "team" ? "Team present today" : "Present across org today";
 
   return (
     <div className="space-y-6">
-      {isEmployee && todayRecord !== undefined && (
-        <CheckInCard todayRecord={todayRecord} />
+      {canCheckIn && todayRecord !== undefined && (
+        <div className="rounded-2xl border border-brand-100 bg-gradient-to-r from-brand-50/50 to-white p-1">
+          <div className="rounded-xl bg-white p-4 sm:p-5">
+            {mode !== "self" && (
+              <p className="text-xs text-gray-500 mb-3">
+                Your own check-in — separate from the {mode === "team" ? "team" : "org"} roster below.
+              </p>
+            )}
+            <CheckInCard todayRecord={todayRecord} />
+          </div>
+        </div>
       )}
 
-      {!isEmployee && presentTodayCount !== undefined && (
+      {mode !== "self" && presentTodayCount !== undefined && (
         <div className="rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50/70 to-white p-5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-brand-500 flex items-center justify-center">
               <Users className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-gray-900">Today&apos;s check-ins</p>
-              <p className="text-xs text-gray-500">Employees present, remote, or late today</p>
+              <p className="text-sm font-semibold text-gray-900">{presenceLabel}</p>
+              <p className="text-xs text-gray-500">
+                {mode === "team"
+                  ? "Direct reports who are present, remote, or late"
+                  : "Employees present, remote, or late today"}
+              </p>
             </div>
           </div>
           <p className="text-3xl font-bold text-brand-600">{presentTodayCount}</p>
@@ -120,6 +182,35 @@ export function AttendanceModule({
 
       {showDevicePanel && appUrl && (
         <DeviceIntegrationPanel appUrl={appUrl} />
+      )}
+
+      {mode !== "self" && currentEmployeeId && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setTab("roster")}
+            className={cn(
+              "px-4 py-2 text-sm font-medium rounded-xl border transition-colors",
+              tab === "roster"
+                ? "bg-brand-500 text-white border-brand-500"
+                : "bg-white text-gray-600 border-gray-200 hover:border-brand-200"
+            )}
+          >
+            {mode === "team" ? "Team roster" : "Org roster"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("mine")}
+            className={cn(
+              "px-4 py-2 text-sm font-medium rounded-xl border transition-colors",
+              tab === "mine"
+                ? "bg-brand-500 text-white border-brand-500"
+                : "bg-white text-gray-600 border-gray-200 hover:border-brand-200"
+            )}
+          >
+            My history
+          </button>
+        </div>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -132,10 +223,10 @@ export function AttendanceModule({
       <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-brand-50/30 via-white to-white">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Attendance log</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Last 30 days · used for payroll deductions</p>
+            <h2 className="text-base font-semibold text-gray-900">{logTitle}</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{logHint}</p>
           </div>
-          {!isEmployee && (
+          {showPeople && (
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -177,7 +268,11 @@ export function AttendanceModule({
             <EmptyState
               icon={Clock}
               title="No attendance records"
-              description="Records appear when employees check in for the day."
+              description={
+                mode === "self" || tab === "mine"
+                  ? "Your check-ins will appear here after you clock in."
+                  : "Records appear when people in your scope check in for the day."
+              }
             />
           ) : (
             <div className="space-y-2">
@@ -192,7 +287,7 @@ export function AttendanceModule({
                   )}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    {!isEmployee && (
+                    {showPeople && (
                       <Avatar
                         firstName={record.employee.firstName}
                         lastName={record.employee.lastName}
@@ -200,7 +295,7 @@ export function AttendanceModule({
                       />
                     )}
                     <div>
-                      {!isEmployee ? (
+                      {showPeople ? (
                         <Link
                           href={`/employees/${record.employee.id}/attendance`}
                           className="text-sm font-semibold text-gray-900 hover:text-brand-600"
@@ -217,7 +312,7 @@ export function AttendanceModule({
                           )}
                         </p>
                       )}
-                      {!isEmployee && (
+                      {showPeople && (
                         <p className="text-xs text-gray-500">{formatDate(record.date)}</p>
                       )}
                     </div>

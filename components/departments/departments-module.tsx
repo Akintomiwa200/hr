@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -64,6 +64,10 @@ export function DepartmentsModule({
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    setDepartments(initial);
+  }, [initial]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return departments;
@@ -108,6 +112,20 @@ export function DepartmentsModule({
       if (!res.ok) {
         notify.error(await readApiError(res, "Failed to save department"));
         return;
+      }
+      const saved = (await res.json()) as Department;
+      if (mode === "create") {
+        setDepartments((list) =>
+          [...list, { ...saved, _count: saved._count ?? { employees: 0, jobs: 0 } }].sort((a, b) =>
+            a.name.localeCompare(b.name)
+          )
+        );
+      } else {
+        setDepartments((list) =>
+          list
+            .map((d) => (d.id === saved.id ? { ...d, ...saved, _count: saved._count ?? d._count } : d))
+            .sort((a, b) => a.name.localeCompare(b.name))
+        );
       }
       notify.success(mode === "create" ? "Department created successfully" : "Department updated successfully");
       setCreateOpen(false);

@@ -12,6 +12,7 @@ import { ensurePayrollSettings, getPayrollSettings } from "@/lib/payroll-engine"
 import { canManagePayroll } from "@/lib/roles";
 import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
 import { teamScopedEmployeeWhere } from "@/lib/employee-access";
+import { getPayrollWorkspace } from "@/lib/role-workspace";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function PayrollPage() {
@@ -20,12 +21,13 @@ export default async function PayrollPage() {
 
   await ensurePayrollSettings(session.companyId);
 
+  const workspace = getPayrollWorkspace(session.role);
   const scope = getCompanyScope(session);
   const orgEmployee = employeeCompanyWhere(scope);
   const teamScope = teamScopedEmployeeWhere(session);
 
   const employeeWhere =
-    session.role === "EMPLOYEE"
+    workspace.mode === "self"
       ? { id: session.employeeId ?? "" }
       : teamScope
         ? { AND: [orgEmployee, teamScope, { status: "ACTIVE" as const }] }
@@ -48,21 +50,13 @@ export default async function PayrollPage() {
   const totalPayroll = records.reduce((sum, r) => sum + r.netPay, 0);
   const canManage = canManagePayroll(session.role);
   const canManageSettings = canManagePayrollSettings(session);
-  const isManagerView =
-    session.role === "MANAGER" || session.role === "SUPERVISOR";
 
   return (
     <div>
       <PageLiveRefresh types={["payroll_updated", "employee_updated"]} pollIntervalMs={5000} />
       <PageHeader
-        title="Payroll"
-        description={
-          session.role === "EMPLOYEE"
-            ? "View your payslips, breakdown, and download salary slips"
-            : isManagerView
-              ? "Preview payslips for yourself and your team — contact HR to make changes"
-              : "Manage compensation, auto deductions, and payslips"
-        }
+        title={workspace.title}
+        description={workspace.description}
         action={
           <ModulePageActions
             helpSlug="payroll"
@@ -76,10 +70,10 @@ export default async function PayrollPage() {
         employees={employees}
         canManage={canManage}
         canManageSettings={canManageSettings}
-        showEmployeeColumn={session.role !== "EMPLOYEE"}
+        showEmployeeColumn={workspace.mode !== "self"}
         settings={settings}
         stats={
-          session.role !== "EMPLOYEE"
+          workspace.mode !== "self"
             ? {
                 total: totalPayroll,
                 count: records.length,

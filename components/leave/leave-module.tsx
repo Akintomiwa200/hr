@@ -43,14 +43,21 @@ export function LeaveModule({
   canApprove,
   isEmployee,
   showRequestForm,
+  mode = isEmployee ? "self" : "org",
+  currentEmployeeId,
 }: {
   leaves: LeaveRow[];
   canApprove: boolean;
   isEmployee: boolean;
   showRequestForm: boolean;
+  mode?: "self" | "team" | "org" | "admin" | "directory";
+  currentEmployeeId?: string | null;
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [tab, setTab] = useState<"inbox" | "mine">(
+    mode === "self" ? "mine" : "inbox"
+  );
   const router = useRouter();
 
   useAppEvents({
@@ -59,18 +66,38 @@ export function LeaveModule({
     onEvent: () => router.refresh(),
   });
 
+  const myLeaves = useMemo(
+    () =>
+      currentEmployeeId
+        ? leaves.filter((l) => l.employee.id === currentEmployeeId)
+        : [],
+    [leaves, currentEmployeeId]
+  );
+
+  const teamLeaves = useMemo(
+    () =>
+      currentEmployeeId
+        ? leaves.filter((l) => l.employee.id !== currentEmployeeId)
+        : leaves,
+    [leaves, currentEmployeeId]
+  );
+
+  const activeLeaves =
+    mode === "self" ? leaves : tab === "mine" ? myLeaves : teamLeaves;
+
   const stats = useMemo(() => {
-    const pending = leaves.filter((l) => l.status === "PENDING").length;
-    const approved = leaves.filter((l) => l.status === "APPROVED").length;
-    const rejected = leaves.filter((l) => l.status === "REJECTED").length;
-    const days = leaves
+    const source = mode === "self" ? leaves : tab === "mine" ? myLeaves : teamLeaves;
+    const pending = source.filter((l) => l.status === "PENDING").length;
+    const approved = source.filter((l) => l.status === "APPROVED").length;
+    const rejected = source.filter((l) => l.status === "REJECTED").length;
+    const days = source
       .filter((l) => l.status === "APPROVED")
       .reduce((sum, l) => sum + leaveDays(l.startDate, l.endDate), 0);
-    return { pending, approved, rejected, days, total: leaves.length };
-  }, [leaves]);
+    return { pending, approved, rejected, days, total: source.length };
+  }, [leaves, myLeaves, teamLeaves, mode, tab]);
 
   const filtered = useMemo(() => {
-    let list = leaves;
+    let list = activeLeaves;
     if (statusFilter !== "ALL") list = list.filter((l) => l.status === statusFilter);
     const q = search.trim().toLowerCase();
     if (!q) return list;
@@ -80,7 +107,25 @@ export function LeaveModule({
         l.reason.toLowerCase().includes(q) ||
         fullName(l.employee.firstName, l.employee.lastName).toLowerCase().includes(q)
     );
-  }, [leaves, search, statusFilter]);
+  }, [activeLeaves, search, statusFilter]);
+
+  const listTitle =
+    mode === "self"
+      ? "Your leave history"
+      : tab === "mine"
+        ? "Your requests"
+        : mode === "team"
+          ? "Team inbox"
+          : "Organization inbox";
+
+  const listHint =
+    mode === "self"
+      ? "Track status and dates for your submissions"
+      : tab === "mine"
+        ? "Your own time-off requests"
+        : canApprove
+          ? "Review, approve, or reject leave for people in your scope"
+          : "Leave activity in your scope";
 
   return (
     <div className="space-y-6">
@@ -89,27 +134,67 @@ export function LeaveModule({
         <StatCard label="Pending" value={stats.pending} icon={Clock} />
         <StatCard label="Approved" value={stats.approved} icon={CheckCircle2} />
         <StatCard
-          label={isEmployee ? "Days approved" : "Approved days"}
+          label={mode === "self" || tab === "mine" ? "Days approved" : "Approved days"}
           value={stats.days}
           icon={CalendarRange}
         />
       </div>
 
       {showRequestForm && (
-        <LeaveRequestForm />
+        <div className="rounded-2xl border border-brand-100 bg-gradient-to-r from-brand-50/50 to-white p-1">
+          <div className="rounded-xl bg-white p-4 sm:p-5">
+            <p className="text-sm font-semibold text-gray-900 mb-1">
+              {mode === "self" ? "Request time off" : "Request your own leave"}
+            </p>
+            <p className="text-xs text-gray-500 mb-4">
+              {mode === "self"
+                ? "Submit a request for HR or your manager to approve."
+                : "Leaders can take leave too — this does not affect the team approval inbox."}
+            </p>
+            <LeaveRequestForm />
+          </div>
+        </div>
+      )}
+
+      {mode !== "self" && currentEmployeeId && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setTab("inbox")}
+            className={cn(
+              "px-4 py-2 text-sm font-medium rounded-xl border transition-colors",
+              tab === "inbox"
+                ? "bg-brand-500 text-white border-brand-500"
+                : "bg-white text-gray-600 border-gray-200 hover:border-brand-200"
+            )}
+          >
+            {mode === "team" ? "Team inbox" : "Org inbox"}
+            {teamLeaves.filter((l) => l.status === "PENDING").length > 0 && (
+              <span className="ml-2 text-[11px] opacity-90">
+                ({teamLeaves.filter((l) => l.status === "PENDING").length} pending)
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("mine")}
+            className={cn(
+              "px-4 py-2 text-sm font-medium rounded-xl border transition-colors",
+              tab === "mine"
+                ? "bg-brand-500 text-white border-brand-500"
+                : "bg-white text-gray-600 border-gray-200 hover:border-brand-200"
+            )}
+          >
+            My requests
+          </button>
+        </div>
       )}
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-brand-50/30 via-white to-white">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">
-              {isEmployee ? "Your leave history" : "Leave requests"}
-            </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {canApprove
-                ? "Review, approve, or reject team leave requests"
-                : "Track status and dates for your submissions"}
-            </p>
+            <h2 className="text-base font-semibold text-gray-900">{listTitle}</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{listHint}</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative">
@@ -158,9 +243,9 @@ export function LeaveModule({
               icon={CalendarDays}
               title="No leave requests"
               description={
-                showRequestForm
+                showRequestForm && (mode === "self" || tab === "mine")
                   ? "Submit a request above — it will appear here once sent."
-                  : "Leave requests from your team will show up here."
+                  : "Leave requests in this view will show up here."
               }
             />
           ) : (
@@ -168,6 +253,11 @@ export function LeaveModule({
               {filtered.map((leave) => {
                 const style = leaveTypeStyle(leave.type);
                 const days = leaveDays(leave.startDate, leave.endDate);
+                const showPerson = !(mode === "self" || tab === "mine");
+                const canAct =
+                  canApprove &&
+                  leave.status === "PENDING" &&
+                  leave.employee.id !== currentEmployeeId;
                 return (
                   <article
                     key={leave.id}
@@ -175,7 +265,7 @@ export function LeaveModule({
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                       <div className="flex items-start gap-3 min-w-0">
-                        {!isEmployee && (
+                        {showPerson && (
                           <Avatar
                             firstName={leave.employee.firstName}
                             lastName={leave.employee.lastName}
@@ -183,7 +273,7 @@ export function LeaveModule({
                           />
                         )}
                         <div className="min-w-0">
-                          {!isEmployee && (
+                          {showPerson && (
                             <Link
                               href={`/employees/${leave.employee.id}/leave`}
                               className="text-sm font-semibold text-gray-900 hover:text-brand-600"
@@ -218,9 +308,7 @@ export function LeaveModule({
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
                         {statusBadge(leave.status)}
-                        {canApprove && leave.status === "PENDING" && (
-                          <LeaveActions leaveId={leave.id} />
-                        )}
+                        {canAct && <LeaveActions leaveId={leave.id} />}
                       </div>
                     </div>
                   </article>

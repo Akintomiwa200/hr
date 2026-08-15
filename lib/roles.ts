@@ -26,6 +26,7 @@ export const PEOPLE_VIEW_ROLES: Role[] = [
   "HR",
   "MANAGER",
   "SUPERVISOR",
+  "EMPLOYEE",
 ];
 
 /** Can add/edit/offboard people company-wide (HR ops). Managers are not HR admins. */

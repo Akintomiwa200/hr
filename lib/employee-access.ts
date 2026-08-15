@@ -69,6 +69,7 @@ export function teamScopedEmployeeWhere(
  * Employees directory scope.
  * Admin/HR: whole company.
  * Manager/Supervisor: only people who report to them (plus themselves).
+ * Employee: whole company (read-only directory — matches org chart / peer profiles).
  */
 export async function peopleDirectoryEmployeeWhere(
   session: SessionUser
@@ -78,8 +79,11 @@ export async function peopleDirectoryEmployeeWhere(
     return undefined;
   }
 
+  if (role === "EMPLOYEE") {
+    return undefined;
+  }
+
   if (!isTeamLeadRole(role)) {
-    // Other non-admin roles should not browse the directory.
     if (!session.employeeId) return { id: "__none__" };
     return { id: session.employeeId };
   }

@@ -13,7 +13,7 @@ import {
   settingsNavItem,
   type NavItem,
 } from "@/lib/dashboard-nav";
-import { roleWorkspaceLabel } from "@/lib/roles";
+import { roleWorkspaceLabel, canManageOrgContent, hasRole } from "@/lib/roles";
 import { useEffect, useState } from "react";
 import { useAutoHideScrollbar } from "@/hooks/use-auto-hide-scrollbar";
 import { useNavSummary } from "@/components/layout/nav-provider";
@@ -103,7 +103,7 @@ function NavSection({
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
-  const filtered = items.filter((item) => item.roles.includes(role));
+  const filtered = items.filter((item) => hasRole(role, item.roles));
   if (filtered.length === 0) return null;
 
   return (
@@ -297,17 +297,19 @@ export function Sidebar({
                 <Settings className="w-4 h-4" />
                 Settings
               </Link>
-              <Link
-                href="/help"
-                className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-gray-600 hover:bg-gray-50"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onCloseMobile?.();
-                }}
-              >
-                <CircleHelp className="w-4 h-4" />
-                Help Center
-              </Link>
+              {canManageOrgContent(role) && (
+                <Link
+                  href="/help"
+                  className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-gray-600 hover:bg-gray-50"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onCloseMobile?.();
+                  }}
+                >
+                  <CircleHelp className="w-4 h-4" />
+                  Help Center
+                </Link>
+              )}
               <form action="/api/auth/logout" method="POST">
                 <button
                   type="submit"

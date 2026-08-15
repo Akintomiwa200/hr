@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import {
   ALL_STAFF,
+  CONTENT_ADMIN_ROLES,
   DEVICE_ADMIN_ROLES,
   DASHBOARD_ROLES,
   INTEGRATION_ADMIN_ROLES,
@@ -42,6 +43,7 @@ import {
   SETTINGS_ROLES,
   SUBSCRIPTION_ADMIN_ROLES,
   SUPER_ADMIN_ONLY,
+  hasRole,
 } from "@/lib/roles";
 
 export type AppFeature = {
@@ -262,7 +264,7 @@ export const appFeatures: AppFeature[] = [
     href: "/documents",
     section: "Workspace",
     icon: FileText,
-    roles: ALL_STAFF,
+    roles: CONTENT_ADMIN_ROLES,
     helpSlug: "documents",
   },
   {
@@ -302,7 +304,7 @@ export const appFeatures: AppFeature[] = [
     href: "/help",
     section: "Workspace",
     icon: CircleHelp,
-    roles: [...ALL_STAFF, ...SUPER_ADMIN_ONLY],
+    roles: CONTENT_ADMIN_ROLES,
   },
   {
     id: "api-docs",
@@ -316,7 +318,7 @@ export const appFeatures: AppFeature[] = [
 ];
 
 export function getAppFeaturesForRole(role: Role): AppFeature[] {
-  return appFeatures.filter((feature) => feature.roles.includes(role));
+  return appFeatures.filter((feature) => hasRole(role, feature.roles));
 }
 
 export function getAppFeaturesBySection(role: Role): Record<string, AppFeature[]> {

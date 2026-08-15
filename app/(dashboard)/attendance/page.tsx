@@ -6,6 +6,7 @@ import { getAppUrlFromHeaders } from "@/lib/app-url";
 import { prisma } from "@/lib/prisma";
 import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
 import { teamScopedEmployeeWhere } from "@/lib/employee-access";
+import { getAttendanceWorkspace } from "@/lib/role-workspace";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { AttendanceModule } from "@/components/attendance/attendance-module";
@@ -14,6 +15,7 @@ export default async function AttendancePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
+  const workspace = getAttendanceWorkspace(session.role);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -25,12 +27,11 @@ export default async function AttendancePage() {
     : orgEmployee;
 
   const whereClause =
-    session.role === "EMPLOYEE" && session.employeeId
+    workspace.mode === "self" && session.employeeId
       ? { employeeId: session.employeeId }
       : { employee: scopedEmployee };
 
-  const isEmployee = session.role === "EMPLOYEE";
-  const showDevicePanel = canManageDevices(session.role);
+  const showDevicePanel = canManageDevices(session.role) && workspace.mode === "org";
   const appUrl = getAppUrlFromHeaders(await headers());
 
   const [records, todayRecord, presentTodayCount] = await Promise.all([
@@ -50,7 +51,7 @@ export default async function AttendancePage() {
           },
         })
       : null,
-    session.role !== "EMPLOYEE"
+    workspace.mode !== "self"
       ? prisma.attendance.count({
           where: {
             date: today,
@@ -64,23 +65,20 @@ export default async function AttendancePage() {
   return (
     <div>
       <PageHeader
-        title="Attendance"
-        description={
-          session.role === "EMPLOYEE"
-            ? "Check in, check out, and view your attendance history"
-            : session.role === "MANAGER" || session.role === "SUPERVISOR"
-              ? "Monitor attendance for your team"
-              : "Monitor daily attendance across the organization"
-        }
+        title={workspace.title}
+        description={workspace.description}
         action={<ModulePageActions helpSlug="attendance" helpLabel="Attendance guide" />}
       />
       <AttendanceModule
         records={records}
         todayRecord={todayRecord}
-        isEmployee={isEmployee}
+        isEmployee={workspace.mode === "self"}
+        mode={workspace.mode}
         presentTodayCount={presentTodayCount}
         appUrl={appUrl}
         showDevicePanel={showDevicePanel}
+        showCheckIn={Boolean(session.employeeId) && workspace.canActForSelf}
+        currentEmployeeId={session.employeeId}
       />
     </div>
   );

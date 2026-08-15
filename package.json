@@ -19,6 +19,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:purge-demo": "tsx scripts/purge-demo-data.mjs",
     "db:setup": "node scripts/db-sync.mjs && tsx prisma/seed.ts",
     "postinstall": "prisma generate"
   },

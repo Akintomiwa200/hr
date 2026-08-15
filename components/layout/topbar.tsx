@@ -23,7 +23,7 @@ import { Avatar } from "@/components/ui";
 import { getPageTitle } from "@/lib/dashboard-nav";
 import { useNavSummary } from "@/components/layout/nav-provider";
 import { formatRelativeTime, fullName } from "@/lib/utils";
-import { roleLabel } from "@/lib/roles";
+import { canManageOrgContent, roleLabel } from "@/lib/roles";
 import type { Role } from "@prisma/client";
 import type { NavNotification } from "@/lib/nav-summary-types";
 
@@ -289,14 +289,16 @@ function UserAccountMenu({
             <Settings className="w-4 h-4" />
             Settings
           </Link>
-          <Link
-            href="/help"
-            className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-gray-600 hover:bg-gray-50"
-            onClick={() => setOpen(false)}
-          >
-            <CircleHelp className="w-4 h-4" />
-            Help Center
-          </Link>
+          {canManageOrgContent(role) && (
+            <Link
+              href="/help"
+              className="flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-gray-600 hover:bg-gray-50"
+              onClick={() => setOpen(false)}
+            >
+              <CircleHelp className="w-4 h-4" />
+              Help Center
+            </Link>
+          )}
           <form action="/api/auth/logout" method="POST">
             <button
               type="submit"

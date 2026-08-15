@@ -354,6 +354,10 @@ export function ManagerDashboard({
         />
       </Suspense>
 
+      <div className="mb-4 rounded-2xl border border-violet-100 bg-violet-50/50 px-5 py-3 text-sm text-violet-950">
+        Manager leadership view — team leave, appraisals, and people who report to you.
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         {[
           { label: "Team Members", value: data.teamSize, color: "text-[#7B61FF]" },
@@ -585,22 +589,32 @@ export function CompanyAdminDashboard({
   upcomingEvents?: UpcomingCalendarEvent[];
   data: Awaited<ReturnType<typeof import("@/lib/dashboard-data").getCompanyAdminDashboardData>>;
 }) {
+  const quickLinks = [
+    { href: "/employees", label: "People admin", hint: "Onboard & directory" },
+    { href: "/payroll", label: "Payroll ops", hint: "Runs & deductions" },
+    { href: "/settings", label: "Company settings", hint: "Org configuration" },
+    { href: "/documents", label: "Documents & policies", hint: "Company content" },
+    { href: "/reports", label: "Org reports", hint: "Headcount & analytics" },
+    { href: "/settings/integrations", label: "Integrations", hint: "Connected apps" },
+  ];
+
   return (
     <div className="w-full">
       <DashboardLiveRefresh />
       <div className="py-[1em] mb-4">
         <h2 className="text-[22px] font-bold text-gray-900 tracking-tight">
-          Company overview, {userName}
+          Company command center, {userName}
         </h2>
         <p className="text-sm text-gray-500 mt-1">
-          Organization-wide HR, payroll, and performance — live from your database.
+          Executive view of people, payroll health, reviews, and integrations — not the day-to-day HR ops desk.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         {[
+          { label: "Headcount", value: data.fulltime + data.freelance, color: "text-gray-900" },
+          { label: "Attendance rate", value: `${data.attendanceRate}%`, color: "text-blue-600" },
           { label: "Reviews awaiting manager", value: data.pendingManagerReviews, color: "text-violet-600" },
-          { label: "Active review cycles", value: data.activeCycles, color: "text-blue-600" },
           { label: "Connected integrations", value: data.connectedIntegrations, color: "text-emerald-600" },
         ].map((stat) => (
           <div
@@ -613,7 +627,111 @@ export function CompanyAdminDashboard({
         ))}
       </div>
 
-      <HrDashboard data={data} userName={userName} upcomingEvents={upcomingEvents} hideGreeting />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        <WidgetCard title="Workforce mix" className="lg:col-span-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-[28px] font-bold text-gray-900 leading-none">{data.fulltime}</p>
+              <p className="text-[12px] text-gray-500 mt-2">Full-time</p>
+            </div>
+            <div>
+              <p className="text-[28px] font-bold text-gray-900 leading-none">{data.freelance}</p>
+              <p className="text-[12px] text-gray-500 mt-2">Freelance</p>
+            </div>
+          </div>
+          <Link
+            href="/employees"
+            className="inline-flex items-center gap-0.5 text-[11px] text-[#7B61FF] font-medium mt-4 hover:underline"
+          >
+            Open people admin <ChevronRight className="w-3 h-3" />
+          </Link>
+        </WidgetCard>
+
+        <WidgetCard
+          title="Payroll pulse"
+          className="lg:col-span-2"
+          action={
+            <Link
+              href="/payroll"
+              className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
+            >
+              Payroll <ChevronRight className="w-3 h-3" />
+            </Link>
+          }
+        >
+          <IncomeChart
+            data={data.incomeChart}
+            highlightMonth={data.highlightMonth}
+            chartYear={data.chartYear}
+          />
+        </WidgetCard>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <WidgetCard title="Admin shortcuts">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {quickLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-xl border border-gray-100 px-3 py-3 hover:border-brand-200 hover:bg-brand-50/30 transition-colors"
+              >
+                <p className="text-[13px] font-semibold text-gray-900">{link.label}</p>
+                <p className="text-[11px] text-gray-500 mt-0.5">{link.hint}</p>
+              </Link>
+            ))}
+          </div>
+        </WidgetCard>
+
+        <WidgetCard
+          title="Review health"
+          action={
+            <Link
+              href="/performance"
+              className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
+            >
+              Performance <ChevronRight className="w-3 h-3" />
+            </Link>
+          }
+        >
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <p className="text-[24px] font-bold text-violet-600 leading-none">
+                {data.activeCycles}
+              </p>
+              <p className="text-[12px] text-gray-500 mt-2">Active cycles</p>
+            </div>
+            <div>
+              <p className="text-[24px] font-bold text-amber-600 leading-none">
+                {data.pendingManagerReviews}
+              </p>
+              <p className="text-[12px] text-gray-500 mt-2">Manager reviews due</p>
+            </div>
+          </div>
+          <p className="text-[12px] text-gray-500">
+            Average completed rating score:{" "}
+            <span className="font-semibold text-gray-800">{data.avgPerformance}%</span>
+          </p>
+        </WidgetCard>
+      </div>
+
+      <div className="mb-4">
+        <UpcomingScheduleWidget events={upcomingEvents} />
+      </div>
+
+      <WidgetCard
+        title="People snapshot"
+        action={
+          <Link
+            href="/employees"
+            className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
+          >
+            Manage <ChevronRight className="w-3 h-3" />
+          </Link>
+        }
+      >
+        <EmployeeTable employees={data.employees.slice(0, 8)} />
+      </WidgetCard>
     </div>
   );
 }
@@ -721,6 +839,11 @@ export function SupervisorDashboard({
         />
       </Suspense>
 
+      <div className="mb-4 rounded-2xl border border-sky-100 bg-sky-50/60 px-5 py-3 text-sm text-sky-950">
+        Supervisor floor view — focus on who is present and leave waiting on you. Managers also see
+        appraisal leadership; you score reviews from Performance when assigned.
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         {[
           { label: "Team Members", value: data.teamSize, color: "text-[#7B61FF]" },
@@ -746,24 +869,24 @@ export function SupervisorDashboard({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <WidgetCard
-          title="Team Attendance"
+          title="Floor attendance"
           action={
             <Link
               href="/attendance"
               className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
             >
-              View all <ChevronRight className="w-3 h-3" />
+              Team attendance <ChevronRight className="w-3 h-3" />
             </Link>
           }
         >
           <p className="text-[32px] font-bold text-emerald-600 leading-none">
             {data.attendanceRate}%
           </p>
-          <p className="text-[12px] text-gray-500 mt-2">Team attendance this period</p>
+          <p className="text-[12px] text-gray-500 mt-2">Your reports&apos; attendance this period</p>
         </WidgetCard>
 
         <WidgetCard
-          title="Leave Approvals"
+          title="Leave waiting on you"
           action={
             <Link
               href="/leave"

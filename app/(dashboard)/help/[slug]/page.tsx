@@ -1,5 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { canManageOrgContent } from "@/lib/roles";
 import { HelpArticleView } from "@/components/help/help-article-view";
 import { getHelpArticle } from "@/lib/help-content";
 
@@ -18,6 +19,7 @@ export async function generateMetadata({ params }: Props) {
 export default async function HelpArticlePage({ params }: Props) {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (!canManageOrgContent(session.role)) redirect("/dashboard");
 
   const { slug } = await params;
   const article = getHelpArticle(slug);

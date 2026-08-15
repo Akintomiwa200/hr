@@ -4,17 +4,36 @@ export type CompanyHoliday = {
   type: "Public" | "Company";
 };
 
+/**
+ * Official Nigeria federal public holidays for 2026.
+ * Islamic dates follow widely published FG calendars and may shift ±1 day by moon sighting.
+ * Source references: Federal Ministry of Interior / FMINO declarations and High Commission calendar.
+ */
 export const companyHolidays2026: CompanyHoliday[] = [
   { name: "New Year's Day", date: "2026-01-01", type: "Public" },
-  { name: "Martin Luther King Jr. Day", date: "2026-01-19", type: "Public" },
-  { name: "Presidents' Day", date: "2026-02-16", type: "Public" },
-  { name: "Company Founders Day", date: "2026-03-15", type: "Company" },
-  { name: "Memorial Day", date: "2026-05-25", type: "Public" },
-  { name: "Juneteenth", date: "2026-06-19", type: "Public" },
-  { name: "Independence Day", date: "2026-07-04", type: "Public" },
-  { name: "Labor Day", date: "2026-09-07", type: "Public" },
-  { name: "Thanksgiving", date: "2026-11-26", type: "Public" },
-  { name: "Day After Thanksgiving", date: "2026-11-27", type: "Company" },
-  { name: "Christmas Eve", date: "2026-12-24", type: "Company" },
+  { name: "Eid el-Fitr", date: "2026-03-20", type: "Public" },
+  { name: "Eid el-Fitr Holiday", date: "2026-03-21", type: "Public" },
+  { name: "Good Friday", date: "2026-04-03", type: "Public" },
+  { name: "Easter Monday", date: "2026-04-06", type: "Public" },
+  { name: "Workers' Day", date: "2026-05-01", type: "Public" },
+  { name: "Eid el-Adha", date: "2026-05-27", type: "Public" },
+  { name: "Eid el-Adha Holiday", date: "2026-05-28", type: "Public" },
+  { name: "Democracy Day", date: "2026-06-12", type: "Public" },
+  { name: "Eid el-Maulud", date: "2026-08-26", type: "Public" },
+  { name: "Independence Day", date: "2026-10-01", type: "Public" },
   { name: "Christmas Day", date: "2026-12-25", type: "Public" },
+  { name: "Boxing Day", date: "2026-12-26", type: "Public" },
 ];
+
+/** Legacy US demo holiday names — replaced when syncing calendars to Nigeria. */
+export const LEGACY_US_HOLIDAY_NAMES = [
+  "Martin Luther King Jr. Day",
+  "Presidents' Day",
+  "Company Founders Day",
+  "Memorial Day",
+  "Juneteenth",
+  "Labor Day",
+  "Thanksgiving",
+  "Day After Thanksgiving",
+  "Christmas Eve",
+] as const;
