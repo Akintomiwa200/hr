@@ -17,6 +17,7 @@ import { LeaveActions } from "@/components/leave/leave-actions";
 import { leaveDays, leaveTypeLabel, leaveTypeStyle } from "@/lib/leave-utils";
 import { cn, formatDate, fullName } from "@/lib/utils";
 import { useAppEvents } from "@/hooks/use-app-events";
+import { scheduleRouterRefresh } from "@/hooks/use-soft-refresh";
 import { useRouter } from "next/navigation";
 
 type LeaveRow = {
@@ -62,8 +63,10 @@ export function LeaveModule({
 
   useAppEvents({
     types: ["leave_updated", "employee_updated"],
-    pollIntervalMs: 4000,
-    onEvent: () => router.refresh(),
+    onEvent: (type) => {
+      if (!type) return;
+      scheduleRouterRefresh(() => router.refresh());
+    },
   });
 
   const myLeaves = useMemo(

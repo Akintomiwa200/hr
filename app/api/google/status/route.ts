@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { redirect } from "next/navigation";
 import {
   disconnectGoogleIntegration,
-  getGoogleAuthUrl,
   getGoogleIntegration,
   isGoogleConfigured,
 } from "@/lib/google-calendar";
+import { getGoogleRedirectUri } from "@/lib/integrations/google/workspace";
 import { isHr, requireSession, unauthorized } from "@/lib/api-auth";
 
 export async function GET() {
@@ -19,6 +18,7 @@ export async function GET() {
     email: integration?.email ?? null,
     connectedAt: integration?.connectedAt ?? null,
     calendarId: integration?.calendarId ?? "primary",
+    redirectUri: getGoogleRedirectUri(),
   });
 }
 

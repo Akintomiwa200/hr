@@ -16,8 +16,8 @@ export default async function AttendanceDevicesPage() {
   return (
     <div>
       <PageHeader
-        title="Device integration"
-        description="API endpoints, live device status, and check-in app connection"
+        title="ZKTeco terminals"
+        description="Register branch locations and live ZKTeco attendance hardware"
         action={<ModulePageActions helpSlug="attendance" helpLabel="Attendance guide" />}
       />
       <DeviceIntegrationHub />

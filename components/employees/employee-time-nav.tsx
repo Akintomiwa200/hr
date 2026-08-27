@@ -14,13 +14,23 @@ const tabs = [
 export function EmployeeTimeNav({
   employeeId,
   active,
+  showTimeTabs = true,
+  showPayrollTab = false,
 }: {
   employeeId: string;
   active: "profile" | "leave" | "attendance" | "payroll";
+  showTimeTabs?: boolean;
+  showPayrollTab?: boolean;
 }) {
+  const visible = tabs.filter((tab) => {
+    if (tab.id === "profile") return true;
+    if (tab.id === "payroll") return showPayrollTab;
+    return showTimeTabs;
+  });
+
   return (
     <div className="flex flex-wrap gap-1 p-1 bg-gray-100 rounded-xl mb-6">
-      {tabs.map((tab) => {
+      {visible.map((tab) => {
         const Icon = tab.icon;
         const isActive = tab.id === active;
         return (

@@ -8,6 +8,7 @@ import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
+import { isSseHandshake } from "@/lib/events";
 
 type DocFile = {
   id: string;
@@ -45,7 +46,25 @@ export function FolderDetailModule({
 
   useEffect(() => {
     const es = new EventSource("/api/events");
-    es.onmessage = () => router.refresh();
+    es.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as {
+          type?: string;
+          data?: Record<string, unknown>;
+        };
+        if (isSseHandshake(payload.type, payload.data)) return;
+        if (
+          payload.type &&
+          payload.type !== "document_updated" &&
+          payload.type !== "folder_updated"
+        ) {
+          return;
+        }
+        router.refresh();
+      } catch {
+        // ignore heartbeat / malformed payloads
+      }
+    };
     return () => es.close();
   }, [router]);
 

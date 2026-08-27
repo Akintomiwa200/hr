@@ -6,6 +6,7 @@ import { getCompanyScope, requireOrgCompanyId } from "@/lib/company-scope";
 import { startEmployeeOffboarding } from "@/lib/checklist/instantiate";
 import { notifyEmployeeChange } from "@/lib/employees/mutations";
 import { prisma } from "@/lib/prisma";
+import { parseLocalDate } from "@/lib/dates";
 
 export async function POST(
   request: NextRequest,
@@ -24,6 +25,7 @@ export async function POST(
 
   const body = await request.json().catch(() => ({}));
   const deactivate = body.deactivate !== false; // default: remove access
+  const endDate = parseLocalDate(body.endDate) ?? new Date();
 
   const companyId = requireOrgCompanyId(getCompanyScope(session));
 
@@ -32,6 +34,7 @@ export async function POST(
       employeeId: id,
       companyId,
       deactivate,
+      endDate,
     });
 
     notifyEmployeeChange(id, deactivate ? "deleted" : "updated");

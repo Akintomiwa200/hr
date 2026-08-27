@@ -356,6 +356,10 @@ export function statusBadge(status: string) {
     NOT_STARTED: { label: "Not started", variant: "neutral" },
     SELF_REVIEW: { label: "Self review", variant: "info" },
     MANAGER_REVIEW: { label: "Manager review", variant: "warning" },
+    PUBLISHED: { label: "Published", variant: "success" },
+    ISSUED: { label: "Issued", variant: "info" },
+    ACKNOWLEDGED: { label: "Acknowledged", variant: "success" },
+    SUBMITTED: { label: "Submitted", variant: "success" },
   };
 
   const config = map[status] || { label: status, variant: "neutral" as const };

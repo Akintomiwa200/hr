@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
       employeeId: event.employeeId,
       employeeCode: event.employeeCode,
       email: event.email,
+      companyId: auth.companyId,
     });
 
     if (!employeeId) {

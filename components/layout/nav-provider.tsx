@@ -5,9 +5,10 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+import { subscribeRealtime } from "@/lib/realtime-sse";
 import type { NavSummary } from "@/lib/nav-summary-types";
 
 type NavContextValue = {
@@ -26,6 +27,10 @@ export function useNavSummary() {
   return ctx;
 }
 
+function summariesEqual(a: NavSummary, b: NavSummary) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function NavProvider({
   initialSummary,
   children,
@@ -33,68 +38,58 @@ export function NavProvider({
   initialSummary: NavSummary;
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   const [summary, setSummary] = useState(initialSummary);
   const [live, setLive] = useState(false);
+  const summaryRef = useRef(summary);
+  summaryRef.current = summary;
 
   const refresh = useCallback(async () => {
     try {
       const res = await fetch("/api/nav/summary", { cache: "no-store" });
       if (!res.ok) return;
       const data = (await res.json()) as NavSummary;
-      setSummary(data);
+      if (!summariesEqual(summaryRef.current, data)) {
+        setSummary(data);
+      }
     } catch {
       // ignore transient network errors
     }
   }, []);
 
   useEffect(() => {
-    setSummary(initialSummary);
+    if (!summariesEqual(summaryRef.current, initialSummary)) {
+      setSummary(initialSummary);
+    }
   }, [initialSummary]);
 
   useEffect(() => {
-    let source: EventSource | null = null;
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastRefreshAt = 0;
 
     const onUpdate = () => {
-      void refresh();
-      router.refresh();
+      const now = Date.now();
+      if (now - lastRefreshAt < 20_000) return;
+      if (debounceTimer) return;
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        lastRefreshAt = Date.now();
+        void refresh();
+      }, 2000);
     };
 
-    try {
-      source = new EventSource("/api/events");
-      source.onopen = () => setLive(true);
-      source.onmessage = (event) => {
-        setLive(true);
-        try {
-          const payload = JSON.parse(event.data) as {
-            type?: string;
-            data?: { connected?: boolean };
-          };
-          if (payload.type === "dashboard_updated" && payload.data?.connected === true) {
-            return;
-          }
-        } catch {
-          // ignore malformed payloads
-        }
-        onUpdate();
-      };
-      source.onerror = () => {
-        setLive(false);
-        source?.close();
-        source = null;
-      };
-    } catch {
-      // SSE unavailable — polling still runs
-    }
-
-    pollTimer = setInterval(refresh, 30_000);
+    setLive(true);
+    const unsubscribe = subscribeRealtime((type) => {
+      if (!type || type === "device_ping") return;
+      setLive(true);
+      onUpdate();
+    });
 
     return () => {
-      source?.close();
-      if (pollTimer) clearInterval(pollTimer);
+      unsubscribe();
+      setLive(false);
+      if (debounceTimer) clearTimeout(debounceTimer);
     };
-  }, [refresh, router]);
+  }, [refresh]);
 
   return (
     <NavContext.Provider value={{ summary, refresh, live }}>

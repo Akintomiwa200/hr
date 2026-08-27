@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_EMPLOYEE_PASSWORD } from "@/lib/constants/auth";
 import { sendWelcomeEmail, type SendEmailResult } from "@/lib/email";
 import { nextEmployeeCode } from "@/lib/employees/next-employee-code";
+import { pinFromEmployeeCode } from "@/lib/zkteco/pin";
+import { parseLocalDate } from "@/lib/dates";
 
 export type CreateEmployeeInput = {
   firstName: string;
@@ -19,6 +21,9 @@ export type CreateEmployeeInput = {
   salary?: number | string;
   status?: string;
   companyId?: string | null;
+  biometricPin?: string | null;
+  branchId?: string | null;
+  hireDate?: string | Date | null;
 };
 
 export type CreateEmployeeResult = {
@@ -32,6 +37,7 @@ function normalizeRoleInput(role?: Role | string): Role {
   if (
     role === "COMPANY_ADMIN" ||
     role === "HR" ||
+    role === "ACCOUNT_OFFICER" ||
     role === "MANAGER" ||
     role === "SUPERVISOR" ||
     role === "EMPLOYEE"
@@ -68,7 +74,8 @@ async function resolveManagerId(input: {
     input.role === "MANAGER" ||
     input.role === "SUPERVISOR" ||
     input.role === "COMPANY_ADMIN" ||
-    input.role === "HR"
+    input.role === "HR" ||
+    input.role === "ACCOUNT_OFFICER"
   ) {
     return null;
   }
@@ -114,6 +121,27 @@ async function adoptUnmanagedDepartmentEmployees(options: {
   });
 }
 
+async function uniqueBiometricPin(companyId: string | null | undefined, employeeCode: string) {
+  const preferred = pinFromEmployeeCode(employeeCode);
+  if (!preferred) return null;
+  let n = Number.parseInt(preferred, 10);
+  if (!Number.isFinite(n)) return preferred;
+  let candidate = preferred;
+  for (let i = 0; i < 50; i++) {
+    const taken = await prisma.employee.findFirst({
+      where: {
+        biometricPin: candidate,
+        ...(companyId ? { user: { companyId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (!taken) return candidate;
+    n += 1;
+    candidate = String(n);
+  }
+  return preferred;
+}
+
 export async function createEmployeeAccount(input: CreateEmployeeInput) {
   const normalizedEmail = input.email.trim().toLowerCase();
   const employmentType =
@@ -136,6 +164,9 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
 
   const employeeCode = await nextEmployeeCode();
   const passwordHash = await bcrypt.hash(DEFAULT_EMPLOYEE_PASSWORD, 10);
+  const biometricPin =
+    (typeof input.biometricPin === "string" && input.biometricPin.trim()) ||
+    (await uniqueBiometricPin(input.companyId, employeeCode));
 
   const user = await prisma.user.create({
     data: {
@@ -154,8 +185,10 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
           jobTitle: input.jobTitle.trim(),
           employmentType,
           departmentId: input.departmentId,
+          branchId: input.branchId?.trim() || null,
+          biometricPin,
           managerId,
-          hireDate: new Date(),
+          hireDate: parseLocalDate(input.hireDate) ?? new Date(),
           salary: Number(input.salary) || 0,
           status: input.status || "ACTIVE",
         },

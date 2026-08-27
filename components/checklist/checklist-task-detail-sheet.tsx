@@ -6,6 +6,8 @@ import { Badge, Button } from "@/components/ui";
 import { Sheet } from "@/components/ui/sheet";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
+import { parseDocumentNames } from "@/lib/checklist/documents";
+import { ChecklistTaskDocumentsPanel, type TaskFile } from "./checklist-task-documents-panel";
 
 type Comment = {
   id: string;
@@ -21,6 +23,9 @@ type TaskDetail = {
   status: string;
   priority: string;
   dueDate: string | null;
+  taskType?: string;
+  requiredDocuments?: unknown;
+  files?: TaskFile[];
   assignee: { id: string; firstName: string; lastName: string } | null;
   instance: {
     id: string;
@@ -210,7 +215,7 @@ export function ChecklistTaskDetailSheet({
                     disabled={saving}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   >
-                    <option value="">Unassigned</option>
+                    <option value="">Anyone / unassigned</option>
                     {employees.map((emp) => (
                       <option key={emp.id} value={emp.id}>
                         {fullName(emp.firstName, emp.lastName)}
@@ -242,7 +247,7 @@ export function ChecklistTaskDetailSheet({
               </p>
               <p>
                 <span className="text-gray-500">Assignee:</span>{" "}
-                {task.assignee ? fullName(task.assignee.firstName, task.assignee.lastName) : "Unassigned"}
+                {task.assignee ? fullName(task.assignee.firstName, task.assignee.lastName) : "Anyone"}
               </p>
               {task.status !== "COMPLETED" && (
                 <div className="flex gap-2 pt-2">
@@ -251,12 +256,32 @@ export function ChecklistTaskDetailSheet({
                       Start Working
                     </Button>
                   )}
-                  <Button loading={saving} onClick={() => patch({ status: "COMPLETED" })}>
+                  <Button loading={saving} onClick={() => patch({ action: "complete" })}>
                     Mark Complete
                   </Button>
                 </div>
               )}
             </div>
+          )}
+
+          <ChecklistTaskDocumentsPanel
+            taskId={task.id}
+            requiredDocuments={task.requiredDocuments}
+            files={task.files ?? []}
+            canManage={canManage}
+            canUpload
+            onChanged={() => {
+              fetch(`/api/checklist/tasks/${task.id}`)
+                .then((res) => (res.ok ? res.json() : null))
+                .then((next) => next && setTask(next));
+              onUpdated();
+            }}
+          />
+
+          {canManage && task.status !== "COMPLETED" && (
+            <Button loading={saving} onClick={() => patch({ action: "complete" })}>
+              Complete task
+            </Button>
           )}
 
           <div>

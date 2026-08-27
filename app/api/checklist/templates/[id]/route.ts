@@ -4,6 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageTemplates } from "@/lib/checklist/access";
+import { parseDocumentNames } from "@/lib/checklist/documents";
+import {
+  fetchTemplateTaskRequiredDocumentsMap,
+  setTemplateTaskRequiredDocumentsById,
+} from "@/lib/checklist/document-store";
 
 export async function GET(
   _request: NextRequest,
@@ -18,8 +23,15 @@ export async function GET(
     include: { tasks: { orderBy: { sortOrder: "asc" } } },
   });
   if (!template) return notFound();
+  const docs = await fetchTemplateTaskRequiredDocumentsMap(id);
 
-  return NextResponse.json(template);
+  return NextResponse.json({
+    ...template,
+    tasks: template.tasks.map((task) => ({
+      ...task,
+      requiredDocuments: docs.get(task.id) ?? [],
+    })),
+  });
 }
 
 export async function PATCH(
@@ -36,21 +48,25 @@ export async function PATCH(
 
   if (body.action === "add_task") {
     if (!body.title?.trim()) return badRequest("Task title is required");
+    const requiredDocuments = parseDocumentNames(body.requiredDocuments);
     const task = await prisma.checklistTemplateTask.create({
       data: {
         templateId: id,
         title: body.title.trim(),
         description: body.description?.trim() || null,
-        taskType: body.taskType || "CHECKBOX",
-        assigneeType: body.assigneeType || "EMPLOYEE",
+        taskType: requiredDocuments.length ? "DOCUMENT" : body.taskType || "CHECKBOX",
+        assigneeType: body.assigneeType || "ANYONE",
         assigneeId: body.assigneeId || null,
         dueDaysOffset: body.dueDaysOffset != null ? Number(body.dueDaysOffset) : null,
         sortOrder: body.sortOrder ?? 0,
       },
     });
+    if (requiredDocuments.length) {
+      await setTemplateTaskRequiredDocumentsById(task.id, requiredDocuments);
+    }
     broadcastAppEvent("checklist_updated", { id, action: "task_added" });
     revalidatePath("/checklist/settings");
-    return NextResponse.json(task);
+    return NextResponse.json({ ...task, requiredDocuments });
   }
 
   if (body.action === "set_default") {

@@ -38,11 +38,9 @@ export function ChecklistSettingsModule({ canManage }: { canManage: boolean }) {
   }, [load]);
 
   useAppEvents({
-    types: ["checklist_updated", "dashboard_updated"],
-    pollIntervalMs: 4000,
+    types: ["checklist_updated"],
     onEvent: () => {
       void load();
-      router.refresh();
     },
   });
 

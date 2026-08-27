@@ -2,9 +2,11 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageChecklists, canViewChecklists } from "@/lib/checklist/access";
+import { ensureDefaultOnboardingTemplate } from "@/lib/checklist/instantiate";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { ChecklistInstanceDetailModule } from "@/components/checklist/checklist-instance-detail-module";
+import { hydrateChecklistTasks } from "@/lib/checklist/document-store";
 
 export default async function OnboardingDetailPage({
   params,
@@ -13,6 +15,7 @@ export default async function OnboardingDetailPage({
 }) {
   const session = await getSession();
   if (!session || !canViewChecklists(session)) redirect("/dashboard");
+  await ensureDefaultOnboardingTemplate(session.companyId ?? null);
 
   const { id } = await params;
   const instance = await prisma.checklistInstance.findUnique({
@@ -23,9 +26,10 @@ export default async function OnboardingDetailPage({
     },
   });
   if (!instance || instance.type !== "ONBOARDING") notFound();
+  const tasks = await hydrateChecklistTasks(instance.tasks);
 
-  const completed = instance.tasks.filter((t) => t.status === "COMPLETED").length;
-  const total = instance.tasks.length;
+  const completed = tasks.filter((t) => t.status === "COMPLETED").length;
+  const total = tasks.length;
 
   return (
     <div>
@@ -41,6 +45,8 @@ export default async function OnboardingDetailPage({
           id: instance.id,
           type: instance.type,
           status: instance.status,
+          startDate: instance.startDate.toISOString(),
+          endDate: instance.endDate?.toISOString() ?? null,
           progress: {
             completed,
             total,
@@ -50,14 +56,19 @@ export default async function OnboardingDetailPage({
             firstName: instance.employee.firstName,
             lastName: instance.employee.lastName,
             hireDate: instance.employee.hireDate.toISOString(),
+            endDate:
+              (instance.employee as { endDate?: Date | null }).endDate?.toISOString() ?? null,
           },
-          tasks: instance.tasks.map((t) => ({
+          tasks: tasks.map((t) => ({
             id: t.id,
             title: t.title,
             description: t.description,
             status: t.status,
+            taskType: t.taskType,
             dueDate: t.dueDate?.toISOString() ?? null,
             assignee: t.assignee,
+            requiredDocuments: t.requiredDocuments,
+            files: t.files.map((file) => ({ id: file.id, documentName: file.documentName })),
           })),
         }}
       />

@@ -1,11 +1,17 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canViewEmployee, getEmployeeOrNull } from "@/lib/employee-access";
+import {
+  canViewEmployeeTimeData,
+  getEmployeeOrNull,
+} from "@/lib/employee-access";
+import { requirePeoplePage } from "@/lib/page-access";
 import { EmployeeSubpageHeader } from "@/components/employees/employee-subpage-header";
 import { EmployeeAttendanceModule } from "@/components/attendance/employee-attendance-module";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 import { fullName } from "@/lib/utils";
+import { canManageEmployees } from "@/lib/roles";
+import { canViewEmployeePayroll } from "@/lib/payroll-access";
 
 export default async function EmployeeAttendancePage({
   params,
@@ -13,13 +19,13 @@ export default async function EmployeeAttendancePage({
   params: Promise<{ id: string }>;
 }) {
   const session = await getSession();
-  if (!session) redirect("/login");
+  requirePeoplePage(session);
 
   const { id } = await params;
   const employee = await getEmployeeOrNull(id);
   if (!employee) notFound();
 
-  const allowed = await canViewEmployee(session, id);
+  const allowed = await canViewEmployeeTimeData(session, id);
   if (!allowed) redirect("/employees");
 
   const today = new Date();
@@ -27,7 +33,7 @@ export default async function EmployeeAttendancePage({
   const thirtyDaysAgo = new Date(today);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const [records, todayRecord] = await Promise.all([
+  const [records, todayRecord, showPayrollTab] = await Promise.all([
     prisma.attendance.findMany({
       where: { employeeId: id },
       orderBy: { date: "desc" },
@@ -38,6 +44,7 @@ export default async function EmployeeAttendancePage({
           where: { employeeId_date: { employeeId: id, date: today } },
         })
       : null,
+    canViewEmployeePayroll(session, id),
   ]);
 
   const recentRecords = records.filter((r) => new Date(r.date) >= thirtyDaysAgo);
@@ -52,7 +59,7 @@ export default async function EmployeeAttendancePage({
 
   return (
     <div>
-      <PageLiveRefresh types={["attendance_updated", "device_ping", "employee_updated"]} pollIntervalMs={3000} />
+      <PageLiveRefresh types={["attendance_updated", "employee_updated"]} />
       <EmployeeSubpageHeader
         employee={employee}
         title="Attendance"
@@ -64,6 +71,8 @@ export default async function EmployeeAttendancePage({
         records={records}
         todayRecord={todayRecord}
         showCheckIn={session.employeeId === id}
+        canManageManual={canManageEmployees(session.role)}
+        showPayrollTab={showPayrollTab}
         stats={stats}
       />
     </div>

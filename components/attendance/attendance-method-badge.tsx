@@ -1,9 +1,9 @@
-import { Monitor, Smartphone, Tablet, UserCog } from "lucide-react";
+import { Fingerprint, Monitor, Smartphone, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const METHOD_CONFIG = {
   WEB: { label: "Web", icon: Monitor, className: "bg-sky-50 text-sky-700" },
-  DEVICE: { label: "Device", icon: Tablet, className: "bg-brand-50 text-brand-700" },
+  DEVICE: { label: "ZKTeco", icon: Fingerprint, className: "bg-brand-50 text-brand-700" },
   MOBILE: { label: "Mobile", icon: Smartphone, className: "bg-violet-50 text-violet-700" },
   MANUAL: { label: "Manual", icon: UserCog, className: "bg-gray-100 text-gray-600" },
 } as const;

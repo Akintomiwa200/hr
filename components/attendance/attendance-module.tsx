@@ -5,13 +5,16 @@ import Link from "next/link";
 import {
   Clock,
   Filter,
+  Pencil,
   Search,
   TrendingUp,
   UserCheck,
   Users,
   X,
 } from "lucide-react";
-import { Avatar, EmptyState, StatCard, statusBadge } from "@/components/ui";
+import { Avatar, Button, EmptyState, StatCard, statusBadge } from "@/components/ui";
+import { Dialog } from "@/components/ui/dialog";
+import { notify, readApiError } from "@/lib/toast";
 import { CheckInCard } from "@/components/attendance/check-in-card";
 import { AttendanceMethodBadge } from "@/components/attendance/attendance-method-badge";
 import { DeviceIntegrationPanel } from "@/components/attendance/device-integration-panel";
@@ -70,6 +73,7 @@ export function AttendanceModule({
   showDevicePanel,
   showCheckIn,
   currentEmployeeId,
+  canManageManual = false,
 }: {
   records: AttendanceRow[];
   todayRecord?: TodayRecord;
@@ -80,10 +84,14 @@ export function AttendanceModule({
   showDevicePanel?: boolean;
   showCheckIn?: boolean;
   currentEmployeeId?: string | null;
+  canManageManual?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [tab, setTab] = useState<"roster" | "mine">(mode === "self" ? "mine" : "roster");
+  const [editRecord, setEditRecord] = useState<AttendanceRow | null>(null);
+  const [editForm, setEditForm] = useState({ checkIn: "", checkOut: "", status: "PRESENT" });
+  const [saving, setSaving] = useState(false);
   useAttendanceLive();
 
   const myRecords = useMemo(
@@ -145,6 +153,32 @@ export function AttendanceModule({
 
   const presenceLabel =
     mode === "team" ? "Team present today" : "Present across org today";
+
+  const saveManualEdit = async () => {
+    if (!editRecord) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/attendance/${editRecord.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          checkIn: editForm.checkIn ? new Date(editForm.checkIn).toISOString() : null,
+          checkOut: editForm.checkOut ? new Date(editForm.checkOut).toISOString() : null,
+          status: editForm.status,
+        }),
+      });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to update attendance"));
+        return;
+      }
+      notify.success("Attendance updated");
+      setEditRecord(null);
+    } catch {
+      notify.error("Failed to update attendance");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -334,6 +368,27 @@ export function AttendanceModule({
                         />
                       )}
                       {statusBadge(record.status)}
+                      {canManageManual && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditRecord(record);
+                            setEditForm({
+                              checkIn: record.checkIn
+                                ? new Date(record.checkIn).toISOString().slice(0, 16)
+                                : "",
+                              checkOut: record.checkOut
+                                ? new Date(record.checkOut).toISOString().slice(0, 16)
+                                : "",
+                              status: record.status,
+                            });
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-brand-600 rounded-lg"
+                          title="Correct attendance"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -342,6 +397,62 @@ export function AttendanceModule({
           )}
         </div>
       </div>
+
+      <Dialog
+        open={!!editRecord}
+        onClose={() => setEditRecord(null)}
+        title="Correct attendance"
+        size="md"
+      >
+        {editRecord && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              {fullName(editRecord.employee.firstName, editRecord.employee.lastName)} ·{" "}
+              {formatDate(editRecord.date)}
+            </p>
+            <div>
+              <label className="block text-[13px] font-medium text-gray-700 mb-1">Check in</label>
+              <input
+                type="datetime-local"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                value={editForm.checkIn}
+                onChange={(e) => setEditForm({ ...editForm, checkIn: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-[13px] font-medium text-gray-700 mb-1">Check out</label>
+              <input
+                type="datetime-local"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                value={editForm.checkOut}
+                onChange={(e) => setEditForm({ ...editForm, checkOut: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-[13px] font-medium text-gray-700 mb-1">Status</label>
+              <select
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                value={editForm.status}
+                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+              >
+                {["PRESENT", "LATE", "REMOTE", "ABSENT", "HALF_DAY"].map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setEditRecord(null)}>
+                Cancel
+              </Button>
+              <Button loading={saving} onClick={saveManualEdit}>
+                Save correction
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }

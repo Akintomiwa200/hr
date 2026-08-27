@@ -8,6 +8,7 @@ import { assertCanAddEmployee, subscriptionErrorMessage } from "@/lib/subscripti
 import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
 import { peopleDirectoryEmployeeWhere } from "@/lib/employee-access";
 import { canAssignRole, normalizeRole } from "@/lib/roles";
+import { parseLocalDate } from "@/lib/dates";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
       department: true,
       manager: { select: { id: true, firstName: true, lastName: true } },
       user: { select: { role: true } },
+      branch: { select: { id: true, name: true, location: true } },
     },
     orderBy: { firstName: "asc" },
   });
@@ -72,11 +74,14 @@ export async function POST(request: NextRequest) {
     address,
     jobTitle,
     departmentId,
+    branchId,
+    biometricPin,
     managerId,
     employmentType = "FULL_TIME",
     role = "EMPLOYEE",
     salary = 0,
     status = "ACTIVE",
+    hireDate,
   } = body;
 
   if (!firstName || !lastName || !email || !jobTitle || !departmentId) {
@@ -102,15 +107,20 @@ export async function POST(request: NextRequest) {
       address,
       jobTitle,
       departmentId,
+      branchId: branchId || null,
+      biometricPin: biometricPin || null,
       managerId,
       employmentType,
       role: resolvedRole,
       salary,
       status,
       companyId: session.companyId,
+      hireDate,
     });
 
     notifyEmployeeChange(employee.id, "created");
+
+    const startDate = parseLocalDate(hireDate) ?? employee.hireDate;
 
     let checklistStarted = false;
     try {
@@ -118,6 +128,7 @@ export async function POST(request: NextRequest) {
       const result = await startEmployeeOnboarding({
         employeeId: employee.id,
         companyId: session.companyId ?? null,
+        startDate,
       });
       checklistStarted = result.created;
     } catch {

@@ -36,7 +36,7 @@ export function EmployeePayrollModule({
 
   return (
     <div>
-      <EmployeeTimeNav employeeId={employeeId} active="payroll" />
+      <EmployeeTimeNav employeeId={employeeId} active="payroll" showPayrollTab showTimeTabs />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Base salary" value={formatCurrency(baseSalary)} icon={Wallet} />

@@ -30,6 +30,8 @@ export function EmployeeAttendanceModule({
   records,
   todayRecord,
   showCheckIn,
+  canManageManual = false,
+  showPayrollTab = false,
   stats,
 }: {
   employeeId: string;
@@ -44,12 +46,14 @@ export function EmployeeAttendanceModule({
     deviceName?: string | null;
   } | null;
   showCheckIn: boolean;
+  canManageManual?: boolean;
+  showPayrollTab?: boolean;
   stats: { present: number; late: number; absent: number; total: number };
 }) {
   useAttendanceLive();
   return (
     <div>
-      <EmployeeTimeNav employeeId={employeeId} active="attendance" />
+      <EmployeeTimeNav employeeId={employeeId} active="attendance" showPayrollTab={showPayrollTab} />
 
       {showCheckIn && (
         <div className="mb-6">

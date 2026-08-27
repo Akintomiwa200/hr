@@ -6,6 +6,8 @@ import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
 import { getCompanyScope, requireOrgCompanyId } from "@/lib/company-scope";
 import { canManageChecklists } from "@/lib/checklist/access";
 import { findOrCreateChecklistInstance } from "@/lib/checklist/instantiate";
+import { parseDocumentNames } from "@/lib/checklist/documents";
+import { hydrateChecklistTasks, setTaskRequiredDocumentsById } from "@/lib/checklist/document-store";
 
 export async function GET(request: NextRequest) {
   const session = await requireSession();
@@ -39,7 +41,11 @@ export async function GET(request: NextRequest) {
     where: {
       ...statusFilter,
       ...(priority && priority !== "ALL" ? { priority } : {}),
-      ...(assigneeId && assigneeId !== "ALL" ? { assigneeId } : {}),
+      ...(assigneeId === "UNASSIGNED"
+        ? { assigneeId: null }
+        : assigneeId && assigneeId !== "ALL"
+          ? { assigneeId }
+          : {}),
       ...(search
         ? {
             OR: [
@@ -48,7 +54,14 @@ export async function GET(request: NextRequest) {
             ],
           }
         : {}),
-      ...(!isAdmin && session.employeeId ? { assigneeId: session.employeeId } : {}),
+      ...(!isAdmin && session.employeeId
+        ? {
+            OR: [
+              { assigneeId: session.employeeId },
+              { instance: { employeeId: session.employeeId } },
+            ],
+          }
+        : {}),
       ...(Object.keys(instanceWhere).length ? { instance: instanceWhere } : {}),
     },
     include: {
@@ -63,7 +76,7 @@ export async function GET(request: NextRequest) {
     orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }],
   });
 
-  return NextResponse.json(tasks);
+  return NextResponse.json(await hydrateChecklistTasks(tasks));
 }
 
 export async function POST(request: NextRequest) {
@@ -81,6 +94,7 @@ export async function POST(request: NextRequest) {
     dueDate,
     taskType,
     priority,
+    requiredDocuments,
   } = body;
 
   if (!title?.trim()) return badRequest("title is required");
@@ -100,14 +114,17 @@ export async function POST(request: NextRequest) {
     resolvedInstanceId = instance.id;
   }
 
+  const docs = parseDocumentNames(requiredDocuments);
+
   const task = await prisma.checklistTask.create({
     data: {
       instanceId: resolvedInstanceId,
       title: title.trim(),
       description: description?.trim() || null,
       assigneeId: assigneeId || null,
+      assigneeType: assigneeId ? "SPECIFIC" : "ANYONE",
       dueDate: dueDate ? new Date(dueDate) : null,
-      taskType: taskType || "CHECKBOX",
+      taskType: docs.length ? "DOCUMENT" : taskType || "CHECKBOX",
       priority: priority || "MEDIUM",
       status: "PENDING",
     },
@@ -117,8 +134,12 @@ export async function POST(request: NextRequest) {
       _count: { select: { comments: true } },
     },
   });
+  if (docs.length) {
+    await setTaskRequiredDocumentsById(task.id, docs, "DOCUMENT");
+  }
 
+  const [hydrated] = await hydrateChecklistTasks([task]);
   broadcastAppEvent("checklist_updated", { id: task.id, action: "task_created" });
   revalidatePath("/checklist/todos");
-  return NextResponse.json(task);
+  return NextResponse.json(hydrated);
 }

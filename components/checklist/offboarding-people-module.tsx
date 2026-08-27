@@ -9,6 +9,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
+import { todayInputValue } from "@/lib/dates";
 
 type EmployeeOption = {
   id: string;
@@ -24,6 +25,7 @@ type ProgressRow = {
   id: string;
   status: string;
   startDate: string;
+  endDate?: string | null;
   employee: {
     id: string;
     firstName: string;
@@ -48,15 +50,19 @@ export function OffboardingPeopleModule({
   const [listLoading, setListLoading] = useState(true);
   const [selected, setSelected] = useState<EmployeeOption | null>(null);
   const [deactivate, setDeactivate] = useState(true);
+  const [endDate, setEndDate] = useState(todayInputValue());
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async (silent = false) => {
-    if (!silent) setListLoading(true);
+    if (!silent && rows.length === 0) setListLoading(true);
     try {
       const res = await fetch("/api/checklist/instances?type=OFFBOARDING", {
         cache: "no-store",
       });
       if (res.ok) setRows(await res.json());
+      else notify.error(await readApiError(res, "Failed to load offboarding list"));
+    } catch {
+      notify.error("Failed to load offboarding list");
     } finally {
       if (!silent) setListLoading(false);
     }
@@ -67,11 +73,9 @@ export function OffboardingPeopleModule({
   }, [load]);
 
   useAppEvents({
-    types: ["checklist_updated", "employee_updated", "dashboard_updated"],
-    pollIntervalMs: 2000,
+    types: ["checklist_updated", "employee_updated"],
     onEvent: () => {
       void load(true);
-      router.refresh();
     },
   });
 
@@ -100,12 +104,16 @@ export function OffboardingPeopleModule({
 
   const confirmOffboard = async () => {
     if (!selected) return;
+    if (!endDate) {
+      notify.error("Choose an end date");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`/api/employees/${selected.id}/offboard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deactivate }),
+        body: JSON.stringify({ deactivate, endDate }),
       });
       if (!res.ok) {
         notify.error(await readApiError(res, "Failed to start offboarding"));
@@ -183,6 +191,7 @@ export function OffboardingPeopleModule({
                     onClick={() => {
                       setSelected(emp);
                       setDeactivate(true);
+                      setEndDate(todayInputValue());
                     }}
                   >
                     <UserMinus className="w-3.5 h-3.5" />
@@ -220,7 +229,7 @@ export function OffboardingPeopleModule({
                       {row.employee.jobTitle}
                       {row.employee.department?.name ? ` · ${row.employee.department.name}` : ""}
                       {" · "}
-                      started {formatDate(row.startDate)}
+                      last day {formatDate(row.endDate || row.startDate)}
                     </p>
                   </div>
                   <div className="flex-1 min-w-[160px]">
@@ -262,6 +271,19 @@ export function OffboardingPeopleModule({
         }
       >
         <div className="space-y-4">
+          <div>
+            <label className="block text-[13px] font-medium text-gray-700 mb-1.5">
+              End date
+            </label>
+            <input
+              type="date"
+              required
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full px-4 py-3 text-[14px] border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+            />
+            <p className="text-xs text-gray-500 mt-1.5">Last working day for this person.</p>
+          </div>
           <label className="flex items-start gap-3 text-sm text-gray-700">
             <input
               type="checkbox"

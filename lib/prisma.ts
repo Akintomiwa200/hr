@@ -29,7 +29,8 @@ function isPrismaClientFresh(client: PrismaClient) {
     hasDelegate(client, "checklistTemplate", "findMany") &&
     hasDelegate(client, "checklistInstance", "findMany") &&
     hasDelegate(client, "checklistTask", "findMany") &&
-    hasDelegate(client, "checklistTaskComment", "create")
+    hasDelegate(client, "checklistTaskComment", "create") &&
+    hasDelegate(client, "branch", "findMany")
   );
 }
 
@@ -88,5 +89,17 @@ export function isChecklistModelsReady() {
     hasDelegate(client, "checklistInstance", "findMany") &&
     hasDelegate(client, "checklistTask", "findMany") &&
     hasDelegate(client, "checklistTaskComment", "create")
+  );
+}
+
+export function isChecklistTaskFileReady() {
+  return hasDelegate(getPrismaClient(), "checklistTaskFile", "findMany");
+}
+
+export function isPortalTemplateModelReady() {
+  const client = getPrismaClient();
+  return (
+    hasDelegate(client, "portalTemplate", "findMany") &&
+    hasDelegate(client, "portalDocument", "findMany")
   );
 }

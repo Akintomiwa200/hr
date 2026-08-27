@@ -7,43 +7,101 @@ import {
   markSyncing,
   markError,
   isConnected,
+  logSyncEvent,
 } from "@/lib/integrations/store";
 import { zohoApiFetch } from "@/lib/integrations/zoho/oauth";
+import {
+  fetchZohoPeopleCount,
+  fetchZohoPeopleFormRecords,
+  mapZohoPeopleDepartmentName,
+  mapZohoPeopleEmployee,
+} from "@/lib/integrations/zoho/people";
 import { broadcastEvent } from "@/lib/events";
 
 type SyncResult = { synced: number; summary: string };
 
+async function upsertDepartment(companyId: string | null, name: string) {
+  const existing = await prisma.department.findFirst({
+    where: { name, companyId },
+  });
+  if (existing) return existing;
+  return prisma.department.create({
+    data: {
+      name,
+      companyId,
+      description: "Imported from Zoho People",
+    },
+  });
+}
+
 async function syncZohoPeople(integration: IntegrationRecord): Promise<SyncResult> {
-  const data = (await zohoApiFetch(integration, "/people/api/forms/employee/getRecords")) as {
-    response?: { result?: Array<Record<string, string>> };
-  };
+  const fetchJson = (path: string) => zohoApiFetch(integration, path);
 
-  const records = data.response?.result ?? [];
-  let synced = 0;
+  const [employeeRows, departmentRows] = await Promise.all([
+    fetchZohoPeopleFormRecords(fetchJson, ["employee", "P_Employee"]),
+    fetchZohoPeopleFormRecords(fetchJson, ["department", "P_Department"]).catch(
+      () => [] as Record<string, unknown>[]
+    ),
+  ]);
 
-  for (const row of records.slice(0, 50)) {
-    const email = row.EmailID || row.Email;
-    if (!email) continue;
-
-    const firstName = row.FirstName || row.First_Name || "Employee";
-    const lastName = row.LastName || row.Last_Name || "";
-    const employeeCode = row.EmployeeID || row.Employee_ID || `ZP-${synced + 1}`;
-
-    const existing = await prisma.employee.findFirst({ where: { email } });
-    if (existing) {
-      await prisma.employee.update({
-        where: { id: existing.id },
-        data: {
-          firstName,
-          lastName,
-          jobTitle: row.Designation || existing.jobTitle,
-        },
-      });
-    }
-    synced++;
+  let departments = 0;
+  const departmentIds = new Map<string, string>();
+  for (const row of departmentRows) {
+    const name = mapZohoPeopleDepartmentName(row);
+    if (!name) continue;
+    const dept = await upsertDepartment(integration.companyId, name);
+    departmentIds.set(name.toLowerCase(), dept.id);
+    departments++;
   }
 
-  return { synced, summary: `Synced ${synced} employees from Zoho People` };
+  let employees = 0;
+  for (const row of employeeRows) {
+    const mapped = mapZohoPeopleEmployee(row);
+    if (!mapped) continue;
+
+    if (mapped.department && !departmentIds.has(mapped.department.toLowerCase())) {
+      const dept = await upsertDepartment(integration.companyId, mapped.department);
+      departmentIds.set(mapped.department.toLowerCase(), dept.id);
+      departments++;
+    }
+
+    const existing = await prisma.employee.findFirst({
+      where: { email: mapped.email },
+    });
+    if (!existing) {
+      employees++;
+      continue;
+    }
+
+    const departmentId = mapped.department
+      ? departmentIds.get(mapped.department.toLowerCase())
+      : undefined;
+
+    await prisma.employee.update({
+      where: { id: existing.id },
+      data: {
+        firstName: mapped.firstName,
+        lastName: mapped.lastName || existing.lastName,
+        jobTitle: mapped.jobTitle || existing.jobTitle,
+        phone: mapped.phone || existing.phone,
+        ...(departmentId ? { departmentId } : {}),
+      },
+    });
+    employees++;
+  }
+
+  const [leave, attendance] = await Promise.all([
+    fetchZohoPeopleCount(fetchJson, "/people/api/leave/getLeaveType"),
+    fetchZohoPeopleCount(
+      fetchJson,
+      `/people/api/attendance/getAttendanceEntries?date=${new Date().toISOString().slice(0, 10)}`
+    ),
+  ]);
+
+  return {
+    synced: employees + departments,
+    summary: `Zoho People: ${employees} employees, ${departments} departments, ${leave} leave types, ${attendance} attendance entries`,
+  };
 }
 
 async function syncZohoRecruit(integration: IntegrationRecord): Promise<SyncResult> {
@@ -188,6 +246,12 @@ export async function runIntegrationSync(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Sync failed";
     await markError(integration.id, message);
+    await logSyncEvent(integration.id, {
+      direction: "inbound",
+      eventType: "full_sync",
+      summary: message,
+      status: "error",
+    }).catch(() => undefined);
     throw error;
   }
 }

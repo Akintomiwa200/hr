@@ -4,6 +4,8 @@ import { broadcastEvent } from "@/lib/events";
 export type DeviceAuthContext = {
   deviceId: string | null;
   deviceName: string | null;
+  companyId: string | null;
+  branchId: string | null;
   source: "env" | "device" | null;
 };
 
@@ -25,6 +27,8 @@ export async function authenticateAttendanceDevice(
     return {
       deviceId: null,
       deviceName: "Check-in app (master key)",
+      companyId: null,
+      branchId: null,
       source: "env",
     };
   }
@@ -52,6 +56,8 @@ export async function authenticateAttendanceDevice(
   return {
     deviceId: device.id,
     deviceName: device.name,
+    companyId: device.companyId,
+    branchId: device.branchId,
     source: "device",
   };
 }

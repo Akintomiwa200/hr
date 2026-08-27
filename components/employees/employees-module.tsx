@@ -24,6 +24,7 @@ import type {
   EmployeeFormData,
   EmployeeRow,
   ManagerOption,
+  BranchOption,
 } from "./types";
 import { employmentLabel, employmentVariant, resolveEmploymentType } from "@/lib/employment";
 import { notify, readApiError } from "@/lib/toast";
@@ -62,8 +63,12 @@ function StatusPill({ label, variant }: { label: string; variant: "fulltime" | "
 export function EmployeesModule({
   employees: initialEmployees,
   departments,
+  branches = [],
   managers,
   canManage,
+  canExport = canManage,
+  canViewSalary = canManage,
+  canViewTimeTabs = true,
   allowedRoles = ORG_ROLES,
   title = "Employees",
   description = "Manage your organization's workforce",
@@ -71,8 +76,12 @@ export function EmployeesModule({
 }: {
   employees: EmployeeRow[];
   departments: DepartmentOption[];
+  branches?: BranchOption[];
   managers: ManagerOption[];
   canManage: boolean;
+  canExport?: boolean;
+  canViewSalary?: boolean;
+  canViewTimeTabs?: boolean;
   allowedRoles?: Role[];
   title?: string;
   description?: string;
@@ -108,7 +117,6 @@ export function EmployeesModule({
 
   useAppEvents({
     types: ["employee_updated", "department_updated", "checklist_updated"],
-    pollIntervalMs: 4000,
     onEvent: () => {
       void refreshList();
     },
@@ -199,7 +207,6 @@ export function EmployeesModule({
       const data = await res.json();
       setEmployees(data);
     }
-    router.refresh();
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -448,6 +455,7 @@ export function EmployeesModule({
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
             </select>
+            {canExport && (
             <button
               type="button"
               onClick={() => window.open("/api/dashboard/export?type=employees", "_blank")}
@@ -456,6 +464,7 @@ export function EmployeesModule({
               <Download className="w-3.5 h-3.5" />
               Export
             </button>
+            )}
           </div>
         </div>
 
@@ -524,6 +533,9 @@ export function EmployeesModule({
                       <span className="inline-block px-2.5 py-1 text-[11px] text-gray-600 bg-gray-100 rounded-md">
                         {emp.department.name}
                       </span>
+                      {emp.branch?.name && (
+                        <p className="text-[10px] text-gray-400 mt-1">{emp.branch.name}</p>
+                      )}
                     </td>
                     <td className="px-3 py-3.5">
                       <div className="flex flex-col gap-1">
@@ -653,8 +665,13 @@ export function EmployeesModule({
                 ["Email", viewEmployee.email],
                 ["Phone", viewEmployee.phone || "—"],
                 ["Role", (viewEmployee.user?.role ?? "EMPLOYEE").toLowerCase()],
-                ["Hire date", formatDate(viewEmployee.hireDate)],
-                ["Salary", formatCurrency(viewEmployee.salary)],
+                ["Start date", formatDate(viewEmployee.hireDate)],
+                ...(viewEmployee.endDate
+                  ? ([["End date", formatDate(viewEmployee.endDate)]] as const)
+                  : []),
+                ...(canViewSalary
+                  ? ([["Salary", formatCurrency(viewEmployee.salary)]] as const)
+                  : []),
                 ["Address", viewEmployee.address || "—"],
               ].map(([label, value]) => (
                 <div key={label}>
@@ -670,24 +687,30 @@ export function EmployeesModule({
               >
                 Full profile
               </Link>
-              <Link
-                href={`/employees/${viewEmployee.id}/attendance`}
-                className="px-4 py-2 text-[13px] border border-gray-200 rounded-xl hover:bg-gray-50"
-              >
-                Attendance
-              </Link>
-              <Link
-                href={`/employees/${viewEmployee.id}/leave`}
-                className="px-4 py-2 text-[13px] border border-gray-200 rounded-xl hover:bg-gray-50"
-              >
-                Leave
-              </Link>
-              <Link
-                href={`/employees/${viewEmployee.id}/payroll`}
-                className="px-4 py-2 text-[13px] border border-gray-200 rounded-xl hover:bg-gray-50"
-              >
-                Payroll
-              </Link>
+              {canViewTimeTabs && (
+                <>
+                  <Link
+                    href={`/employees/${viewEmployee.id}/attendance`}
+                    className="px-4 py-2 text-[13px] border border-gray-200 rounded-xl hover:bg-gray-50"
+                  >
+                    Attendance
+                  </Link>
+                  <Link
+                    href={`/employees/${viewEmployee.id}/leave`}
+                    className="px-4 py-2 text-[13px] border border-gray-200 rounded-xl hover:bg-gray-50"
+                  >
+                    Leave
+                  </Link>
+                </>
+              )}
+              {canViewSalary && (
+                <Link
+                  href={`/employees/${viewEmployee.id}/payroll`}
+                  className="px-4 py-2 text-[13px] border border-gray-200 rounded-xl hover:bg-gray-50"
+                >
+                  Payroll
+                </Link>
+              )}
             </div>
           </div>
         )}
@@ -711,6 +734,7 @@ export function EmployeesModule({
             data={formData}
             onChange={setFormData}
             departments={departments}
+            branches={branches}
             managers={managers}
             allowedRoles={allowedRoles}
           />
@@ -750,6 +774,7 @@ export function EmployeesModule({
             data={formData}
             onChange={setFormData}
             departments={departments}
+            branches={branches}
             managers={managers}
             isEdit
             allowedRoles={allowedRoles}

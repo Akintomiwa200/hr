@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getSession } from "@/lib/auth";
-import { canManageDevices } from "@/lib/roles";
+import { canManageDevices, canManageEmployees } from "@/lib/roles";
 import { getAppUrlFromHeaders } from "@/lib/app-url";
 import { prisma } from "@/lib/prisma";
 import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
@@ -32,6 +32,7 @@ export default async function AttendancePage() {
       : { employee: scopedEmployee };
 
   const showDevicePanel = canManageDevices(session.role) && workspace.mode === "org";
+  const canManageManual = canManageEmployees(session.role) && workspace.mode === "org";
   const appUrl = getAppUrlFromHeaders(await headers());
 
   const [records, todayRecord, presentTodayCount] = await Promise.all([
@@ -79,6 +80,7 @@ export default async function AttendancePage() {
         showDevicePanel={showDevicePanel}
         showCheckIn={Boolean(session.employeeId) && workspace.canActForSelf}
         currentEmployeeId={session.employeeId}
+        canManageManual={canManageManual}
       />
     </div>
   );

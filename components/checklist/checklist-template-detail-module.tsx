@@ -14,8 +14,10 @@ type TemplateTask = {
   title: string;
   description: string | null;
   assigneeType: string;
+  taskType?: string;
   dueDaysOffset: number | null;
   sortOrder: number;
+  requiredDocuments?: unknown;
 };
 
 type TemplateDetail = {
@@ -28,6 +30,7 @@ type TemplateDetail = {
 };
 
 const ASSIGNEE_OPTIONS = [
+  { value: "ANYONE", label: "Anyone (unassigned)" },
   { value: "EMPLOYEE", label: "New hire / employee" },
   { value: "LINE_MANAGER", label: "Line manager" },
   { value: "HR", label: "HR" },
@@ -51,8 +54,9 @@ export function ChecklistTemplateDetailModule({
   const [form, setForm] = useState({
     title: "",
     description: "",
-    assigneeType: "EMPLOYEE",
+    assigneeType: "ANYONE",
     dueDaysOffset: "3",
+    requiredDocuments: "",
   });
 
   const load = useCallback(async () => {
@@ -71,11 +75,9 @@ export function ChecklistTemplateDetailModule({
   }, [load]);
 
   useAppEvents({
-    types: ["checklist_updated", "dashboard_updated"],
-    pollIntervalMs: 5000,
+    types: ["checklist_updated"],
     onEvent: () => {
       void load();
-      router.refresh();
     },
   });
 
@@ -137,6 +139,7 @@ export function ChecklistTemplateDetailModule({
           assigneeType: form.assigneeType,
           dueDaysOffset: form.dueDaysOffset === "" ? null : Number(form.dueDaysOffset),
           sortOrder: template?.tasks.length ?? 0,
+          requiredDocuments: form.requiredDocuments,
         }),
       });
       if (!res.ok) {
@@ -145,7 +148,13 @@ export function ChecklistTemplateDetailModule({
       }
       notify.success("Task added — it will apply to future onboarding/offboarding");
       setTaskOpen(false);
-      setForm({ title: "", description: "", assigneeType: "EMPLOYEE", dueDaysOffset: "3" });
+      setForm({
+        title: "",
+        description: "",
+        assigneeType: "ANYONE",
+        dueDaysOffset: "3",
+        requiredDocuments: "",
+      });
       await load();
     } finally {
       setSaving(false);
@@ -284,6 +293,11 @@ export function ChecklistTemplateDetailModule({
                     {task.description && (
                       <p className="text-xs text-gray-500 mt-0.5">{task.description}</p>
                     )}
+                    {Array.isArray(task.requiredDocuments) && task.requiredDocuments.length > 0 && (
+                      <p className="text-[11px] text-brand-600 mt-1">
+                        Documents: {task.requiredDocuments.join(", ")}
+                      </p>
+                    )}
                   </td>
                   <td className="px-5 py-4 text-gray-600">
                     {ASSIGNEE_OPTIONS.find((o) => o.value === task.assigneeType)?.label ??
@@ -342,6 +356,13 @@ export function ChecklistTemplateDetailModule({
             placeholder="Due days from start (negative = before start)"
             value={form.dueDaysOffset}
             onChange={(e) => setForm({ ...form, dueDaysOffset: e.target.value })}
+          />
+          <textarea
+            className="w-full px-4 py-3 border rounded-xl text-sm"
+            rows={3}
+            placeholder="Required documents (optional, one per line)"
+            value={form.requiredDocuments}
+            onChange={(e) => setForm({ ...form, requiredDocuments: e.target.value })}
           />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setTaskOpen(false)}>

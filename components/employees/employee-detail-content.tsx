@@ -31,6 +31,7 @@ import type {
 
 type EmployeeDetail = Employee & {
   department: Department;
+  branch?: { id: string; name: string; location: string } | null;
   manager: Employee | null;
   directReports: Employee[];
   leaveRequests: LeaveRequest[];
@@ -140,6 +141,7 @@ export function EmployeeDetailContent({
               </h1>
               <p className="text-[14px] text-gray-500 mt-0.5">
                 {employee.jobTitle} · {employee.department.name}
+                {employee.branch?.name ? ` · ${employee.branch.name}` : ""}
               </p>
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <StatusPill
@@ -226,6 +228,16 @@ export function EmployeeDetailContent({
           <InfoRow icon={Mail} label="Email" value={employee.email} />
           <InfoRow icon={Phone} label="Phone" value={employee.phone || "—"} />
           <InfoRow icon={Briefcase} label="Department" value={employee.department.name} />
+          {employee.branch && (
+            <InfoRow
+              icon={MapPin}
+              label="Branch"
+              value={`${employee.branch.name} · ${employee.branch.location}`}
+            />
+          )}
+          {employee.biometricPin && (
+            <InfoRow icon={Clock} label="ZKTeco PIN" value={employee.biometricPin} />
+          )}
           <InfoRow
             icon={Users}
             label="Manager"
@@ -235,7 +247,14 @@ export function EmployeeDetailContent({
                 : "—"
             }
           />
-          <InfoRow icon={CalendarDays} label="Hire Date" value={formatDate(employee.hireDate)} />
+          <InfoRow icon={CalendarDays} label="Start Date" value={formatDate(employee.hireDate)} />
+          {(employee as { endDate?: Date | string | null }).endDate ? (
+            <InfoRow
+              icon={CalendarDays}
+              label="End Date"
+              value={formatDate((employee as { endDate?: Date | string | null }).endDate!)}
+            />
+          ) : null}
           {employee.address && (
             <InfoRow icon={MapPin} label="Address" value={employee.address} />
           )}

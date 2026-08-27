@@ -10,13 +10,37 @@ import {
   normalizeRole,
 } from "@/lib/roles";
 
-export async function canManageEmployee(
-  session: SessionUser,
-  _employeeId?: string
+export async function employeeBelongsToCompany(
+  employeeId: string,
+  companyId: string | null
 ): Promise<boolean> {
-  return canManageEmployees(session.role);
+  if (!companyId) return true;
+  const emp = await prisma.employee.findFirst({
+    where: { id: employeeId, user: { companyId } },
+    select: { id: true },
+  });
+  return !!emp;
 }
 
+export async function assertEmployeeInCompany(
+  session: SessionUser,
+  employeeId: string
+): Promise<boolean> {
+  if (isSuperAdmin(session.role) && !session.companyId) return true;
+  if (!session.companyId) return false;
+  return employeeBelongsToCompany(employeeId, session.companyId);
+}
+
+export async function canManageEmployee(
+  session: SessionUser,
+  employeeId?: string
+): Promise<boolean> {
+  if (!canManageEmployees(session.role)) return false;
+  if (!employeeId) return true;
+  return assertEmployeeInCompany(session, employeeId);
+}
+
+/** Basic profile — org directory peers can open colleague profiles (employees only). */
 export async function canViewEmployee(
   session: SessionUser,
   employeeId: string
@@ -25,8 +49,22 @@ export async function canViewEmployee(
   if (isSuperAdmin(role) || isCompanyAdmin(role) || isHrRole(role)) return true;
   if (session.employeeId === employeeId) return true;
 
-  // Same-company colleagues can open profiles (needed for full org chart links).
-  if (session.companyId) {
+  if (session.companyId && !(await assertEmployeeInCompany(session, employeeId))) {
+    return false;
+  }
+
+  if (isTeamLeadRole(role) && session.employeeId) {
+    const report = await prisma.employee.findFirst({
+      where: {
+        id: employeeId,
+        OR: [{ id: session.employeeId }, { managerId: session.employeeId }],
+      },
+      select: { id: true },
+    });
+    return !!report;
+  }
+
+  if (session.companyId && role === "EMPLOYEE") {
     const peer = await prisma.employee.findFirst({
       where: {
         id: employeeId,
@@ -34,12 +72,23 @@ export async function canViewEmployee(
       },
       select: { id: true },
     });
-    if (peer) return true;
+    return !!peer;
   }
 
+  return false;
+}
+
+/** Attendance / leave history — self, HR/admin, or direct manager chain only. */
+export async function canViewEmployeeTimeData(
+  session: SessionUser,
+  employeeId: string
+): Promise<boolean> {
+  const role = normalizeRole(session.role);
+  if (isSuperAdmin(role) || isCompanyAdmin(role) || isHrRole(role)) return true;
+  if (session.employeeId === employeeId) return true;
+  if (!(await assertEmployeeInCompany(session, employeeId))) return false;
   if (!session.employeeId) return false;
 
-  // Managers/supervisors can open profiles for themselves and direct reports only.
   if (isTeamLeadRole(role)) {
     const report = await prisma.employee.findFirst({
       where: {
@@ -54,7 +103,26 @@ export async function canViewEmployee(
   return false;
 }
 
-/** Team leaders only see themselves + direct reports; HR/admin see all (caller still applies company scope). */
+export async function canApproveEmployeeLeave(
+  session: SessionUser,
+  employeeId: string
+): Promise<boolean> {
+  const role = normalizeRole(session.role);
+  if (isSuperAdmin(role) || isCompanyAdmin(role) || isHrRole(role)) return true;
+  if (!session.employeeId) return false;
+  if (!(await assertEmployeeInCompany(session, employeeId))) return false;
+
+  if (isTeamLeadRole(role)) {
+    const report = await prisma.employee.findFirst({
+      where: { id: employeeId, managerId: session.employeeId },
+      select: { id: true },
+    });
+    return !!report;
+  }
+
+  return false;
+}
+
 export function teamScopedEmployeeWhere(
   session: SessionUser
 ): Prisma.EmployeeWhereInput | undefined {
@@ -65,12 +133,6 @@ export function teamScopedEmployeeWhere(
   };
 }
 
-/**
- * Employees directory scope.
- * Admin/HR: whole company.
- * Manager/Supervisor: only people who report to them (plus themselves).
- * Employee: whole company (read-only directory — matches org chart / peer profiles).
- */
 export async function peopleDirectoryEmployeeWhere(
   session: SessionUser
 ): Promise<Prisma.EmployeeWhereInput | undefined> {
@@ -100,4 +162,18 @@ export async function getEmployeeOrNull(id: string) {
     where: { id },
     include: { department: true },
   });
+}
+
+export async function employeeIdsInCompanyScope(
+  session: SessionUser,
+  ids: string[]
+): Promise<string[]> {
+  if (ids.length === 0) return [];
+  if (isSuperAdmin(session.role) && !session.companyId) return ids;
+  if (!session.companyId) return [];
+  const rows = await prisma.employee.findMany({
+    where: { id: { in: ids }, user: { companyId: session.companyId } },
+    select: { id: true },
+  });
+  return rows.map((row) => row.id);
 }

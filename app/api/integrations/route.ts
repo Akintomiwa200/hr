@@ -4,8 +4,9 @@ import { requireRoles, unauthorized } from "@/lib/api-auth";
 import { INTEGRATION_CATALOG } from "@/lib/integrations/catalog";
 import { listIntegrations, isConnected } from "@/lib/integrations/store";
 import { providerToSlug } from "@/lib/integrations/providers";
-import { isGoogleWorkspaceConfigured } from "@/lib/integrations/google/workspace";
+import { isGoogleWorkspaceConfigured, getGoogleRedirectUri } from "@/lib/integrations/google/workspace";
 import { isZohoConfigured } from "@/lib/integrations/zoho/oauth";
+import { getZohoRedirectUri } from "@/lib/integrations/oauth-env";
 import { INTEGRATION_ADMIN_ROLES } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 
@@ -56,6 +57,8 @@ export async function GET() {
   });
 
   return NextResponse.json({
+    googleRedirectUri: getGoogleRedirectUri(),
+    zohoRedirectUri: getZohoRedirectUri(),
     items,
     logs: recentLogs.map((log) => ({
       id: log.id,

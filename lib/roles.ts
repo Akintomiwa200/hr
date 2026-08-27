@@ -4,6 +4,7 @@ export const ALL_ROLES: Role[] = [
   "SUPER_ADMIN",
   "COMPANY_ADMIN",
   "HR",
+  "ACCOUNT_OFFICER",
   "MANAGER",
   "SUPERVISOR",
   "EMPLOYEE",
@@ -12,6 +13,7 @@ export const ALL_ROLES: Role[] = [
 export const ORG_ROLES: Role[] = [
   "COMPANY_ADMIN",
   "HR",
+  "ACCOUNT_OFFICER",
   "MANAGER",
   "SUPERVISOR",
   "EMPLOYEE",
@@ -58,6 +60,7 @@ export const LEAVE_APPROVER_ROLES: Role[] = [
 export const PAYROLL_VIEW_ROLES: Role[] = [
   "COMPANY_ADMIN",
   "HR",
+  "ACCOUNT_OFFICER",
   "MANAGER",
   "SUPERVISOR",
   "EMPLOYEE",
@@ -65,10 +68,16 @@ export const PAYROLL_VIEW_ROLES: Role[] = [
 
 export const PAYROLL_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
 
+/** Run bulk payroll, edit payslips, import adjustments. */
+export const PAYROLL_OPERATIONS_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "ACCOUNT_OFFICER"];
+
+/** Download payroll register as CSV / Excel / PDF. */
+export const PAYROLL_EXPORT_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "ACCOUNT_OFFICER"];
+
 /** Full recruitment module (jobs/candidates). */
 export const RECRUITMENT_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
 
-export const DEVICE_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
+export const DEVICE_ADMIN_ROLES: Role[] = ["SUPER_ADMIN", "COMPANY_ADMIN", "HR"];
 export const SUBSCRIPTION_ADMIN_ROLES: Role[] = ["SUPER_ADMIN", "COMPANY_ADMIN"];
 export const INTEGRATION_ADMIN_ROLES: Role[] = ["SUPER_ADMIN", "COMPANY_ADMIN", "HR"];
 
@@ -151,6 +160,18 @@ export function canManagePayroll(role: Role) {
   return hasRole(role, PAYROLL_ADMIN_ROLES);
 }
 
+export function canOperatePayroll(role: Role) {
+  return hasRole(role, PAYROLL_OPERATIONS_ROLES);
+}
+
+export function canExportPayroll(role: Role) {
+  return hasRole(role, PAYROLL_EXPORT_ROLES);
+}
+
+export function isAccountOfficerRole(role: Role) {
+  return normalizeRole(role) === "ACCOUNT_OFFICER";
+}
+
 export function canApproveLeave(role: Role) {
   return hasRole(role, LEAVE_APPROVER_ROLES);
 }
@@ -198,7 +219,7 @@ export function assignableRolesFor(actorRole: Role): Role[] {
   const role = normalizeRole(actorRole);
   if (role === "SUPER_ADMIN" || role === "COMPANY_ADMIN") return [...ORG_ROLES];
   if (role === "HR") {
-    return ["HR", "MANAGER", "SUPERVISOR", "EMPLOYEE"];
+    return ["HR", "ACCOUNT_OFFICER", "MANAGER", "SUPERVISOR", "EMPLOYEE"];
   }
   if (role === "MANAGER") {
     return ["EMPLOYEE", "SUPERVISOR"];
@@ -215,6 +236,7 @@ export function roleLabel(role: Role): string {
     SUPER_ADMIN: "Super Admin",
     COMPANY_ADMIN: "Company Admin",
     HR: "HR",
+    ACCOUNT_OFFICER: "Account Officer",
     MANAGER: "Manager",
     SUPERVISOR: "Supervisor",
     EMPLOYEE: "Employee",
@@ -227,6 +249,7 @@ export function roleWorkspaceLabel(role: Role): string {
     SUPER_ADMIN: "Platform",
     COMPANY_ADMIN: "Company Admin",
     HR: "HR workspace",
+    ACCOUNT_OFFICER: "Finance workspace",
     MANAGER: "Manager workspace",
     SUPERVISOR: "Supervisor workspace",
     EMPLOYEE: "Employee workspace",

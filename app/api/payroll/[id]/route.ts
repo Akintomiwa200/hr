@@ -8,7 +8,6 @@ import {
   requireSession,
   unauthorized,
 } from "@/lib/api-auth";
-import { canManagePayroll } from "@/lib/roles";
 import {
   canManagePayrollRecord,
   canViewPayrollRecord,
@@ -152,11 +151,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await requireSession();
-  if (!session || !canManagePayroll(session.role)) return unauthorized();
+  if (!session) return unauthorized();
 
   const { id } = await params;
   const existing = await prisma.payrollRecord.findUnique({ where: { id } });
   if (!existing) return notFound();
+
+  const canManage = await canManagePayrollRecord(session, existing);
+  if (!canManage) return forbidden();
 
   await prisma.payrollRecord.delete({ where: { id } });
   broadcastAppEvent("payroll_updated", { id });

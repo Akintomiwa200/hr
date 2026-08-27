@@ -55,6 +55,41 @@ export function PayrollSettingsPanel({
           <Card className="p-4 bg-violet-50/40 border-violet-100">
             <label className="flex items-center justify-between gap-3 cursor-pointer">
               <div>
+                <p className="text-sm font-semibold text-gray-900">Pro-rata salary</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Pay staff based on days they came to work instead of the full monthly amount.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={form.proRataSalaryEnabled}
+                onChange={(e) =>
+                  setForm({ ...form, proRataSalaryEnabled: e.target.checked })
+                }
+                className="w-5 h-5 accent-violet-600"
+              />
+            </label>
+          </Card>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase">
+              Working days per week
+            </label>
+            <select
+              className={`${inputClass} mt-1`}
+              value={form.workingDaysPerWeek}
+              onChange={(e) =>
+                setForm({ ...form, workingDaysPerWeek: Number(e.target.value) })
+              }
+            >
+              <option value={5}>5-day week (Mon–Fri)</option>
+              <option value={6}>6-day week (Mon–Sat)</option>
+            </select>
+          </div>
+
+          <Card className="p-4 bg-violet-50/40 border-violet-100">
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <div>
                 <p className="text-sm font-semibold text-gray-900">Holiday allowance</p>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Add a fixed holiday allowance to each payroll run when enabled.

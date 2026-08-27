@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { redirect } from "next/navigation";
 import { requireRoles, unauthorized } from "@/lib/api-auth";
-import { getAppUrlFromRequest } from "@/lib/app-url";
 import { slugToProvider, encodeOAuthState } from "@/lib/integrations/providers";
 import { getGoogleAuthUrl } from "@/lib/integrations/google/workspace";
 import { getZohoAuthUrl } from "@/lib/integrations/zoho/oauth";
@@ -18,18 +17,16 @@ export async function GET(
   const { session, error } = await requireRoles(INTEGRATION_ADMIN_ROLES);
   if (error || !session) return error ?? unauthorized();
 
-  const appUrl = getAppUrlFromRequest(request);
   const state = encodeOAuthState({
     userId: session.id,
     companyId: session.companyId ?? null,
+    provider,
   });
 
-  let url: string | null = null;
-  if (provider === "GOOGLE_WORKSPACE") {
-    url = getGoogleAuthUrl(state, appUrl);
-  } else {
-    url = getZohoAuthUrl(provider, state, appUrl);
-  }
+  const url =
+    provider === "GOOGLE_WORKSPACE"
+      ? getGoogleAuthUrl(state)
+      : getZohoAuthUrl(provider, state);
 
   if (!url) redirect(`/settings/integrations?error=not-configured&provider=${slug}`);
   redirect(url);

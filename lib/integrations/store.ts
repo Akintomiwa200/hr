@@ -113,7 +113,9 @@ export function parseMetadata(integration: IntegrationRecord | null): Record<str
 }
 
 export function isConnected(integration: IntegrationRecord | null) {
-  return integration?.status === "CONNECTED" && Boolean(integration.refreshToken);
+  if (!integration) return false;
+  if (integration.status === "DISCONNECTED") return false;
+  return Boolean(integration.refreshToken || integration.accessToken);
 }
 
 export async function markSyncing(integrationId: string) {
@@ -139,7 +141,7 @@ export async function markError(integrationId: string, message: string) {
     where: { id: integrationId },
     data: {
       status: "ERROR" as IntegrationStatus,
-      lastError: message,
+      lastError: message.slice(0, 500),
     },
   });
 }

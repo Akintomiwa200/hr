@@ -309,7 +309,10 @@ export async function getOffboardingReport(session: SessionUser, filters: Report
     department: inst.employee.department.name,
     jobTitle: inst.employee.jobTitle,
     resignationDate: inst.startDate.toISOString(),
-    lastWorkingDate: inst.endDate?.toISOString() ?? "—",
+    lastWorkingDate:
+      inst.endDate?.toISOString() ??
+      (inst.employee as { endDate?: Date | null }).endDate?.toISOString() ??
+      "—",
     status: inst.status,
   }));
   return { chart, rows };

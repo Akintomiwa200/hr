@@ -1,4 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import { listPendingPayrollDeductions } from "@/lib/payroll-deductions";
+import {
+  countDaysWorked,
+  countExpectedWorkingDays,
+  formatShortDates,
+  proRatedBaseSalary,
+  roundMoney,
+} from "@/lib/payroll-working-days";
 import {
   defaultPayrollSettings,
   parseBreakdown,
@@ -17,6 +25,8 @@ function mapSettings(row: {
   absenceDeductionPerDay: number;
   damageDeductionEnabled: boolean;
   taxRatePercent: number;
+  workingDaysPerWeek?: number;
+  proRataSalaryEnabled?: boolean;
 }): PayrollSettingsData {
   return {
     holidayAllowanceEnabled: row.holidayAllowanceEnabled,
@@ -25,6 +35,8 @@ function mapSettings(row: {
     absenceDeductionPerDay: row.absenceDeductionPerDay,
     damageDeductionEnabled: row.damageDeductionEnabled,
     taxRatePercent: row.taxRatePercent,
+    workingDaysPerWeek: row.workingDaysPerWeek === 6 ? 6 : 5,
+    proRataSalaryEnabled: row.proRataSalaryEnabled !== false,
   };
 }
 
@@ -99,41 +111,91 @@ export async function buildAutoPayrollBreakdown(input: {
   bonus?: number;
   settings?: PayrollSettingsData;
   manualItems?: PayrollLineItem[];
+  companyId?: string | null;
 }) {
+  const employee = await prisma.employee.findUnique({
+    where: { id: input.employeeId },
+    select: { user: { select: { companyId: true } } },
+  });
+  const companyId = input.companyId ?? employee?.user.companyId ?? null;
+
   let settings = input.settings;
   if (!settings) {
-    const employee = await prisma.employee.findUnique({
-      where: { id: input.employeeId },
-      select: { user: { select: { companyId: true } } },
-    });
-    settings = await getPayrollSettings(employee?.user.companyId);
+    settings = await getPayrollSettings(companyId);
   }
+
   const periodStart = new Date(input.periodStart);
   periodStart.setHours(0, 0, 0, 0);
   const periodEnd = new Date(input.periodEnd);
   periodEnd.setHours(23, 59, 59, 999);
 
-  const attendance = await prisma.attendance.findMany({
-    where: {
+  const [attendance, holidays, pendingDeductions] = await Promise.all([
+    prisma.attendance.findMany({
+      where: {
+        employeeId: input.employeeId,
+        date: { gte: periodStart, lte: periodEnd },
+      },
+      orderBy: { date: "asc" },
+    }),
+    prisma.holiday.findMany({
+      where: {
+        date: { gte: periodStart, lte: periodEnd },
+        ...(companyId ? { OR: [{ companyId }, { companyId: null }] } : {}),
+      },
+      select: { date: true },
+    }),
+    listPendingPayrollDeductions({
+      companyId,
       employeeId: input.employeeId,
-      date: { gte: periodStart, lte: periodEnd },
-    },
+      periodStart,
+    }),
+  ]);
+
+  const lateRows = attendance.filter((row) => row.status === "LATE");
+  const absentRows = attendance.filter((row) => row.status === "ABSENT");
+  const lateDays = lateRows.length;
+  const absentDays = absentRows.length;
+
+  const expectedWorkingDays = countExpectedWorkingDays({
+    periodStart,
+    periodEnd,
+    workingDaysPerWeek: settings.workingDaysPerWeek,
+    holidayDates: holidays.map((row) => row.date),
   });
+  const daysWorked = countDaysWorked(attendance);
 
-  const lateDays = attendance.filter((row) => row.status === "LATE").length;
-  const absentDays = attendance.filter((row) => row.status === "ABSENT").length;
+  const monthlyBase = input.baseSalary;
+  const earnedBase = settings.proRataSalaryEnabled
+    ? proRatedBaseSalary({
+        monthlyBase,
+        daysWorked,
+        expectedWorkingDays,
+      })
+    : monthlyBase;
 
-  const items: PayrollLineItem[] = [
-    {
+  const items: PayrollLineItem[] = [];
+
+  if (settings.proRataSalaryEnabled) {
+    items.push({
+      id: lineId("base"),
+      type: "EARNING",
+      category: "BASE_SALARY",
+      label: `Base salary (${daysWorked}/${expectedWorkingDays} days worked)`,
+      amount: earnedBase,
+      auto: true,
+      editable: true,
+    });
+  } else {
+    items.push({
       id: lineId("base"),
       type: "EARNING",
       category: "BASE_SALARY",
       label: "Base salary",
-      amount: input.baseSalary,
+      amount: monthlyBase,
       auto: false,
       editable: true,
-    },
-  ];
+    });
+  }
 
   const bonus = input.bonus ?? 0;
   if (bonus > 0) {
@@ -161,26 +223,40 @@ export async function buildAutoPayrollBreakdown(input: {
   }
 
   if (lateDays > 0) {
+    const lateDates = formatShortDates(lateRows.map((row) => row.date));
     items.push({
       id: lineId("late"),
       type: "DEDUCTION",
       category: "LATENESS",
-      label: `Lateness deduction (${lateDays} day${lateDays === 1 ? "" : "s"})`,
-      amount: lateDays * settings.latenessDeductionPerDay,
+      label: `Lateness deduction — ${lateDays} day${lateDays === 1 ? "" : "s"} @ ${settings.latenessDeductionPerDay}/day (${lateDates})`,
+      amount: roundMoney(lateDays * settings.latenessDeductionPerDay),
       auto: true,
       editable: true,
     });
   }
 
-  if (absentDays > 0) {
+  if (absentDays > 0 && !settings.proRataSalaryEnabled) {
+    const absentDates = formatShortDates(absentRows.map((row) => row.date));
     items.push({
       id: lineId("absence"),
       type: "DEDUCTION",
       category: "ABSENCE",
-      label: `Absence deduction (${absentDays} day${absentDays === 1 ? "" : "s"})`,
-      amount: absentDays * settings.absenceDeductionPerDay,
+      label: `Absence deduction — ${absentDays} day${absentDays === 1 ? "" : "s"} @ ${settings.absenceDeductionPerDay}/day (${absentDates})`,
+      amount: roundMoney(absentDays * settings.absenceDeductionPerDay),
       auto: true,
       editable: true,
+    });
+  }
+
+  for (const deduction of pendingDeductions) {
+    items.push({
+      id: `pending-${deduction.id}`,
+      type: "DEDUCTION",
+      category: "OTHER",
+      label: deduction.reason,
+      amount: roundMoney(deduction.amount),
+      auto: true,
+      editable: false,
     });
   }
 
@@ -195,7 +271,7 @@ export async function buildAutoPayrollBreakdown(input: {
       type: "DEDUCTION",
       category: "TAX",
       label: `Tax (${settings.taxRatePercent}%)`,
-      amount: Math.round(preTax.grossPay * (settings.taxRatePercent / 100) * 100) / 100,
+      amount: roundMoney(preTax.grossPay * (settings.taxRatePercent / 100)),
       auto: true,
       editable: true,
     });
@@ -204,7 +280,17 @@ export async function buildAutoPayrollBreakdown(input: {
   return {
     items,
     summary: summarizePayroll(items),
-    meta: { lateDays, absentDays },
+    meta: {
+      lateDays,
+      absentDays,
+      daysWorked,
+      expectedWorkingDays,
+      monthlyBase,
+      earnedBase,
+      workingDaysPerWeek: settings.workingDaysPerWeek,
+      proRataSalaryEnabled: settings.proRataSalaryEnabled,
+      pendingDeductionIds: pendingDeductions.map((row) => row.id),
+    },
   };
 }
 

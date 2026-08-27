@@ -40,6 +40,12 @@ type SearchResults = {
     date: string;
     type: string;
   }[];
+  letters?: {
+    id: string;
+    title: string;
+    kind: string;
+    category: string;
+  }[];
 };
 
 const inputClass =
@@ -81,7 +87,8 @@ export function SearchModule({ initialQuery = "" }: { initialQuery?: string }) {
     (results?.documents.length ?? 0) +
     (results?.jobs.length ?? 0) +
     (results?.announcements.length ?? 0) +
-    (results?.holidays.length ?? 0);
+    (results?.holidays.length ?? 0) +
+    (results?.letters?.length ?? 0);
 
   return (
     <div>
@@ -126,6 +133,28 @@ export function SearchModule({ initialQuery = "" }: { initialQuery?: string }) {
                     <p className="text-sm font-medium text-gray-900">{fullName(emp.firstName, emp.lastName)}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{emp.jobTitle} · {emp.department.name}</p>
                     <p className="text-xs text-gray-400 mt-1">{emp.email}</p>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {(results.letters?.length ?? 0) > 0 && (
+            <section>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-2">
+                <FileText className="w-4 h-4" /> Letters & forms
+              </h2>
+              <div className="space-y-2">
+                {results.letters!.map((letter) => (
+                  <Link
+                    key={letter.id}
+                    href={`/letters/${letter.id}`}
+                    className="block p-4 bg-white border border-gray-100 rounded-xl hover:border-violet-200 transition-all"
+                  >
+                    <p className="text-sm font-medium text-gray-900">{letter.title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {letter.kind === "FORM" ? "Form" : "Letter"} · {letter.category}
+                    </p>
                   </Link>
                 ))}
               </div>

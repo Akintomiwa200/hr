@@ -1,11 +1,17 @@
 import { redirect, notFound } from "next/navigation";
-import { getSession, canApproveLeave } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canViewEmployee, getEmployeeOrNull } from "@/lib/employee-access";
+import {
+  canApproveEmployeeLeave,
+  canViewEmployeeTimeData,
+  getEmployeeOrNull,
+} from "@/lib/employee-access";
+import { requirePeoplePage } from "@/lib/page-access";
 import { EmployeeSubpageHeader } from "@/components/employees/employee-subpage-header";
 import { EmployeeLeaveModule } from "@/components/leave/employee-leave-module";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 import { fullName } from "@/lib/utils";
+import { canViewEmployeePayroll } from "@/lib/payroll-access";
 
 export default async function EmployeeLeavePage({
   params,
@@ -13,24 +19,28 @@ export default async function EmployeeLeavePage({
   params: Promise<{ id: string }>;
 }) {
   const session = await getSession();
-  if (!session) redirect("/login");
+  requirePeoplePage(session);
 
   const { id } = await params;
   const employee = await getEmployeeOrNull(id);
   if (!employee) notFound();
 
-  const allowed = await canViewEmployee(session, id);
+  const allowed = await canViewEmployeeTimeData(session, id);
   if (!allowed) redirect("/employees");
 
-  const leaves = await prisma.leaveRequest.findMany({
-    where: { employeeId: id },
-    include: { approver: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const [leaves, showPayrollTab, canApprove] = await Promise.all([
+    prisma.leaveRequest.findMany({
+      where: { employeeId: id },
+      include: { approver: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    canViewEmployeePayroll(session, id),
+    canApproveEmployeeLeave(session, id),
+  ]);
 
   return (
     <div>
-      <PageLiveRefresh types={["leave_updated", "employee_updated"]} pollIntervalMs={4000} />
+      <PageLiveRefresh types={["leave_updated", "employee_updated"]} />
       <EmployeeSubpageHeader
         employee={employee}
         title="Leave"
@@ -41,7 +51,8 @@ export default async function EmployeeLeavePage({
         employeeName={fullName(employee.firstName, employee.lastName)}
         leaves={leaves}
         showRequestForm={session.employeeId === id}
-        canApprove={canApproveLeave(session.role)}
+        canApprove={canApprove}
+        showPayrollTab={showPayrollTab}
       />
     </div>
   );

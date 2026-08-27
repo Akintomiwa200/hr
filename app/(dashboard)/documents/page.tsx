@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { canManageOrgContent } from "@/lib/roles";
 import { isDocumentFolderModelReady, prisma } from "@/lib/prisma";
 import { getCompanyScope, folderCompanyWhere } from "@/lib/company-scope";
 import { canManageDocuments, canViewSharedResource, formatFileSize } from "@/lib/documents/access";
@@ -12,7 +11,6 @@ import { HelpLink } from "@/components/help/help-link";
 export default async function DocumentsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (!canManageOrgContent(session.role)) redirect("/dashboard");
 
   if (!isDocumentFolderModelReady()) {
     return (
@@ -25,6 +23,7 @@ export default async function DocumentsPage() {
       </div>
     );
   }
+
   const scope = getCompanyScope(session);
   const employee = session.employeeId
     ? await prisma.employee.findUnique({
@@ -69,7 +68,11 @@ export default async function DocumentsPage() {
     <div>
       <PageHeader
         title="Documents"
-        description="Company policies, contracts, and shared folders"
+        description={
+          isAdmin
+            ? "Company policies, contracts, and shared folders"
+            : "Shared company documents available to you"
+        }
         action={<HelpLink slug="documents" label="Documents guide" />}
       />
       <DocumentsModule folders={folders} canManage={isAdmin} departments={departments} />

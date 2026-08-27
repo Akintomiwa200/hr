@@ -23,6 +23,8 @@ import { Button, statusBadge } from "@/components/ui";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
 import { useCurrency, useFormatCurrency } from "@/components/providers/currency-provider";
+import { useAppEvents } from "@/hooks/use-app-events";
+import { scheduleRouterRefresh } from "@/hooks/use-soft-refresh";
 import type { PayrollLineItem } from "@/lib/payroll-types";
 import {
   categoryTag,
@@ -234,6 +236,10 @@ export function PayslipDetailModule({
   companyName?: string;
 }) {
   const router = useRouter();
+  useAppEvents({
+    types: ["payroll_updated"],
+    onEvent: () => scheduleRouterRefresh(() => router.refresh()),
+  });
   const formatCurrency = useFormatCurrency();
   const { currency } = useCurrency();
   const [editing, setEditing] = useState(false);

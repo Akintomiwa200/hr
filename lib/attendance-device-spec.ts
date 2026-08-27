@@ -17,6 +17,25 @@ export type AttendanceDeviceSpec = {
     health: { method: string; url: string; description: string };
     docs: { method: string; url: string; description: string };
   };
+  zkteco: {
+    protocol: string;
+    realtime: boolean;
+    cloudServer: {
+      host: string;
+      path: string;
+      portHint: string;
+      protocol: string;
+      origin: string;
+    };
+    endpoints: {
+      cdata: { method: string; url: string; description: string };
+      getrequest: { method: string; url: string; description: string };
+      ping: { method: string; url: string; description: string };
+      devicecmd: { method: string; url: string; description: string };
+    };
+    identifyBy: string;
+    setup: string[];
+  };
   punchRequest: {
     action: string[];
     identifyBy: string[];
@@ -33,19 +52,26 @@ export type AttendanceDeviceSpec = {
 };
 
 export function buildAttendanceDeviceSpec(appUrl: string): AttendanceDeviceSpec {
-  const base = appUrl.replace(/\/$/, "");
-  const punchUrl = `${base}/api/attendance/device`;
-  const syncUrl = `${base}/api/attendance/device/sync`;
+  const raw = (appUrl || "http://localhost:3000").replace(/\/$/, "");
+  const base = raw.includes("://") ? raw : `https://${raw}`;
+  let origin: URL;
+  try {
+    origin = new URL(base);
+  } catch {
+    origin = new URL("http://localhost:3000");
+  }
+  const punchUrl = `${origin.origin}/api/attendance/device`;
+  const syncUrl = `${origin.origin}/api/attendance/device/sync`;
 
   return {
-    version: "1.0",
+    version: "2.0",
     appUrl: base,
     realtime: {
       transport: "SSE",
       url: `${base}/api/events`,
       events: ["attendance_updated", "device_ping"],
       description:
-        "Dashboard and attendance pages refresh when devices punch. device_ping fires on each device health check.",
+        "ZKTeco terminals at every branch push punches over ADMS. Dashboards refresh live via SSE.",
     },
     authentication: {
       headers: ["X-Device-Key: <api-key>", "Authorization: Bearer <api-key>"],
@@ -55,7 +81,7 @@ export function buildAttendanceDeviceSpec(appUrl: string): AttendanceDeviceSpec 
       punch: {
         method: "POST",
         url: punchUrl,
-        description: "Record check-in, check-out, or auto-toggle for one employee",
+        description: "Optional REST punch for kiosk/mobile apps (not used by ZKTeco hardware)",
       },
       sync: {
         method: "POST",
@@ -72,6 +98,48 @@ export function buildAttendanceDeviceSpec(appUrl: string): AttendanceDeviceSpec 
         url: `${base}/api/attendance/device/docs`,
         description: "Full integration spec for HR admins (session auth)",
       },
+    },
+    zkteco: {
+      protocol: "ADMS / iclock",
+      realtime: true,
+      cloudServer: {
+        host: origin.hostname,
+        path: "/iclock",
+        portHint: origin.port || (origin.protocol === "https:" ? "443" : "80"),
+        protocol: origin.protocol.replace(":", "") || "https",
+        origin: origin.origin,
+      },
+      endpoints: {
+        cdata: {
+          method: "GET/POST",
+          url: `${base}/iclock/cdata`,
+          description: "Handshake and ATTLOG push from each branch terminal",
+        },
+        getrequest: {
+          method: "GET",
+          url: `${base}/iclock/getrequest`,
+          description: "Device polls for commands and keep-alive",
+        },
+        ping: {
+          method: "GET",
+          url: `${base}/iclock/ping`,
+          description: "Online heartbeat by serial number",
+        },
+        devicecmd: {
+          method: "POST",
+          url: `${base}/iclock/devicecmd`,
+          description: "Command acknowledgement from the terminal",
+        },
+      },
+      identifyBy:
+        "Device PIN maps to Employee biometric PIN (numeric), then employee code (EMP001 → 1)",
+      setup: [
+        "Create a branch for each office location with the local timezone",
+        "Register the ZKTeco terminal with its Serial Number and assign it to that branch",
+        "On the device: COMM → Cloud Server / ADMS → enable, set Server Address and Port",
+        "Enroll staff on the terminal using their biometric PIN from the employee profile",
+        "Punches appear on Attendance in real time, tagged with the branch device",
+      ],
     },
     punchRequest: {
       action: ["check_in", "check_out", "toggle"],

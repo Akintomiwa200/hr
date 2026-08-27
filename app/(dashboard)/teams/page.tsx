@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { requirePeoplePage } from "@/lib/page-access";
 import { getTeamsPageData } from "@/lib/teams-data";
 import { getCompanyScope } from "@/lib/company-scope";
 import { getTeamsWorkspace } from "@/lib/role-workspace";
@@ -10,7 +11,7 @@ import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function TeamsPage() {
   const session = await getSession();
-  if (!session) redirect("/login");
+  requirePeoplePage(session);
 
   const workspace = getTeamsWorkspace(session.role);
   const scope = getCompanyScope(session);
@@ -18,10 +19,7 @@ export default async function TeamsPage() {
 
   return (
     <div>
-      <PageLiveRefresh
-        types={["employee_updated", "department_updated", "job_updated"]}
-        pollIntervalMs={5000}
-      />
+      <PageLiveRefresh types={["employee_updated", "department_updated", "job_updated"]} />
       <PageHeader
         title={workspace.title}
         description={workspace.description}

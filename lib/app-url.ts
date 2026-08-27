@@ -8,7 +8,7 @@ function trimSlash(url: string) {
   return url.replace(/\/$/, "");
 }
 
-function isLocalHostName(hostname: string) {
+export function isLocalHostName(hostname: string) {
   const host = hostname.toLowerCase();
   return (
     host === "localhost" ||
@@ -18,7 +18,6 @@ function isLocalHostName(hostname: string) {
   );
 }
 
-/** True when URL is missing, invalid, or clearly a local/dummy value. */
 export function isDummyAppUrl(value?: string | null) {
   const raw = value?.trim();
   if (!raw) return true;

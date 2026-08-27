@@ -191,6 +191,15 @@ export function getPayrollWorkspace(role: Role): ModuleWorkspace {
       canActForTeam: true,
     };
   }
+  if (r === "ACCOUNT_OFFICER") {
+    return {
+      title: "Payroll register",
+      description: "Group payroll runs, export registers, import updates, and edit individual payslips",
+      mode: "org",
+      canActForSelf: false,
+      canActForTeam: false,
+    };
+  }
   return {
     title: "Payroll operations",
     description: "Run payroll, configure deductions, and manage payslips",

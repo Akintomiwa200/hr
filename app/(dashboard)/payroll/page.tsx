@@ -9,11 +9,13 @@ import {
   payrollListWhere,
 } from "@/lib/payroll-access";
 import { ensurePayrollSettings, getPayrollSettings } from "@/lib/payroll-engine";
-import { canManagePayroll } from "@/lib/roles";
+import {
+  canOperatePayroll,
+  canExportPayroll,
+} from "@/lib/roles";
 import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
 import { teamScopedEmployeeWhere } from "@/lib/employee-access";
 import { getPayrollWorkspace } from "@/lib/role-workspace";
-import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function PayrollPage() {
   const session = await getSession();
@@ -48,12 +50,13 @@ export default async function PayrollPage() {
   ]);
 
   const totalPayroll = records.reduce((sum, r) => sum + r.netPay, 0);
-  const canManage = canManagePayroll(session.role);
+  const canOperate = canOperatePayroll(session.role);
+  const canExport = canExportPayroll(session.role);
   const canManageSettings = canManagePayrollSettings(session);
+  const showGroupRuns = workspace.mode === "org" && canOperate;
 
   return (
     <div>
-      <PageLiveRefresh types={["payroll_updated", "employee_updated"]} pollIntervalMs={5000} />
       <PageHeader
         title={workspace.title}
         description={workspace.description}
@@ -68,9 +71,12 @@ export default async function PayrollPage() {
       <PayrollModule
         records={records}
         employees={employees}
-        canManage={canManage}
+        canOperate={canOperate}
         canManageSettings={canManageSettings}
+        canExport={canExport}
+        showGroupRuns={showGroupRuns}
         showEmployeeColumn={workspace.mode !== "self"}
+        workspaceMode={workspace.mode}
         settings={settings}
         stats={
           workspace.mode !== "self"

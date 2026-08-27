@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canViewEmployee } from "@/lib/employee-access";
+import { requirePeoplePage } from "@/lib/page-access";
 import { canViewEmployeePayroll } from "@/lib/payroll-access";
 import { EmployeeDetailContent } from "@/components/employees/employee-detail-content";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
@@ -12,7 +13,7 @@ export default async function EmployeeDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const session = await getSession();
-  if (!session) redirect("/login");
+  requirePeoplePage(session);
 
   const { id } = await params;
 
@@ -24,6 +25,7 @@ export default async function EmployeeDetailPage({
     where: { id },
     include: {
       department: true,
+      branch: true,
       manager: true,
       directReports: true,
       user: { select: { role: true } },
@@ -53,7 +55,6 @@ export default async function EmployeeDetailPage({
           "performance_updated",
           "checklist_updated",
         ]}
-        pollIntervalMs={4000}
       />
       <EmployeeDetailContent employee={employee} canViewSalary={canViewSalary} />
     </div>

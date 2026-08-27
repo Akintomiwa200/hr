@@ -7,7 +7,6 @@ import { getLeaveWorkspace } from "@/lib/role-workspace";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { LeaveModule } from "@/components/leave/leave-module";
-import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function LeavePage() {
   const session = await getSession();
@@ -38,7 +37,6 @@ export default async function LeavePage() {
 
   return (
     <div>
-      <PageLiveRefresh types={["leave_updated", "employee_updated"]} pollIntervalMs={4000} />
       <PageHeader
         title={workspace.title}
         description={workspace.description}

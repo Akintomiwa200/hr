@@ -7,6 +7,8 @@ import { Badge, Button, Card } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
+import { useAppEvents } from "@/hooks/use-app-events";
+import { scheduleRouterRefresh } from "@/hooks/use-soft-refresh";
 
 type Announcement = {
   id: string;
@@ -28,6 +30,10 @@ export function AnnouncementsModule({
   canManage: boolean;
 }) {
   const router = useRouter();
+  useAppEvents({
+    types: ["announcement_created"],
+    onEvent: () => scheduleRouterRefresh(() => router.refresh()),
+  });
   const [createOpen, setCreateOpen] = useState(false);
   const [editAnn, setEditAnn] = useState<Announcement | null>(null);
   const [deleteAnn, setDeleteAnn] = useState<Announcement | null>(null);

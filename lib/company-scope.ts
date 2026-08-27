@@ -54,12 +54,34 @@ export function deviceCompanyWhere(
   return { companyId: scope.companyId };
 }
 
+export function branchCompanyWhere(scope: CompanyScope): Prisma.BranchWhereInput {
+  if (scope.isPlatformAdmin && !scope.companyId) return {};
+  if (!scope.companyId) return { OR: [{ companyId: null }, { companyId: scope.companyId }] };
+  return { companyId: scope.companyId };
+}
+
 export function requireOrgCompanyId(scope: CompanyScope): string | null {
   if (scope.companyId) return scope.companyId;
   return null;
 }
 
 export function folderCompanyWhere(scope: CompanyScope): Prisma.DocumentFolderWhereInput {
+  if (scope.isPlatformAdmin && !scope.companyId) return {};
+  if (!scope.companyId) return { OR: [{ companyId: null }, { companyId: scope.companyId }] };
+  return { OR: [{ companyId: scope.companyId }, { companyId: null }] };
+}
+
+export function portalTemplateCompanyWhere(
+  scope: CompanyScope
+): Prisma.PortalTemplateWhereInput {
+  if (scope.isPlatformAdmin && !scope.companyId) return {};
+  if (!scope.companyId) return { OR: [{ companyId: null }, { companyId: scope.companyId }] };
+  return { OR: [{ companyId: scope.companyId }, { companyId: null }] };
+}
+
+export function portalDocumentCompanyWhere(
+  scope: CompanyScope
+): Prisma.PortalDocumentWhereInput {
   if (scope.isPlatformAdmin && !scope.companyId) return {};
   if (!scope.companyId) return { OR: [{ companyId: null }, { companyId: scope.companyId }] };
   return { OR: [{ companyId: scope.companyId }, { companyId: null }] };

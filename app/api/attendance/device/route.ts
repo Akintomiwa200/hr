@@ -10,7 +10,7 @@ import {
   resolveEmployeeId,
 } from "@/lib/attendance-service";
 import { buildAttendanceDeviceSpec, isDeviceOnline } from "@/lib/attendance-device-spec";
-import { getAppUrlFromRequest } from "@/lib/app-url";
+import { getReachableOriginFromRequest } from "@/lib/app-url-server";
 import { prisma } from "@/lib/prisma";
 
 type DeviceAction = "check_in" | "check_out" | "toggle";
@@ -20,6 +20,7 @@ type DeviceBody = {
   employeeId?: string;
   employeeCode?: string;
   email?: string;
+  pin?: string;
   timestamp?: string;
   externalId?: string;
   status?: "PRESENT" | "LATE" | "REMOTE" | "ABSENT" | "HALF_DAY";
@@ -53,6 +54,8 @@ export async function POST(request: NextRequest) {
     employeeId: body.employeeId,
     employeeCode: body.employeeCode,
     email: body.email,
+    pin: body.pin,
+    companyId: auth.companyId,
   });
 
   if (!employeeId) {
@@ -93,7 +96,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const appUrl = getAppUrlFromRequest(request);
+  const appUrl = getReachableOriginFromRequest(request).origin;
   const spec = buildAttendanceDeviceSpec(appUrl);
   const apiKey = getDeviceApiKeyFromRequest(request);
 
@@ -117,7 +120,10 @@ export async function GET(request: NextRequest) {
   }
 
   const devices = await prisma.attendanceDevice.findMany({
-    where: { isActive: true },
+    where: {
+      isActive: true,
+      ...(auth.companyId ? { companyId: auth.companyId } : {}),
+    },
     select: { id: true, name: true, location: true, lastSeenAt: true },
     orderBy: { name: "asc" },
   });

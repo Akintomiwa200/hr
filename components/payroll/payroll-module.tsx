@@ -7,6 +7,7 @@ import {
   Download,
   Eye,
   Filter,
+  Layers,
   Pencil,
   Plus,
   Search,
@@ -21,6 +22,8 @@ import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName, cn } from "@/lib/utils";
 import { useFormatCurrency } from "@/components/providers/currency-provider";
 import type { PayrollLineItem, PayrollSettingsData } from "@/lib/payroll-types";
+import { useAppEvents } from "@/hooks/use-app-events";
+import { scheduleRouterRefresh } from "@/hooks/use-soft-refresh";
 
 type PayrollRow = {
   id: string;
@@ -52,28 +55,48 @@ const STATUS_FILTERS = [
 export function PayrollModule({
   records,
   employees,
-  canManage,
+  canOperate,
   canManageSettings,
+  canExport,
+  showGroupRuns,
   showEmployeeColumn,
+  workspaceMode,
   stats,
   settings,
 }: {
   records: PayrollRow[];
   employees: EmployeeOption[];
-  canManage: boolean;
+  canOperate: boolean;
   canManageSettings: boolean;
+  canExport: boolean;
+  showGroupRuns: boolean;
   showEmployeeColumn: boolean;
+  workspaceMode: "self" | "team" | "org" | "admin" | "directory";
   stats?: { total: number; count: number; avg: number };
   settings?: PayrollSettingsData;
 }) {
   const router = useRouter();
   const formatCurrency = useFormatCurrency();
+
+  useAppEvents({
+    types: ["payroll_updated"],
+    onEvent: () => scheduleRouterRefresh(() => router.refresh()),
+  });
+
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteRecord, setDeleteRecord] = useState<PayrollRow | null>(null);
   const [preview, setPreview] = useState<{
     items: PayrollLineItem[];
     summary: { grossPay: number; deductions: number; netPay: number };
-    meta: { lateDays: number; absentDays: number };
+    meta: {
+      lateDays: number;
+      absentDays: number;
+      daysWorked?: number;
+      expectedWorkingDays?: number;
+      monthlyBase?: number;
+      proRataSalaryEnabled?: boolean;
+      workingDaysPerWeek?: number;
+    };
   } | null>(null);
   const [form, setForm] = useState({
     employeeId: employees[0]?.id ?? "",
@@ -225,7 +248,7 @@ export function PayrollModule({
           <div>
             <h2 className="text-base font-semibold text-gray-900">Payslips</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Auto deductions from attendance · edit breakdown per payslip
+              Pro-rata salary from attendance · lateness · manual deductions
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -246,7 +269,44 @@ export function PayrollModule({
               </div>
             )}
             {canManageSettings && settings && <PayrollSettingsPanel settings={settings} />}
-            {canManage && (
+            {showGroupRuns && (
+              <Link
+                href="/payroll/runs"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50"
+              >
+                <Layers className="w-4 h-4" />
+                Group runs
+              </Link>
+            )}
+            {canExport && showEmployeeColumn && (
+              <Button
+                variant="secondary"
+                onClick={() => window.open("/api/payroll/export?format=csv", "_blank")}
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </Button>
+            )}
+            {canOperate && canManageSettings && (
+              <Link
+                href="/payroll/deductions"
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50"
+              >
+                Deductions
+              </Link>
+            )}
+            {canOperate && workspaceMode === "org" && (
+              <Button
+                onClick={() => {
+                  setCreateOpen(true);
+                  setPreview(null);
+                }}
+              >
+                <Plus className="w-4 h-4" />
+                Process individual
+              </Button>
+            )}
+            {canOperate && workspaceMode !== "org" && (
               <Button
                 onClick={() => {
                   setCreateOpen(true);
@@ -332,7 +392,7 @@ export function PayrollModule({
                         <Download className="w-3.5 h-3.5" />
                         Download
                       </a>
-                      {canManage && (
+                      {canOperate && (
                         <>
                           <Link
                             href={`/payroll/${record.id}`}
@@ -484,9 +544,21 @@ export function PayrollModule({
                 <span>Net pay</span>
                 <span className="text-emerald-600">{formatCurrency(preview.summary.netPay)}</span>
               </div>
-              {(preview.meta.lateDays > 0 || preview.meta.absentDays > 0) && (
+              {(preview.meta.proRataSalaryEnabled ||
+                preview.meta.lateDays > 0 ||
+                preview.meta.absentDays > 0) && (
                 <p className="text-xs text-gray-500 mt-2">
-                  Based on {preview.meta.lateDays} late and {preview.meta.absentDays} absent day(s).
+                  {preview.meta.proRataSalaryEnabled &&
+                  preview.meta.daysWorked !== undefined &&
+                  preview.meta.expectedWorkingDays !== undefined
+                    ? `${preview.meta.daysWorked}/${preview.meta.expectedWorkingDays} working days (${preview.meta.workingDaysPerWeek ?? 5}-day week). `
+                    : ""}
+                  {preview.meta.lateDays > 0
+                    ? `${preview.meta.lateDays} late day(s). `
+                    : ""}
+                  {preview.meta.absentDays > 0
+                    ? `${preview.meta.absentDays} absent day(s).`
+                    : ""}
                 </p>
               )}
             </div>

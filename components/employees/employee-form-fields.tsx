@@ -1,9 +1,10 @@
 "use client";
 
-import type { EmployeeFormData, DepartmentOption, ManagerOption } from "./types";
+import type { EmployeeFormData, DepartmentOption, ManagerOption, BranchOption } from "./types";
 import type { Role } from "@prisma/client";
 import { ORG_ROLES, isCompanyAdmin, roleLabel } from "@/lib/roles";
 import { useCurrency } from "@/components/providers/currency-provider";
+import { toDateInputValue, todayInputValue } from "@/lib/dates";
 
 const inputClass =
   "w-full px-4 py-3 text-[14px] border border-gray-200 rounded-xl bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/30 focus:border-[#7B61FF] transition-shadow";
@@ -18,10 +19,14 @@ export function employeeToFormData(employee: {
   jobTitle: string;
   employmentType?: string | null;
   departmentId: string;
+  branchId?: string | null;
+  biometricPin?: string | null;
   managerId?: string | null;
   salary: number;
   status: string;
   address?: string | null;
+  hireDate?: Date | string | null;
+  endDate?: Date | string | null;
   user?: { role: Role } | null;
 }): EmployeeFormData {
   return {
@@ -31,6 +36,8 @@ export function employeeToFormData(employee: {
     phone: employee.phone ?? "",
     jobTitle: employee.jobTitle.replace(/\s*\(Freelance\)/i, "").trim(),
     departmentId: employee.departmentId,
+    branchId: employee.branchId ?? "",
+    biometricPin: employee.biometricPin ?? "",
     managerId: employee.managerId ?? "",
     employmentType:
       employee.employmentType === "FREELANCE" ? "FREELANCE" : "FULL_TIME",
@@ -38,6 +45,8 @@ export function employeeToFormData(employee: {
     salary: String(employee.salary),
     status: employee.status,
     address: employee.address ?? "",
+    hireDate: toDateInputValue(employee.hireDate) || todayInputValue(),
+    endDate: toDateInputValue(employee.endDate),
   };
 }
 
@@ -45,6 +54,7 @@ export function EmployeeFormFields({
   data,
   onChange,
   departments,
+  branches = [],
   managers,
   isEdit,
   allowedRoles = ORG_ROLES,
@@ -52,6 +62,7 @@ export function EmployeeFormFields({
   data: EmployeeFormData;
   onChange: (data: EmployeeFormData) => void;
   departments: DepartmentOption[];
+  branches?: BranchOption[];
   managers: ManagerOption[];
   isEdit?: boolean;
   allowedRoles?: Role[];
@@ -151,6 +162,37 @@ export function EmployeeFormFields({
         </div>
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className={labelClass}>Branch / location</label>
+          <select
+            value={data.branchId}
+            onChange={(e) => set("branchId", e.target.value)}
+            className={inputClass}
+          >
+            <option value="">Unassigned</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+                {b.location ? ` — ${b.location}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>ZKTeco PIN</label>
+          <input
+            value={data.biometricPin}
+            onChange={(e) => set("biometricPin", e.target.value)}
+            className={inputClass}
+            placeholder="Numeric PIN on the terminal"
+          />
+          <p className="mt-1 text-[11px] text-gray-400">
+            Must match the user ID on the branch device. Defaults from employee code (EMP001 → 1).
+          </p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
           <label className={labelClass}>Employment</label>
@@ -201,6 +243,33 @@ export function EmployeeFormFields({
         </div>
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className={labelClass}>Start date</label>
+          <input
+            type="date"
+            value={data.hireDate}
+            onChange={(e) => set("hireDate", e.target.value)}
+            required
+            className={inputClass}
+          />
+        </div>
+        {isEdit ? (
+          <div>
+            <label className={labelClass}>End date</label>
+            <input
+              type="date"
+              value={data.endDate}
+              onChange={(e) => set("endDate", e.target.value)}
+              className={inputClass}
+            />
+            <p className="mt-1 text-[11px] text-gray-400">
+              Last working day. Set automatically when offboarding starts.
+            </p>
+          </div>
+        ) : null}
+      </div>
+
       <div>
         <label className={labelClass}>Address</label>
         <input
@@ -223,10 +292,14 @@ export const emptyEmployeeForm = (
   phone: "",
   jobTitle: "",
   departmentId: departments[0]?.id ?? "",
+  branchId: "",
+  biometricPin: "",
   managerId: "",
   employmentType: "FULL_TIME",
   role: "EMPLOYEE",
   salary: "",
   status: "ACTIVE",
   address: "",
+  hireDate: todayInputValue(),
+  endDate: "",
 });

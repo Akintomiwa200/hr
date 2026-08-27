@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useAppEvents } from "@/hooks/use-app-events";
+import { scheduleRouterRefresh } from "@/hooks/use-soft-refresh";
 
 type DevicePingData = {
   deviceId?: string | null;
@@ -13,24 +14,26 @@ export function useDeviceLive(onDevicePing?: (data: DevicePingData) => void) {
   const router = useRouter();
 
   useAppEvents({
-    types: ["attendance_updated", "device_ping", "dashboard_updated"],
-    pollIntervalMs: 4000,
+    types: ["attendance_updated", "device_ping"],
     onEvent: (type) => {
       if (type === "device_ping") {
-        // payload details aren't threaded through; refresh covers device status
         onDevicePing?.({});
+        return;
       }
-      router.refresh();
+      if (type === "attendance_updated") {
+        scheduleRouterRefresh(() => router.refresh());
+      }
     },
   });
 }
 
 export function useAttendanceLive() {
   const router = useRouter();
-
   useAppEvents({
-    types: ["attendance_updated", "device_ping", "dashboard_updated", "leave_updated"],
-    pollIntervalMs: 3000,
-    onEvent: () => router.refresh(),
+    types: ["attendance_updated", "leave_updated"],
+    onEvent: (type) => {
+      if (!type) return;
+      scheduleRouterRefresh(() => router.refresh());
+    },
   });
 }

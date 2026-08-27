@@ -17,6 +17,7 @@ import {
   ensurePayrollSettings,
   summarizePayroll,
 } from "@/lib/payroll-engine";
+import { markDeductionsApplied } from "@/lib/payroll-deductions";
 import {
   type PayrollLineItem,
   serializeBreakdown,
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
   await ensurePayrollSettings(session.companyId);
 
   let items: PayrollLineItem[];
+  let pendingDeductionIds: string[] = [];
   if (Array.isArray(breakdown) && breakdown.length > 0) {
     items = breakdown;
   } else {
@@ -74,8 +76,10 @@ export async function POST(request: NextRequest) {
       baseSalary: Number(baseSalary),
       bonus: Number(bonus ?? 0),
       manualItems,
+      companyId: session.companyId,
     });
     items = result.items;
+    pendingDeductionIds = result.meta.pendingDeductionIds;
   }
 
   const summary = summarizePayroll(items);
@@ -97,6 +101,10 @@ export async function POST(request: NextRequest) {
     },
     include: { employee: { include: { user: true } } },
   });
+
+  if (pendingDeductionIds.length > 0) {
+    await markDeductionsApplied(pendingDeductionIds, record.id);
+  }
 
   if (status === "PAID" || status === "PROCESSED") {
     await createNotification({

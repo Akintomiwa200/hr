@@ -30,6 +30,7 @@ import {
   ListTodo,
   UserMinus,
   BarChart3,
+  PenLine,
 } from "lucide-react";
 import { CHECKLIST_ADMIN_ROLES, CHECKLIST_TEMPLATE_ROLES, CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
 import {
@@ -38,6 +39,8 @@ import {
   DASHBOARD_ROLES,
   INTEGRATION_ADMIN_ROLES,
   ORG_CHART_ROLES,
+  PAYROLL_ADMIN_ROLES,
+  PAYROLL_OPERATIONS_ROLES,
   PAYROLL_VIEW_ROLES,
   PEOPLE_ADMIN_ROLES,
   PEOPLE_VIEW_ROLES,
@@ -223,7 +226,7 @@ export const dashboardNavSections: NavSection[] = [
         id: "attendance-devices",
         href: "/attendance/devices",
         label: "Devices",
-        pageTitle: "Attendance Devices",
+        pageTitle: "Devices",
         icon: Router,
         roles: DEVICE_ADMIN_ROLES,
       },
@@ -234,6 +237,29 @@ export const dashboardNavSections: NavSection[] = [
         pageTitle: "Payroll",
         icon: Wallet,
         roles: PAYROLL_VIEW_ROLES,
+        match: (pathname) =>
+          pathname === "/payroll" ||
+          (pathname.startsWith("/payroll/") &&
+            !pathname.startsWith("/payroll/deductions") &&
+            !pathname.startsWith("/payroll/runs")),
+      },
+      {
+        id: "payroll-runs",
+        href: "/payroll/runs",
+        label: "Payroll runs",
+        pageTitle: "Payroll runs",
+        icon: Wallet,
+        roles: PAYROLL_OPERATIONS_ROLES,
+        match: (pathname) => pathname.startsWith("/payroll/runs"),
+      },
+      {
+        id: "payroll-deductions",
+        href: "/payroll/deductions",
+        label: "Deductions",
+        pageTitle: "Payroll Deductions",
+        icon: Wallet,
+        roles: PAYROLL_ADMIN_ROLES,
+        match: (pathname) => pathname.startsWith("/payroll/deductions"),
       },
     ],
   },
@@ -313,7 +339,16 @@ export const dashboardNavSections: NavSection[] = [
         label: "Documents",
         pageTitle: "Documents",
         icon: FileText,
+        roles: ALL_STAFF,
+      },
+      {
+        id: "letters",
+        href: "/letters",
+        label: "Letters & forms",
+        pageTitle: "Letters & forms",
+        icon: PenLine,
         roles: CONTENT_ADMIN_ROLES,
+        match: (pathname) => pathname === "/letters" || pathname.startsWith("/letters/"),
       },
       {
         id: "help",
@@ -421,6 +456,14 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
     title: "Employee Payroll",
   },
   {
+    test: (p) => p.startsWith("/payroll/runs"),
+    title: "Payroll runs",
+  },
+  {
+    test: (p) => p.startsWith("/payroll/deductions"),
+    title: "Payroll Deductions",
+  },
+  {
     test: (p) => /^\/employees\/[^/]+$/.test(p),
     title: "Employee Profile",
   },
@@ -489,12 +532,28 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
     title: "Help Guide",
   },
   {
+    test: (p) => p.startsWith("/letters/documents/"),
+    title: "Letter or form",
+  },
+  {
+    test: (p) => /^\/letters\/[^/]+$/.test(p),
+    title: "Edit letter or form",
+  },
+  {
+    test: (p) => p.startsWith("/letters"),
+    title: "Letters & forms",
+  },
+  {
     test: (p) => /^\/documents\/[^/]+$/.test(p),
     title: "Folder Documents",
   },
   {
     test: (p) => p.startsWith("/reports"),
     title: "Reports",
+  },
+  {
+    test: (p) => p.startsWith("/checklist/tasks/"),
+    title: "Task documents",
   },
   {
     test: (p) => p.startsWith("/checklist/onboarding"),

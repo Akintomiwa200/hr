@@ -28,6 +28,8 @@ export type PayrollSettingsData = {
   absenceDeductionPerDay: number;
   damageDeductionEnabled: boolean;
   taxRatePercent: number;
+  workingDaysPerWeek: number;
+  proRataSalaryEnabled: boolean;
 };
 
 export const defaultPayrollSettings: PayrollSettingsData = {
@@ -37,6 +39,8 @@ export const defaultPayrollSettings: PayrollSettingsData = {
   absenceDeductionPerDay: 100,
   damageDeductionEnabled: true,
   taxRatePercent: 10,
+  workingDaysPerWeek: 5,
+  proRataSalaryEnabled: true,
 };
 
 export function parseBreakdown(raw: string | null | undefined): PayrollLineItem[] {

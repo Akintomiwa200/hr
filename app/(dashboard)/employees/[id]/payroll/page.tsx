@@ -2,8 +2,8 @@ import { redirect, notFound } from "next/navigation";
 import { getSession, canManagePayroll } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canViewEmployee, getEmployeeOrNull } from "@/lib/employee-access";
-import { canViewEmployeePayroll } from "@/lib/payroll-access";
-import { EmployeeSubpageHeader } from "@/components/employees/employee-subpage-header";
+import { requirePeoplePage } from "@/lib/page-access";
+import { canViewEmployeePayroll } from "@/lib/payroll-access";import { EmployeeSubpageHeader } from "@/components/employees/employee-subpage-header";
 import { EmployeePayrollModule } from "@/components/payroll/employee-payroll-module";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 import { fullName } from "@/lib/utils";
@@ -14,7 +14,7 @@ export default async function EmployeePayrollPage({
   params: Promise<{ id: string }>;
 }) {
   const session = await getSession();
-  if (!session) redirect("/login");
+  requirePeoplePage(session);
 
   const { id } = await params;
   const employee = await getEmployeeOrNull(id);
@@ -33,7 +33,7 @@ export default async function EmployeePayrollPage({
 
   return (
     <div>
-      <PageLiveRefresh types={["payroll_updated", "employee_updated"]} pollIntervalMs={5000} />
+      <PageLiveRefresh types={["payroll_updated", "employee_updated"]} />
       <EmployeeSubpageHeader
         employee={employee}
         title="Payroll"

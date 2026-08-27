@@ -433,7 +433,10 @@ x-cron-secret: your-secret`}
             code={`# Environment variables
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=${base}/api/google/callback
 ZOHO_CLIENT_ID=
+ZOHO_CLIENT_SECRET=
+ZOHO_REDIRECT_URI=${base}/api/integrations/zoho/callback
 ZOHO_CLIENT_SECRET=
 INTEGRATION_CRON_SECRET=
 APP_URL=${base}`}

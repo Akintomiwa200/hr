@@ -10,6 +10,7 @@ import {
 } from "@/components/employees/onboarding-notice";
 import { notify, readApiError } from "@/lib/toast";
 import { ORG_ROLES, roleLabel } from "@/lib/roles";
+import { todayInputValue } from "@/lib/dates";
 
 type Department = { id: string; name: string };
 type Manager = { id: string; firstName: string; lastName: string };
@@ -164,6 +165,16 @@ export function NewEmployeeForm({
           <div>
             <label className={labelClass}>Salary</label>
             <input name="salary" type="number" min="0" className={inputClass} placeholder="85000" />
+          </div>
+          <div>
+            <label className={labelClass}>Start date</label>
+            <input
+              name="hireDate"
+              type="date"
+              required
+              defaultValue={todayInputValue()}
+              className={inputClass}
+            />
           </div>
         </div>
       </section>

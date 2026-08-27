@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { requireRecruitmentPage } from "@/lib/page-access";
 import { canManageRecruitment } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
@@ -12,8 +13,7 @@ import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function RecruitmentPage() {
   const session = await getSession();
-  if (!session) redirect("/login");
-  if (session.role === "EMPLOYEE") redirect("/dashboard");
+  requireRecruitmentPage(session);
 
   const scope = getCompanyScope(session);
   const companyFilter = scope.companyId

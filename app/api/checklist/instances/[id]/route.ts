@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageChecklists } from "@/lib/checklist/access";
+import { hydrateChecklistTasks } from "@/lib/checklist/document-store";
 
 export async function GET(
   _request: NextRequest,
@@ -28,9 +29,11 @@ export async function GET(
 
   const completed = instance.tasks.filter((t) => t.status === "COMPLETED").length;
   const total = instance.tasks.length;
+  const tasks = await hydrateChecklistTasks(instance.tasks);
 
   return NextResponse.json({
     ...instance,
+    tasks,
     progress: { completed, total, percent: total > 0 ? Math.round((completed / total) * 100) : 0 },
   });
 }

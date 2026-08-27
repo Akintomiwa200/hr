@@ -1,7 +1,9 @@
-import { prisma } from "@/lib/prisma";
 import type { SessionUser } from "@/lib/auth";
 import {
+  canExportPayroll,
   canManagePayroll,
+  canOperatePayroll,
+  isAccountOfficerRole,
   isCompanyAdmin,
   isHrRole,
   isSuperAdmin,
@@ -13,12 +15,20 @@ export async function canViewPayrollRecord(
   record: { employeeId: string }
 ) {
   const role = normalizeRole(session.role);
-  if (isSuperAdmin(role) || isCompanyAdmin(role) || isHrRole(role)) return true;
+  if (
+    isSuperAdmin(role) ||
+    isCompanyAdmin(role) ||
+    isHrRole(role) ||
+    isAccountOfficerRole(role)
+  ) {
+    return true;
+  }
   if (role === "EMPLOYEE" && session.employeeId === record.employeeId) {
     return true;
   }
   if ((role === "MANAGER" || role === "SUPERVISOR") && session.employeeId) {
     if (session.employeeId === record.employeeId) return true;
+    const { prisma } = await import("@/lib/prisma");
     const employee = await prisma.employee.findUnique({
       where: { id: record.employeeId },
       select: { managerId: true },
@@ -28,7 +38,6 @@ export async function canViewPayrollRecord(
   return false;
 }
 
-/** Whether the viewer may open an employee's salary / payslip history (read-only for managers). */
 export async function canViewEmployeePayroll(
   session: SessionUser,
   employeeId: string
@@ -36,20 +45,28 @@ export async function canViewEmployeePayroll(
   return canViewPayrollRecord(session, { employeeId });
 }
 
-/**
- * Create / edit / delete payroll — HR and company admins only.
- * Managers may preview team payslips but cannot change them.
- */
 export async function canManagePayrollRecord(
   session: SessionUser,
   _record: { employeeId: string }
 ) {
-  if (canManagePayroll(session.role) || isSuperAdmin(session.role)) return true;
+  if (canOperatePayroll(session.role) || isSuperAdmin(session.role)) return true;
   return false;
 }
 
 export function canManagePayrollSettings(session: SessionUser) {
   return canManagePayroll(session.role);
+}
+
+export function canBulkPayroll(session: SessionUser) {
+  return canOperatePayroll(session.role) || isSuperAdmin(session.role);
+}
+
+export function canExportPayrollData(session: SessionUser) {
+  return canExportPayroll(session.role) || isSuperAdmin(session.role);
+}
+
+export function canImportPayrollData(session: SessionUser) {
+  return canOperatePayroll(session.role) || isSuperAdmin(session.role);
 }
 
 export async function payrollListWhere(session: SessionUser) {
@@ -70,4 +87,21 @@ export async function payrollListWhere(session: SessionUser) {
   if (isSuperAdmin(role) && !companyId) return {};
   if (!companyId) return { employee: { user: { companyId: null } } };
   return { employee: { user: { companyId } } };
+}
+
+export async function payrollRunListWhere(session: SessionUser) {
+  const role = normalizeRole(session.role);
+  if (!canBulkPayroll(session) && !isSuperAdmin(role)) {
+    return { id: "__none__" };
+  }
+  const companyId = session.companyId ?? null;
+  if (isSuperAdmin(role) && !companyId) return {};
+  if (!companyId) return { companyId: null };
+  return { companyId };
+}
+
+export async function activePayrollEmployeeWhere(session: SessionUser) {
+  const { getCompanyScope, employeeCompanyWhere } = await import("@/lib/company-scope");
+  const scope = getCompanyScope(session);
+  return { ...employeeCompanyWhere(scope), status: "ACTIVE" as const };
 }

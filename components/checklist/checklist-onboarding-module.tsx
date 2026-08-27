@@ -63,11 +63,9 @@ export function ChecklistOnboardingModule({
   }, [load]);
 
   useAppEvents({
-    types: ["checklist_updated", "dashboard_updated", "employee_updated"],
-    pollIntervalMs: 2000,
+    types: ["checklist_updated", "employee_updated"],
     onEvent: () => {
       void load({ silent: true });
-      router.refresh();
     },
   });
 

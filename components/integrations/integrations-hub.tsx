@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   BookOpen,
   ExternalLink,
@@ -105,7 +104,6 @@ function formatWhen(value: string | null) {
 }
 
 export function IntegrationsHub() {
-  const router = useRouter();
   const [items, setItems] = useState<IntegrationItem[]>([]);
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,7 +116,10 @@ export function IntegrationsHub() {
       notify.error(await readApiError(res, "Failed to load integrations"));
       return;
     }
-    const data = (await res.json()) as { items: IntegrationItem[]; logs: SyncLog[] };
+    const data = (await res.json()) as {
+      items: IntegrationItem[];
+      logs: SyncLog[];
+    };
     setItems(data.items);
     setLogs(data.logs);
   }, []);
@@ -244,8 +245,6 @@ export function IntegrationsHub() {
         {items.map((item) => {
           const Icon = VENDOR_ICONS[item.provider] ?? Link2;
           const busy = busySlug === item.slug;
-          const appUrl =
-            typeof window !== "undefined" ? window.location.origin : "";
 
           return (
             <Card key={item.provider} className="flex flex-col">
@@ -285,19 +284,10 @@ export function IntegrationsHub() {
                   </p>
                 )}
                 {item.lastError && (
-                  <p className="text-xs text-amber-700">Last sync failed. Use Sync now to retry.</p>
-                )}
-                {item.webhookPath && item.webhookSecret && (
-                  <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 space-y-1">
-                    <p className="font-medium text-gray-700">Webhook URL (real-time)</p>
-                    <code className="block break-all text-[11px]">
-                      {appUrl}
-                      {item.webhookPath}
-                    </code>
-                    <p className="text-[10px] text-gray-400">
-                      Secret: {item.webhookSecret.slice(0, 8)}…
-                    </p>
-                  </div>
+                  <p className="text-xs text-amber-700">
+                    Last sync failed. Use Sync now to retry
+                    {item.lastError.length < 180 ? ` — ${item.lastError}` : "."}
+                  </p>
                 )}
 
                 <div className="flex flex-wrap gap-2 mt-auto pt-2">

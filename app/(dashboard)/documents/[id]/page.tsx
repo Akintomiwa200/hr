@@ -1,6 +1,5 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { canManageOrgContent } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { canManageDocuments, canViewSharedResource, formatFileSize } from "@/lib/documents/access";
 import { shareScopeLabel } from "@/lib/documents/share-groups";
@@ -14,7 +13,6 @@ export default async function FolderDetailPage({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (!canManageOrgContent(session.role)) redirect("/dashboard");
 
   const { id } = await params;
   const folder = await prisma.documentFolder.findUnique({

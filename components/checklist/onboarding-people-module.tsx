@@ -15,6 +15,7 @@ import { notify, readApiError } from "@/lib/toast";
 import { ORG_ROLES, roleLabel } from "@/lib/roles";
 import type { Role } from "@prisma/client";
 import { formatDate, fullName } from "@/lib/utils";
+import { todayInputValue } from "@/lib/dates";
 
 type Department = { id: string; name: string };
 type Manager = { id: string; firstName: string; lastName: string };
@@ -57,12 +58,18 @@ export function OnboardingPeopleModule({
   const [listLoading, setListLoading] = useState(true);
 
   const load = useCallback(async (silent = false) => {
-    if (!silent) setListLoading(true);
+    if (!silent && rows.length === 0) setListLoading(true);
     try {
       const res = await fetch("/api/checklist/instances?type=ONBOARDING", {
         cache: "no-store",
       });
-      if (res.ok) setRows(await res.json());
+      if (res.ok) {
+        setRows(await res.json());
+      } else {
+        notify.error(await readApiError(res, "Failed to load onboarding list"));
+      }
+    } catch {
+      notify.error("Failed to load onboarding list");
     } finally {
       if (!silent) setListLoading(false);
     }
@@ -73,11 +80,9 @@ export function OnboardingPeopleModule({
   }, [load]);
 
   useAppEvents({
-    types: ["checklist_updated", "employee_updated", "dashboard_updated"],
-    pollIntervalMs: 2000,
+    types: ["checklist_updated", "employee_updated"],
     onEvent: () => {
       void load(true);
-      router.refresh();
     },
   });
 
@@ -216,6 +221,16 @@ export function OnboardingPeopleModule({
                 <label className={labelClass}>Salary</label>
                 <input name="salary" type="number" min="0" className={inputClass} placeholder="85000" />
               </div>
+              <div>
+                <label className={labelClass}>Start date</label>
+                <input
+                  name="hireDate"
+                  type="date"
+                  required
+                  defaultValue={todayInputValue()}
+                  className={inputClass}
+                />
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -279,7 +294,7 @@ export function OnboardingPeopleModule({
                       {row.employee.jobTitle}
                       {row.employee.department?.name ? ` · ${row.employee.department.name}` : ""}
                       {" · "}
-                      started {formatDate(row.startDate)}
+                      start date {formatDate(row.startDate)}
                     </p>
                   </div>
                   <div className="flex-1 min-w-[160px]">

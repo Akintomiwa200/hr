@@ -24,12 +24,14 @@ export function EmployeeLeaveModule({
   leaves,
   showRequestForm,
   canApprove,
+  showPayrollTab = false,
 }: {
   employeeId: string;
   employeeName: string;
   leaves: Leave[];
   showRequestForm: boolean;
   canApprove: boolean;
+  showPayrollTab?: boolean;
 }) {
   const pending = leaves.filter((l) => l.status === "PENDING").length;
   const approved = leaves.filter((l) => l.status === "APPROVED").length;
@@ -37,7 +39,7 @@ export function EmployeeLeaveModule({
 
   return (
     <div>
-      <EmployeeTimeNav employeeId={employeeId} active="leave" />
+      <EmployeeTimeNav employeeId={employeeId} active="leave" showPayrollTab={showPayrollTab} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total" value={leaves.length} icon={CalendarDays} />

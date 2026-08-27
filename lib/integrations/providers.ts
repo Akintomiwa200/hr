@@ -17,15 +17,24 @@ export function slugToProvider(slug: string): IntegrationProvider | null {
   return SLUG_TO_PROVIDER[slug] ?? null;
 }
 
-export function encodeOAuthState(input: { userId: string; companyId?: string | null }) {
+export function encodeOAuthState(input: {
+  userId: string;
+  companyId?: string | null;
+  provider?: IntegrationProvider;
+}) {
   return Buffer.from(JSON.stringify(input)).toString("base64url");
 }
 
-export function decodeOAuthState(state: string): { userId: string; companyId?: string | null } | null {
+export function decodeOAuthState(state: string): {
+  userId: string;
+  companyId?: string | null;
+  provider?: IntegrationProvider;
+} | null {
   try {
     return JSON.parse(Buffer.from(state, "base64url").toString("utf8")) as {
       userId: string;
       companyId?: string | null;
+      provider?: IntegrationProvider;
     };
   } catch {
     return null;

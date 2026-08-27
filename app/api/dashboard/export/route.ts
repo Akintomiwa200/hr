@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
+import {
+  peopleDirectoryEmployeeWhere,
+  teamScopedEmployeeWhere,
+} from "@/lib/employee-access";
+import { canManageEmployees, hasRole, PEOPLE_ADMIN_ROLES } from "@/lib/roles";
 import { fullName } from "@/lib/utils";
 import { employmentLabel, resolveEmploymentType } from "@/lib/employment";
 import {
@@ -22,7 +28,19 @@ export async function GET(request: NextRequest) {
   const type = request.nextUrl.searchParams.get("type") ?? "dashboard";
 
   if (type === "employees") {
+    if (!hasRole(session.role, PEOPLE_ADMIN_ROLES)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const scope = getCompanyScope(session);
+    const orgEmployee = employeeCompanyWhere(scope);
+    const directoryScope = await peopleDirectoryEmployeeWhere(session);
+    const employeeWhere = directoryScope
+      ? { AND: [orgEmployee, directoryScope] }
+      : orgEmployee;
+
     const employees = await prisma.employee.findMany({
+      where: employeeWhere,
       include: { department: true, user: { select: { role: true } } },
       orderBy: { firstName: "asc" },
     });
@@ -56,10 +74,16 @@ export async function GET(request: NextRequest) {
     const dayEnd = new Date(dayStart);
     dayEnd.setHours(23, 59, 59, 999);
 
-    const whereEmployee =
-      session.role === "EMPLOYEE" && session.employeeId
-        ? { employeeId: session.employeeId }
-        : {};
+    const scope = getCompanyScope(session);
+    const orgEmployee = employeeCompanyWhere(scope);
+    const teamScope = teamScopedEmployeeWhere(session);
+
+    let whereEmployee: Record<string, unknown> = { employee: orgEmployee };
+    if (session.role === "EMPLOYEE" && session.employeeId) {
+      whereEmployee = { employeeId: session.employeeId };
+    } else if (teamScope) {
+      whereEmployee = { employee: { AND: [orgEmployee, teamScope] } };
+    }
 
     const records = await prisma.attendance.findMany({
       where: {

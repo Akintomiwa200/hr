@@ -176,7 +176,7 @@ export function SettingsModule({
                   <dd className="font-medium text-gray-900">{employee.department.name}</dd>
                 </div>
                 <div className="flex justify-between py-3">
-                  <dt className="text-gray-500">Hire date</dt>
+                  <dt className="text-gray-500">Start date</dt>
                   <dd className="font-medium text-gray-900">{formatDate(employee.hireDate)}</dd>
                 </div>
               </>
@@ -372,7 +372,7 @@ export function SettingsModule({
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 mb-1">API & device integration</h3>
                   <p className="text-xs text-gray-500 leading-relaxed max-w-xl">
-                    Full REST reference, attendance device endpoints, SSE realtime events, and kiosk setup console.
+                    Full REST reference, ZKTeco ADMS endpoints, SSE realtime events, and branch terminal console.
                   </p>
                 </div>
               </div>
@@ -387,7 +387,7 @@ export function SettingsModule({
                   href="/attendance/devices"
                   className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-brand-600 bg-white border border-brand-200 rounded-xl hover:bg-brand-50"
                 >
-                  Device console
+                  ZKTeco console
                 </Link>
               </div>
             </div>

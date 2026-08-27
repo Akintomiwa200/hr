@@ -8,6 +8,7 @@ import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { Sheet } from "@/components/ui/sheet";
 import { ShareFolderDialog } from "@/components/documents/share-folder-dialog";import { notify, readApiError } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
+import { isSseHandshake } from "@/lib/events";
 
 export type FolderRow = {
   id: string;
@@ -47,7 +48,25 @@ export function DocumentsModule({
 
   useEffect(() => {
     const es = new EventSource("/api/events");
-    es.onmessage = () => router.refresh();
+    es.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as {
+          type?: string;
+          data?: Record<string, unknown>;
+        };
+        if (isSseHandshake(payload.type, payload.data)) return;
+        if (
+          payload.type &&
+          payload.type !== "document_updated" &&
+          payload.type !== "folder_updated"
+        ) {
+          return;
+        }
+        router.refresh();
+      } catch {
+        // ignore heartbeat / malformed payloads
+      }
+    };
     return () => es.close();
   }, [router]);
 

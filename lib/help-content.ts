@@ -1,6 +1,6 @@
 import type { Role } from "@prisma/client";
 import type { LucideIcon } from "lucide-react";
-import { ALL_STAFF, CONTENT_ADMIN_ROLES, RECRUITMENT_ROLES } from "@/lib/roles";
+import { ALL_STAFF, CONTENT_ADMIN_ROLES, DEVICE_ADMIN_ROLES, RECRUITMENT_ROLES } from "@/lib/roles";
 import {
   Bell,
   Briefcase,
@@ -13,6 +13,7 @@ import {
   Medal,
   Megaphone,
   Network,
+  PenLine,
   Search,
   Settings,
   Users,
@@ -62,7 +63,7 @@ export const helpCategories: HelpCategory[] = [
   { id: "time", label: "Time & Leave", description: "Calendar, leave, attendance", icon: CalendarOff },
   { id: "pay", label: "Payroll", description: "Compensation and payslips", icon: Wallet },
   { id: "talent", label: "Talent", description: "Recruitment and performance", icon: Briefcase },
-  { id: "workspace", label: "Workspace", description: "Docs, announcements, search", icon: FileText },
+  { id: "workspace", label: "Workspace", description: "Docs, letters, announcements, search", icon: FileText },
   { id: "account", label: "Account", description: "Settings and permissions", icon: Settings },
 ];
 
@@ -194,15 +195,19 @@ export const helpArticles: HelpArticle[] = [
     sections: [
       {
         heading: "Daily check-in",
-        body: "Employees use the Check In button on the Attendance page to record arrival. Check out when leaving for the day. Punches from kiosk or biometric devices sync in real time and appear with a Device badge.",
+        body: "Employees use the Check In button on the Attendance page to record arrival. Check out when leaving for the day. Punches from ZKTeco terminals at each branch sync in real time and appear with the branch device name.",
       },
       {
-        heading: "Device integration API",
-        body: "Open Attendance → Devices for the integration console, or visit /docs for the full REST reference. Register kiosks, ping devices, and test punches. GET /api/attendance/device returns the spec; authenticated devices receive live online status. Punches broadcast attendance_updated and device_ping over SSE.",
+        heading: "ZKTeco hardware",
+        body: "Smart HR talks the native ZKTeco ADMS / iclock protocol. Each company branch (office location) has its own timezone and one or more terminals. Register the device serial number, point Cloud Server / ADMS at this app’s host, and enroll staff using their ZKTeco PIN. Fingerprint, face, and card punches push immediately — no local PC or BioTime server required.",
       },
       {
-        heading: "Device integration",
-        body: "HR admins configure check-in apps to POST to /api/attendance/device with X-Device-Key. Use employeeCode (e.g. EMP001), action check_in/check_out/toggle, and optional externalId for idempotent sync.",
+        heading: "Branches and locations",
+        body: "Open Attendance → ZKTeco to create a branch for every office. Assign terminals and employees to that location. Late/present is calculated in the branch timezone. Visiting staff can punch at another branch; the record still shows which terminal they used.",
+      },
+      {
+        heading: "Live terminal status",
+        body: "Open Attendance → ZKTeco for live online status per terminal. Punches broadcast attendance_updated and device_ping over SSE so dashboards refresh without a reload.",
       },
       {
         heading: "Team monitoring",
@@ -218,8 +223,41 @@ export const helpArticles: HelpArticle[] = [
         question: "Can I edit past attendance?",
         answer: "Employees record their own check-ins. Admins should coordinate corrections through HR policy.",
       },
+      {
+        question: "Which biometric hardware is supported?",
+        answer:
+          "ZKTeco terminals that support Cloud Server / ADMS (iclock) — including SpeedFace, MB, K, and F series. Each device is mapped to a company branch by serial number.",
+      },
     ],
-    relatedSlugs: ["calendar", "leave", "employees"],
+    relatedSlugs: ["calendar", "leave", "employees", "attendance-devices"],
+  },
+  {
+    slug: "attendance-devices",
+    title: "ZKTeco branch terminals",
+    description: "Connect ZKTeco hardware at every office location for real-time attendance.",
+    category: "time",
+    icon: Clock,
+    roles: DEVICE_ADMIN_ROLES,
+    moduleHref: "/attendance/devices",
+    sections: [
+      {
+        heading: "Create branches first",
+        body: "Add each office with its city/address and timezone. Late arrival uses that timezone, not the server’s clock.",
+      },
+      {
+        heading: "Register the serial number",
+        body: "On the terminal, open System Info or check the sticker for SN. Register it in Attendance → ZKTeco and assign the device to the correct branch.",
+      },
+      {
+        heading: "Point ADMS at Smart HR",
+        body: "COMM → Cloud Server / ADMS: enable the service, set Server Address to this app’s host, Port 443 (HTTPS) or 80 (HTTP), and path /iclock. After a minute the terminal shows online.",
+      },
+      {
+        heading: "Enroll employees",
+        body: "The user ID on the device must match the employee’s ZKTeco PIN (shown on their profile). EMP001 defaults to PIN 1.",
+      },
+    ],
+    relatedSlugs: ["attendance", "employees"],
   },
   {
     slug: "payroll",
@@ -401,7 +439,36 @@ export const helpArticles: HelpArticle[] = [
         body: "Documents appear in global Search results when you search by title.",
       },
     ],
-    relatedSlugs: ["search", "employees"],
+    relatedSlugs: ["search", "employees", "letters"],
+  },
+  {
+    slug: "letters",
+    title: "Letters & forms",
+    description: "Create HR letters and forms in the portal and issue them in real time.",
+    category: "workspace",
+    icon: PenLine,
+    roles: CONTENT_ADMIN_ROLES,
+    moduleHref: "/letters",
+    sections: [
+      {
+        heading: "Create in the portal",
+        body: "Company Admins and HR open Letters & forms in the sidebar. Start from a built-in letter or form (offer, appointment, salary certificate, warning, leave form, and more) or a blank template. Edit the body with merge fields such as employee name, job title, and salary.",
+      },
+      {
+        heading: "Issue live",
+        body: "Publish a template, then issue a letter or assign a form to one or more people. They get an in-app notification. Dashboards refresh over live events so another HR user sees new templates immediately.",
+      },
+      {
+        heading: "Employee response",
+        body: "Employees open the notification to acknowledge a letter or complete a form. HR can print any issued letter from the document page.",
+      },
+    ],
+    steps: [
+      { title: "Open Letters & forms", body: "Use the sidebar under More (HR and Company Admin)." },
+      { title: "Create a template", body: "Pick a starter or start blank, then save. Changes appear live." },
+      { title: "Issue or assign", body: "Select employees and send. They are notified in the portal." },
+    ],
+    relatedSlugs: ["documents", "employees", "announcements"],
   },
   {
     slug: "announcements",

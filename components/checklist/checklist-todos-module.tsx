@@ -82,6 +82,7 @@ export function ChecklistTodosModule({
     assigneeId: "",
     dueDate: "",
     priority: "MEDIUM",
+    requiredDocuments: "",
   });
 
   const buildQuery = useCallback(() => {
@@ -111,11 +112,9 @@ export function ChecklistTodosModule({
   }, [load]);
 
   useAppEvents({
-    types: ["checklist_updated", "dashboard_updated"],
-    pollIntervalMs: 2000,
+    types: ["checklist_updated"],
     onEvent: () => {
       void load({ silent: true });
-      router.refresh();
     },
   });
 
@@ -134,6 +133,7 @@ export function ChecklistTodosModule({
           assigneeId: form.assigneeId || undefined,
           dueDate: form.dueDate || undefined,
           priority: form.priority,
+          requiredDocuments: form.requiredDocuments,
         }),
       });
       if (!res.ok) {
@@ -142,7 +142,7 @@ export function ChecklistTodosModule({
       }
       notify.success("Task created");
       setCreateOpen(false);
-      setForm((f) => ({ ...f, title: "", description: "", dueDate: "" }));
+      setForm((f) => ({ ...f, title: "", description: "", dueDate: "", requiredDocuments: "" }));
       load();
     } finally {
       setCreating(false);
@@ -153,7 +153,7 @@ export function ChecklistTodosModule({
     const res = await fetch(`/api/checklist/tasks/${taskId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(status === "COMPLETED" ? { action: "complete" } : { status }),
     });
     if (!res.ok) {
       notify.error(await readApiError(res, "Failed to update task"));
@@ -219,6 +219,7 @@ export function ChecklistTodosModule({
             className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white"
           >
             <option value="ALL">All assignees</option>
+            <option value="UNASSIGNED">Unassigned</option>
             {employees.map((emp) => (
               <option key={emp.id} value={emp.id}>
                 {fullName(emp.firstName, emp.lastName)}
@@ -355,16 +356,15 @@ export function ChecklistTodosModule({
                   <td className="px-5 py-4">
                     {task.status !== "COMPLETED" && (
                       <div className="flex gap-1">
-                        {task.status === "PENDING" && (
-                          <Button size="sm" variant="ghost" onClick={() => updateStatus(task.id, "IN_PROGRESS")}>
-                            Start
-                          </Button>
-                        )}
-                        {task.status === "IN_PROGRESS" && (
-                          <Button size="sm" variant="ghost" onClick={() => updateStatus(task.id, "COMPLETED")}>
-                            Done
-                          </Button>
-                        )}
+                        <Link
+                          href={`/checklist/tasks/${task.id}`}
+                          className="px-2 py-1 text-xs font-medium text-brand-600 hover:underline"
+                        >
+                          Documents
+                        </Link>
+                        <Button size="sm" variant="ghost" onClick={() => updateStatus(task.id, "COMPLETED")}>
+                          Complete
+                        </Button>
                       </div>
                     )}
                   </td>
@@ -443,7 +443,7 @@ export function ChecklistTodosModule({
                 onChange={(e) => setForm((f) => ({ ...f, assigneeId: e.target.value }))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
               >
-                <option value="">Unassigned</option>
+                <option value="">Anyone / unassigned</option>
                 {employees.map((emp) => (
                   <option key={emp.id} value={emp.id}>
                     {fullName(emp.firstName, emp.lastName)}
@@ -471,6 +471,18 @@ export function ChecklistTodosModule({
               type="date"
               value={form.dueDate}
               onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Required documents (optional)
+            </label>
+            <textarea
+              value={form.requiredDocuments}
+              onChange={(e) => setForm((f) => ({ ...f, requiredDocuments: e.target.value }))}
+              rows={3}
+              placeholder={"National ID\nSigned contract"}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
             />
           </div>
@@ -505,11 +517,13 @@ function TaskCard({ task, onOpen }: { task: TodoTask; onOpen: () => void }) {
         {task.instance.type} · {fullName(task.instance.employee.firstName, task.instance.employee.lastName)}
       </p>
       <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
-        {task.assignee && (
+        {task.assignee ? (
           <span className="inline-flex items-center gap-1">
             <User className="w-3 h-3" />
             {fullName(task.assignee.firstName, task.assignee.lastName)}
           </span>
+        ) : (
+          <span className="inline-flex items-center gap-1">Anyone</span>
         )}
         {task.dueDate && (
           <span className={`inline-flex items-center gap-1 ${isOverdue ? "text-red-500 font-medium" : ""}`}>

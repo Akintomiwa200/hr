@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { isPortalTemplateModelReady, prisma } from "@/lib/prisma";
 import { requireSession, unauthorized } from "@/lib/api-auth";
 import { getHolidays } from "@/lib/holidays-data";
-import { getCompanyScope, employeeCompanyWhere, announcementCompanyWhere } from "@/lib/company-scope";
+import {
+  getCompanyScope,
+  employeeCompanyWhere,
+  announcementCompanyWhere,
+  portalTemplateCompanyWhere,
+} from "@/lib/company-scope";
+import { canManageLetters } from "@/lib/letters/access";
 
 export async function GET(request: NextRequest) {
   const session = await requireSession();
@@ -10,7 +16,14 @@ export async function GET(request: NextRequest) {
 
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (!q) {
-    return NextResponse.json({ employees: [], documents: [], jobs: [], announcements: [], holidays: [] });
+    return NextResponse.json({
+      employees: [],
+      documents: [],
+      jobs: [],
+      announcements: [],
+      holidays: [],
+      letters: [],
+    });
   }
 
   const contains = { contains: q };
@@ -52,7 +65,7 @@ export async function GET(request: NextRequest) {
         }
       : { title: contains };
 
-  const [employees, documents, jobs, announcements, allHolidays] = await Promise.all([
+  const [employees, documents, jobs, announcements, allHolidays, letters] = await Promise.all([
     prisma.employee.findMany({
       where: employeeWhere,
       include: { department: true },
@@ -84,6 +97,17 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     }),
     getHolidays(session.companyId),
+    canManageLetters(session) && isPortalTemplateModelReady()
+      ? prisma.portalTemplate.findMany({
+          where: {
+            ...portalTemplateCompanyWhere(scope),
+            OR: [{ title: contains }, { description: contains }, { category: contains }],
+          },
+          take: 6,
+          orderBy: { updatedAt: "desc" },
+          select: { id: true, title: true, kind: true, category: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   const holidays = allHolidays
@@ -100,5 +124,5 @@ export async function GET(request: NextRequest) {
       type: holiday.type,
     }));
 
-  return NextResponse.json({ employees, documents, jobs, announcements, holidays });
+  return NextResponse.json({ employees, documents, jobs, announcements, holidays, letters });
 }

@@ -13,6 +13,7 @@ export type RealtimeEventType =
   | "interview_updated"
   | "document_updated"
   | "folder_updated"
+  | "letter_updated"
   | "checklist_updated"
   | "holiday_updated"
   | "integration_sync"
@@ -53,4 +54,11 @@ export function broadcastEvent(
   data?: Record<string, unknown>
 ) {
   eventBus.publish(type, data);
+}
+
+export function isSseHandshake(
+  type?: string | null,
+  data?: Record<string, unknown> | null
+) {
+  return type === "dashboard_updated" && data?.connected === true;
 }

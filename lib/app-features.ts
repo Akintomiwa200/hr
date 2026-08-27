@@ -27,6 +27,7 @@ import {
   CreditCard,
   ListTodo,
   UserMinus,
+  PenLine,
 } from "lucide-react";
 import {
   ALL_STAFF,
@@ -189,8 +190,8 @@ export const appFeatures: AppFeature[] = [
   },
   {
     id: "attendance-devices",
-    label: "Attendance Devices",
-    description: "Kiosk and biometric device API keys",
+    label: "Devices",
+    description: "Real-time ZKTeco attendance hardware at every branch location",
     href: "/attendance/devices",
     section: "Time & Leave",
     icon: Router,
@@ -266,6 +267,16 @@ export const appFeatures: AppFeature[] = [
     icon: FileText,
     roles: CONTENT_ADMIN_ROLES,
     helpSlug: "documents",
+  },
+  {
+    id: "letters",
+    label: "Letters & forms",
+    description: "Create HR letters and forms in the portal and issue them live",
+    href: "/letters",
+    section: "Workspace",
+    icon: PenLine,
+    roles: CONTENT_ADMIN_ROLES,
+    helpSlug: "letters",
   },
   {
     id: "integrations",

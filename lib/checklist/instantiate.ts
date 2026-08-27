@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { parseDocumentNames } from "@/lib/checklist/documents";
+import {
+  fetchTemplateTaskRequiredDocumentsMap,
+  setTaskRequiredDocumentsById,
+  setTasksRequiredDocumentsByTitle,
+  setTemplateTaskRequiredDocuments,
+} from "@/lib/checklist/document-store";
 
 async function resolveHrAssigneeId(companyId: string | null) {
   const preferRoles = ["HR", "COMPANY_ADMIN"] as const;
@@ -34,12 +41,14 @@ export async function createChecklistFromTemplate(opts: {
   companyId: string | null;
   type: "ONBOARDING" | "OFFBOARDING";
   startDate?: Date;
+  endDate?: Date | null;
 }) {
   const template = await prisma.checklistTemplate.findUnique({
     where: { id: opts.templateId },
     include: { tasks: { orderBy: { sortOrder: "asc" } } },
   });
   if (!template) throw new Error("Template not found");
+  const templateDocs = await fetchTemplateTaskRequiredDocumentsMap(template.id);
 
   const employee = await prisma.employee.findUnique({
     where: { id: opts.employeeId },
@@ -57,6 +66,7 @@ export async function createChecklistFromTemplate(opts: {
       type: opts.type,
       employeeId: employee.id,
       startDate: start,
+      endDate: opts.endDate ?? null,
       status: "IN_PROGRESS",
     },
   });
@@ -70,6 +80,8 @@ export async function createChecklistFromTemplate(opts: {
       assigneeId = hrAssigneeId;
     } else if (task.assigneeType === "SPECIFIC") {
       assigneeId = task.assigneeId;
+    } else {
+      assigneeId = null;
     }
 
     const dueDate =
@@ -77,12 +89,16 @@ export async function createChecklistFromTemplate(opts: {
         ? new Date(start.getTime() + task.dueDaysOffset * 24 * 60 * 60 * 1000)
         : null;
 
-    await prisma.checklistTask.create({
+    const requiredDocuments =
+      templateDocs.get(task.id) ??
+      parseDocumentNames((task as { requiredDocuments?: unknown }).requiredDocuments);
+
+    const createdTask = await prisma.checklistTask.create({
       data: {
         instanceId: instance.id,
         title: task.title,
         description: task.description,
-        taskType: task.taskType,
+        taskType: requiredDocuments.length ? "DOCUMENT" : task.taskType,
         assigneeType: task.assigneeType,
         assigneeId,
         dueDate,
@@ -91,6 +107,9 @@ export async function createChecklistFromTemplate(opts: {
         priority: "MEDIUM",
       },
     });
+    if (requiredDocuments.length) {
+      await setTaskRequiredDocumentsById(createdTask.id, requiredDocuments, "DOCUMENT");
+    }
   }
 
   return prisma.checklistInstance.findUnique({
@@ -174,6 +193,7 @@ export async function resolveActiveTemplate(
 export async function startEmployeeOnboarding(opts: {
   employeeId: string;
   companyId: string | null;
+  startDate?: Date;
 }) {
   const existing = await prisma.checklistInstance.findFirst({
     where: {
@@ -190,6 +210,7 @@ export async function startEmployeeOnboarding(opts: {
     employeeId: opts.employeeId,
     companyId: opts.companyId,
     type: "ONBOARDING",
+    startDate: opts.startDate,
   });
 
   broadcastAppEvent("checklist_updated", {
@@ -206,6 +227,7 @@ export async function startEmployeeOffboarding(opts: {
   employeeId: string;
   companyId: string | null;
   deactivate?: boolean;
+  endDate?: Date;
 }) {
   const existing = await prisma.checklistInstance.findFirst({
     where: {
@@ -225,8 +247,15 @@ export async function startEmployeeOffboarding(opts: {
       employeeId: opts.employeeId,
       companyId: opts.companyId,
       type: "OFFBOARDING",
+      startDate: opts.endDate,
+      endDate: opts.endDate ?? null,
     });
     created = true;
+  } else if (opts.endDate) {
+    instance = await prisma.checklistInstance.update({
+      where: { id: instance.id },
+      data: { endDate: opts.endDate },
+    });
   }
 
   if (opts.deactivate) {
@@ -234,6 +263,10 @@ export async function startEmployeeOffboarding(opts: {
       where: { id: opts.employeeId },
       data: { status: "INACTIVE" },
     });
+  }
+
+  if (opts.endDate) {
+    await prisma.$executeRaw`UPDATE "Employee" SET "endDate" = ${opts.endDate} WHERE "id" = ${opts.employeeId}`;
   }
 
   broadcastAppEvent("checklist_updated", {
@@ -249,6 +282,24 @@ export async function startEmployeeOffboarding(opts: {
   return { instance, created, deactivated: Boolean(opts.deactivate) };
 }
 
+
+async function syncKnownDocumentTasks(templateId: string) {
+  const rows: Array<{ title: string; docs: string[] }> = [
+    {
+      title: "Collect documents - Hard copies",
+      docs: ["National ID", "Tax forms", "Signed contract"],
+    },
+    { title: "Upload signed work contract", docs: ["Signed work contract"] },
+    {
+      title: "Return documents and handover notes",
+      docs: ["Handover notes", "Returned assets form"],
+    },
+  ];
+  for (const row of rows) {
+    await setTemplateTaskRequiredDocuments(templateId, row.title, row.docs);
+    await setTasksRequiredDocumentsByTitle(row.title, row.docs);
+  }
+}
 
 export async function ensureDefaultOnboardingTemplate(companyId: string | null) {
   const existing = await prisma.checklistTemplate.findFirst({
@@ -271,7 +322,7 @@ export async function ensureDefaultOnboardingTemplate(companyId: string | null) 
     return existing;
   }
 
-  return prisma.checklistTemplate.create({
+  const created = await prisma.checklistTemplate.create({
     data: {
       companyId,
       type: "ONBOARDING",
@@ -282,26 +333,28 @@ export async function ensureDefaultOnboardingTemplate(companyId: string | null) 
           {
             title: "Prepare company welcome kit",
             description: "Laptop, badge, and welcome materials",
-            assigneeType: "HR",
+            assigneeType: "ANYONE",
             dueDaysOffset: -1,
             sortOrder: 0,
           },
           {
             title: "Collect documents - Hard copies",
             description: "ID, tax forms, and signed contract",
-            assigneeType: "EMPLOYEE",
+            assigneeType: "ANYONE",
+            taskType: "DOCUMENT",
             dueDaysOffset: 3,
             sortOrder: 1,
           },
           {
             title: "Upload signed work contract",
-            assigneeType: "EMPLOYEE",
+            assigneeType: "ANYONE",
+            taskType: "DOCUMENT",
             dueDaysOffset: 5,
             sortOrder: 2,
           },
           {
             title: "Line manager intro meeting",
-            assigneeType: "LINE_MANAGER",
+            assigneeType: "ANYONE",
             dueDaysOffset: 1,
             sortOrder: 3,
           },
@@ -309,6 +362,8 @@ export async function ensureDefaultOnboardingTemplate(companyId: string | null) 
       },
     },
   });
+  await syncKnownDocumentTasks(created.id);
+  return created;
 }
 
 export async function ensureDefaultOffboardingTemplate(companyId: string | null) {
@@ -332,7 +387,7 @@ export async function ensureDefaultOffboardingTemplate(companyId: string | null)
     return existing;
   }
 
-  return prisma.checklistTemplate.create({
+  const created = await prisma.checklistTemplate.create({
     data: {
       companyId,
       type: "OFFBOARDING",
@@ -343,25 +398,26 @@ export async function ensureDefaultOffboardingTemplate(companyId: string | null)
           {
             title: "Collect company assets",
             description: "Laptop, badge, keys, and access cards",
-            assigneeType: "HR",
+            assigneeType: "ANYONE",
             dueDaysOffset: 0,
             sortOrder: 0,
           },
           {
             title: "Revoke system access",
-            assigneeType: "HR",
+            assigneeType: "ANYONE",
             dueDaysOffset: 0,
             sortOrder: 1,
           },
           {
             title: "Exit interview",
-            assigneeType: "LINE_MANAGER",
+            assigneeType: "ANYONE",
             dueDaysOffset: 1,
             sortOrder: 2,
           },
           {
             title: "Return documents and handover notes",
-            assigneeType: "EMPLOYEE",
+            assigneeType: "ANYONE",
+            taskType: "DOCUMENT",
             dueDaysOffset: 2,
             sortOrder: 3,
           },
@@ -369,4 +425,6 @@ export async function ensureDefaultOffboardingTemplate(companyId: string | null)
       },
     },
   });
+  await syncKnownDocumentTasks(created.id);
+  return created;
 }
