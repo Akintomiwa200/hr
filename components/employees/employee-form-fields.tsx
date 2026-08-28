@@ -21,6 +21,9 @@ export function employeeToFormData(employee: {
   departmentId: string;
   branchId?: string | null;
   biometricPin?: string | null;
+  isShiftWorker?: boolean | null;
+  shiftStartHour?: number | null;
+  shiftStartMinute?: number | null;
   managerId?: string | null;
   salary: number;
   status: string;
@@ -38,6 +41,11 @@ export function employeeToFormData(employee: {
     departmentId: employee.departmentId,
     branchId: employee.branchId ?? "",
     biometricPin: employee.biometricPin ?? "",
+    isShiftWorker: Boolean(employee.isShiftWorker),
+    shiftStartTime:
+      employee.shiftStartHour != null && employee.shiftStartMinute != null
+        ? `${String(employee.shiftStartHour).padStart(2, "0")}:${String(employee.shiftStartMinute).padStart(2, "0")}`
+        : "09:00",
     managerId: employee.managerId ?? "",
     employmentType:
       employee.employmentType === "FREELANCE" ? "FREELANCE" : "FULL_TIME",
@@ -68,7 +76,7 @@ export function EmployeeFormFields({
   allowedRoles?: Role[];
 }) {
   const { currency } = useCurrency();
-  function set(field: keyof EmployeeFormData, value: string) {
+  function set(field: keyof EmployeeFormData, value: string | boolean) {
     onChange({ ...data, [field]: value });
   }
 
@@ -191,6 +199,31 @@ export function EmployeeFormFields({
             Must match the user ID on the branch device. Defaults from employee code (EMP001 → 1).
           </p>
         </div>
+        <div className="sm:col-span-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={data.isShiftWorker}
+              onChange={(e) => set("isShiftWorker", e.target.checked)}
+              className="w-4 h-4 accent-violet-600"
+            />
+            <span className="text-[13px] font-medium text-gray-700">Shift worker</span>
+          </label>
+          <p className="mt-1 text-[11px] text-gray-400">
+            Uses a custom start time for lateness instead of company attendance settings.
+          </p>
+          {data.isShiftWorker && (
+            <div className="mt-2">
+              <label className={labelClass}>Shift start time</label>
+              <input
+                type="time"
+                value={data.shiftStartTime}
+                onChange={(e) => set("shiftStartTime", e.target.value)}
+                className={inputClass}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -294,6 +327,8 @@ export const emptyEmployeeForm = (
   departmentId: departments[0]?.id ?? "",
   branchId: "",
   biometricPin: "",
+  isShiftWorker: false,
+  shiftStartTime: "09:00",
   managerId: "",
   employmentType: "FULL_TIME",
   role: "EMPLOYEE",

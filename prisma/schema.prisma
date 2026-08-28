@@ -38,6 +38,7 @@ enum AttendanceStatus {
   PRESENT
   ABSENT
   LATE
+  EARLY
   REMOTE
   HALF_DAY
 }
@@ -148,6 +149,7 @@ model Company {
   branches          Branch[]
   attendanceDevices AttendanceDevice[]
   payrollSettings   PayrollSettings[]
+  attendanceSettings AttendanceSettings[]
   payrollRuns       PayrollRun[]
   performanceSettings PerformanceSettings[]
   kpiDefinitions    KpiDefinition[]
@@ -242,6 +244,9 @@ model Employee {
   departmentId     String
   branchId         String?
   biometricPin     String?
+  isShiftWorker    Boolean   @default(false)
+  shiftStartHour   Int?
+  shiftStartMinute Int?
   managerId        String?
   hireDate         DateTime
   endDate          DateTime?
@@ -261,6 +266,7 @@ model Employee {
   leaveRequests     LeaveRequest[]
   approvedLeaves    LeaveRequest[]     @relation("LeaveApprover")
   attendanceRecords Attendance[]
+  attendanceBreaks  AttendanceBreak[]
   payrollRecords    PayrollRecord[]
   payrollDeductions PayrollDeduction[]
   performanceReviews PerformanceReview[] @relation("ReviewEmployee")
@@ -317,8 +323,39 @@ model Attendance {
 
   employee Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   device   AttendanceDevice? @relation(fields: [deviceId], references: [id])
+  breaks   AttendanceBreak[]
 
   @@unique([employeeId, date])
+}
+
+model AttendanceBreak {
+  id           String    @id @default(cuid())
+  employeeId   String
+  attendanceId String?
+  date         DateTime
+  breakStart   DateTime
+  breakEnd     DateTime?
+  createdAt    DateTime  @default(now())
+
+  employee   Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  attendance Attendance? @relation(fields: [attendanceId], references: [id], onDelete: SetNull)
+
+  @@index([employeeId, date])
+  @@index([attendanceId])
+}
+
+model AttendanceSettings {
+  id                   String   @id @default(cuid())
+  companyId            String?  @unique
+  workStartHour        Int      @default(9)
+  workStartMinute      Int      @default(0)
+  graceMinutes         Int      @default(15)
+  breakTrackingEnabled Boolean  @default(false)
+  maxBreakMinutes      Int      @default(60)
+  timezone             String   @default("Africa/Lagos")
+  updatedAt            DateTime @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id])
 }
 
 model AttendanceDevice {
@@ -389,6 +426,9 @@ model AttendancePunchLog {
 
   @@unique([serialNumber, pin, punchedAt, statusCode])
   @@index([deviceId, punchedAt])
+  @@index([serialNumber, punchedAt(sort: Desc)])
+  @@index([punchedAt(sort: Desc)])
+  @@index([processed, error])
 }
 
 model PayrollRecord {

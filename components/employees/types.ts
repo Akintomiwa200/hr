@@ -21,6 +21,8 @@ export type EmployeeFormData = {
   departmentId: string;
   branchId: string;
   biometricPin: string;
+  isShiftWorker: boolean;
+  shiftStartTime: string;
   managerId: string;
   employmentType: "FULL_TIME" | "FREELANCE";
   role: Role;

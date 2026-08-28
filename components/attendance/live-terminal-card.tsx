@@ -6,6 +6,7 @@ import { Button } from "@/components/ui";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { DEFAULT_ZK_PORT, formatDeviceEndpoint } from "@/lib/zkteco/device-ip";
 import { isDeviceLive, isDeviceOnline } from "@/lib/attendance-device-spec";
+import { useLiveClock } from "@/hooks/use-live-clock";
 
 export type LiveTerminalCardData = {
   id: string;
@@ -50,7 +51,9 @@ export function LiveTerminalCard({
   actions?: React.ReactNode;
   compact?: boolean;
 }) {
+  useLiveClock(30_000);
   const connected = terminalOnline(device.lastSeenAt, device.isActive);
+  const live = device.isActive && isDeviceLive(device.lastSeenAt);
   const status = statusLabel(device);
   const endpoint = device.ipAddress
     ? formatDeviceEndpoint(device.ipAddress, device.commPort ?? DEFAULT_ZK_PORT)
@@ -83,7 +86,7 @@ export function LiveTerminalCard({
                   status.tone === "gray" && "bg-gray-100 text-gray-500"
                 )}
               >
-                {status.tone === "green" && (
+                {status.live && (
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 )}
                 {status.text}
@@ -98,10 +101,15 @@ export function LiveTerminalCard({
               {endpoint ? ` · Device IP ${endpoint}` : " · No Device IP yet"}
             </p>
             {connected && device.lastSeenAt && (
-              <p className="text-[11px] text-emerald-700 mt-0.5">
-                {status.text === "Live"
+              <p
+                className={cn(
+                  "text-[11px] mt-0.5",
+                  live ? "text-emerald-700" : "text-amber-700"
+                )}
+              >
+                {live
                   ? `Heartbeat ${formatRelativeTime(device.lastSeenAt)}`
-                  : `Connected · last signal ${formatRelativeTime(device.lastSeenAt)}`}
+                  : `Last signal ${formatRelativeTime(device.lastSeenAt)} — waiting for next ping`}
               </p>
             )}
             {!connected && device.lastSeenAt && (

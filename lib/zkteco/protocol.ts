@@ -9,12 +9,27 @@ export type ZkAttLogRow = {
   rawLine: string;
 };
 
-export type ZkPunchAction = "check_in" | "check_out" | "toggle";
+export type ZkPunchAction =
+  | "check_in"
+  | "check_out"
+  | "toggle"
+  | "break_start"
+  | "break_end"
+  | "ignore";
 
 /** ZKTeco ATT status: 0 in, 1 out, 2 break-out, 3 break-in, 4 OT-in, 5 OT-out. */
-export function punchActionFromStatus(statusCode: number): ZkPunchAction {
-  if ([1, 2, 5].includes(statusCode)) return "check_out";
-  if ([0, 3, 4].includes(statusCode)) return "check_in";
+export function punchActionFromStatus(
+  statusCode: number,
+  breakTracking = false
+): ZkPunchAction {
+  if (breakTracking) {
+    if (statusCode === 2) return "break_start";
+    if (statusCode === 3) return "break_end";
+  } else if (statusCode === 2 || statusCode === 3) {
+    return "ignore";
+  }
+  if ([1, 5].includes(statusCode)) return "check_out";
+  if ([0, 4].includes(statusCode)) return "check_in";
   return "toggle";
 }
 

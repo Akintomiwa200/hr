@@ -1,7 +1,9 @@
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import net from "node:net";
 import { DEFAULT_ZK_PORT, isPrivateIpv4 } from "@/lib/zkteco/device-ip";
+import { connectTimeoutMs, probeTcp } from "@/lib/zkteco/probe";
+
+export { probeDevicePort } from "@/lib/zkteco/probe";
 
 type ZKLibClient = {
   createSocket(): Promise<unknown>;
@@ -31,14 +33,8 @@ export type PulledPunch = {
   rawLine: string;
 };
 
-const PRIVATE_CONNECT_MS = 12_000;
-const PUBLIC_CONNECT_MS = 8_000;
 const PULL_TIMEOUT_MS = 45_000;
 const DISCONNECT_TIMEOUT_MS = 3_000;
-
-function connectTimeoutMs(ip: string) {
-  return isPrivateIpv4(ip) ? PRIVATE_CONNECT_MS : PUBLIC_CONNECT_MS;
-}
 
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string) {
   return new Promise<T>((resolve, reject) => {
@@ -103,29 +99,6 @@ export function describePullError(err: unknown, ip?: string, port?: number) {
     return "Could not stay connected to the terminal. Try Sync again.";
   }
   return message.replace(/^Error:\s*/, "") || "Could not sync with the terminal.";
-}
-
-type ProbeResult = "open" | "refused" | "timeout" | "unreachable";
-
-function probeTcp(ip: string, port: number, timeoutMs: number) {
-  return new Promise<ProbeResult>((resolve) => {
-    const socket = net.connect({ host: ip, port });
-    let settled = false;
-    const finish = (result: ProbeResult) => {
-      if (settled) return;
-      settled = true;
-      socket.destroy();
-      resolve(result);
-    };
-    socket.setTimeout(timeoutMs);
-    socket.once("connect", () => finish("open"));
-    socket.once("timeout", () => finish("timeout"));
-    socket.once("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "ECONNREFUSED" || err.code === "ECONNRESET") finish("refused");
-      else if (err.code === "EHOSTUNREACH" || err.code === "ENETUNREACH") finish("unreachable");
-      else finish("timeout");
-    });
-  });
 }
 
 function pinFromRecord(record: {

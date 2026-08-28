@@ -46,6 +46,7 @@ export type AttendancePunchRow = {
   id: string;
   pin: string;
   punchedAt: string;
+  createdAt: string;
   statusCode: number;
   action: "check_in" | "check_out" | "toggle";
   verifyLabel: string;
@@ -136,7 +137,8 @@ export async function getAttendanceOverview(session: SessionUser): Promise<Atten
   const showPunches = canManageDevices(session.role) && workspace.mode === "org";
   const todayStart = startOfDayInZone(DEFAULT_BRANCH_TIMEZONE);
   const today = startOfLocalDay();
-  const historyStart = new Date(todayStart.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const historyStart = new Date(todayStart.getTime() - 180 * 24 * 60 * 60 * 1000);
+  const punchHistoryStart = new Date(todayStart.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const [records, todaySelf, presentTodayCount, branches, devices] = await Promise.all([
     prisma.attendance.findMany({
@@ -159,7 +161,7 @@ export async function getAttendanceOverview(session: SessionUser): Promise<Atten
       ? prisma.attendance.count({
           where: {
             date: today,
-            status: { in: ["PRESENT", "REMOTE", "LATE", "HALF_DAY"] },
+            status: { in: ["PRESENT", "REMOTE", "LATE", "EARLY", "HALF_DAY"] },
             employee: scopedEmployee,
           },
         })
@@ -214,9 +216,26 @@ export async function getAttendanceOverview(session: SessionUser): Promise<Atten
     if (serials.length > 0) or.push({ serialNumber: { in: serials } });
     const [logs, endpoints] = await Promise.all([
       prisma.attendancePunchLog.findMany({
-        where: { OR: or, punchedAt: { gte: historyStart } },
-        orderBy: { punchedAt: "desc" },
-        take: 1000,
+        where: {
+          OR: or,
+          punchedAt: { gte: punchHistoryStart },
+        },
+        orderBy: [{ punchedAt: "desc" }],
+        take: 1200,
+        select: {
+          id: true,
+          pin: true,
+          punchedAt: true,
+          createdAt: true,
+          statusCode: true,
+          verifyType: true,
+          processed: true,
+          duplicate: true,
+          error: true,
+          serialNumber: true,
+          deviceId: true,
+          employeeId: true,
+        },
       }),
       loadDeviceEndpoints(deviceIds),
     ]);
@@ -244,6 +263,7 @@ export async function getAttendanceOverview(session: SessionUser): Promise<Atten
         id: log.id,
         pin: log.pin,
         punchedAt: log.punchedAt.toISOString(),
+        createdAt: log.createdAt.toISOString(),
         statusCode: log.statusCode,
         action: punchActionFromStatus(log.statusCode),
         verifyLabel: verifyLabel(log.verifyType),
@@ -266,9 +286,17 @@ export async function getAttendanceOverview(session: SessionUser): Promise<Atten
       const fromDevice = punches.filter(
         (p) => p.deviceId === device.id || p.serialNumber.trim().toUpperCase() === sn
       );
-      const todayFromDevice = fromDevice.filter(
+      const serverToday = fromDevice.filter(
         (p) => new Date(p.punchedAt).getTime() >= todayMs
       );
+      const latestPunchAt = fromDevice[0]?.punchedAt;
+      const deviceDayStart = latestPunchAt
+        ? startOfDayInZone(DEFAULT_BRANCH_TIMEZONE, new Date(latestPunchAt)).getTime()
+        : todayMs;
+      const todayFromDevice =
+        serverToday.length > 0
+          ? serverToday
+          : fromDevice.filter((p) => new Date(p.punchedAt).getTime() >= deviceDayStart);
       const lastPunch = todayFromDevice[0] ?? fromDevice[0] ?? null;
       const users = new Set(
         todayFromDevice.map((p) => p.employee?.id || `pin:${p.pin}`)

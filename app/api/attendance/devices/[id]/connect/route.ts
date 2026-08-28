@@ -3,16 +3,17 @@ import { requireRoles } from "@/lib/api-auth";
 import { DEVICE_ADMIN_ROLES } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { getCompanyScope, deviceCompanyWhere } from "@/lib/company-scope";
-import { DEFAULT_ZK_PORT, isPrivateIpv4, parseHostAndPort } from "@/lib/zkteco/device-ip";
-import { connectRealtimePush, downloadAttendanceLogs } from "@/lib/zkteco/pull";
-import { ingestPullAttendance, queueRealtimePushCommands, replayUnprocessedPunches } from "@/lib/zkteco/service";
+import { DEFAULT_ZK_PORT, parseHostAndPort } from "@/lib/zkteco/device-ip";
+import { probeDevicePort } from "@/lib/zkteco/probe";
+import { queueRealtimePushCommands } from "@/lib/zkteco/service";
 import { saveDeviceEndpoint } from "@/lib/zkteco/device-endpoint-store";
 import { getReachableOriginFromRequest } from "@/lib/app-url-server";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { isDeviceOnline } from "@/lib/attendance-device-spec";
+import { scheduleDevicePull } from "@/lib/zkteco/live-pull";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 20;
 
 export async function POST(
   request: NextRequest,
@@ -88,62 +89,60 @@ export async function POST(
   }
 
   await saveDeviceEndpoint(id, endpoint.ip, endpoint.port);
-  await queueRealtimePushCommands(id, admsUrl);
+  await queueRealtimePushCommands(id, admsUrl).catch(() => undefined);
 
   const serial =
     data.serialNumber ||
     existing.serialNumber ||
     (typeof body.serialNumber === "string" ? body.serialNumber.trim().toUpperCase() : "");
-  if (serial) {
-    await replayUnprocessedPunches(serial);
-  }
 
   const alreadyLive = isDeviceOnline(existing.lastSeenAt);
+  const probe = await Promise.race([
+    probeDevicePort(endpoint.ip, endpoint.port, 5_000),
+    new Promise<"timeout">((resolve) => {
+      setTimeout(() => resolve("timeout"), 6_000);
+    }),
+  ]);
+  const reachedDevice = probe === "open";
 
-  const savedPayload = {
-    ok: true as const,
-    saved: true as const,
+  if (reachedDevice) {
+    scheduleDevicePull(id, true);
+  }
+
+  broadcastAppEvent("attendance_updated", {
+    id,
+    action: reachedDevice ? "device_connected" : "device_saved",
+  });
+
+  const hardware = `${endpoint.ip}:${endpoint.port}`;
+  let message: string;
+  if (reachedDevice) {
+    message = `Reached ${hardware}. Real-time PUSH is on for SN ${serial || "this terminal"}. Recent thumbprints are downloading now — check Live or History in a few seconds.`;
+  } else if (probe === "refused") {
+    message = `Saved ${hardware}, but the port refused the connection. Confirm COMM → Ethernet IP/port on the machine.`;
+  } else if (probe === "unreachable") {
+    message = `Saved ${hardware}, but this server cannot reach that network. Use the LAN IP while this PC is on the same office Wi‑Fi.`;
+  } else if (alreadyLive) {
+    message = `Saved ${hardware}. Could not probe port 4370 just now, but the terminal was already pushing. Real-time PUSH stays on.`;
+  } else {
+    message = `Saved ${hardware}. No reply on port 4370 yet. Real-time PUSH is listening for SN ${serial || "this terminal"} — punches still appear when the machine can reach Smart HR.`;
+  }
+
+  return NextResponse.json({
+    ok: true,
+    saved: true,
     ipAddress: endpoint.ip,
     commPort: endpoint.port,
     listenUrl: admsUrl,
     listenHost: reachable.hostname,
     listenPort: reachable.port,
     serialNumber: serial || existing.serialNumber,
-  };
-
-  try {
-    const pulled = isPrivateIpv4(endpoint.ip)
-      ? await connectRealtimePush({
-          ip: endpoint.ip,
-          port: endpoint.port,
-          admsUrl,
-        })
-      : await downloadAttendanceLogs({
-          ip: endpoint.ip,
-          port: endpoint.port,
-        });
-    const ingested = await ingestPullAttendance(id, pulled.punches);
-    broadcastAppEvent("attendance_updated", { id, action: "device_connected" });
-
-    return NextResponse.json({
-      ...savedPayload,
-      reachedDevice: true,
-      realtime: "live",
-      logsDownloaded: pulled.punches.length,
-      processed: ingested.processed,
-      unmatched: ingested.unmatched,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Could not reach the terminal yet.";
-    broadcastAppEvent("attendance_updated", { id, action: "device_saved" });
-    return NextResponse.json({
-      ...savedPayload,
-      reachedDevice: alreadyLive,
-      realtime: alreadyLive ? "live" : "waiting",
-      processed: 0,
-      unmatched: 0,
-      logsDownloaded: 0,
-      message,
-    });
-  }
+    reachedDevice,
+    realtime: reachedDevice || alreadyLive ? "live" : "waiting",
+    probe,
+    processed: 0,
+    unmatched: 0,
+    logsDownloaded: 0,
+    message,
+  });
 }

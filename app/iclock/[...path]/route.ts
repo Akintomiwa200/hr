@@ -96,7 +96,10 @@ export async function GET(
     return iclockText(await pendingDeviceCommands(sn, peerIp));
   }
   if (action === "ping") {
-    if (sn) void heartbeatBySerial(sn, peerIp).catch(() => undefined);
+    if (!sn) return iclockOk();
+    void heartbeatBySerial(sn, peerIp).catch(() => undefined);
+    const cmds = await pendingDeviceCommands(sn, peerIp);
+    if (cmds.trim() && cmds.trim() !== "OK") return iclockText(cmds);
     return iclockOk();
   }
   if (action === "registry") {
@@ -129,11 +132,20 @@ export async function POST(
     return iclockOk();
   }
   if (action === "ping") {
-    if (sn) void heartbeatBySerial(sn, peerIp).catch(() => undefined);
+    if (!sn) return iclockOk();
+    void heartbeatBySerial(sn, peerIp).catch(() => undefined);
+    const cmds = await pendingDeviceCommands(sn, peerIp);
+    if (cmds.trim() && cmds.trim() !== "OK") return iclockText(cmds);
     return iclockOk();
   }
   if (action === "registry") {
     if (sn) await recordDeviceInfo(sn, await readBody(request));
+    return iclockOk();
+  }
+
+  const body = await readBody(request);
+  if (sn && (tableFrom(request) === "ATTLOG" || looksLikeAttLog(body))) {
+    await ingestAttLog(sn, body, request.nextUrl.searchParams.get("Stamp") ?? undefined, peerIp);
     return iclockOk();
   }
 

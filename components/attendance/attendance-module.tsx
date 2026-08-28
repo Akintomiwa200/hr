@@ -22,17 +22,17 @@ import { CheckInCard } from "@/components/attendance/check-in-card";
 import { AttendanceMethodBadge } from "@/components/attendance/attendance-method-badge";
 import { LiveTerminalCard } from "@/components/attendance/live-terminal-card";
 import { useAttendanceLive } from "@/hooks/use-attendance-live";
+import { usePollingFetch } from "@/hooks/use-polling-fetch";
 import { cn, formatDate, fullName } from "@/lib/utils";
+import { isDeviceOnline } from "@/lib/attendance-device-spec";
 import type { WorkspaceMode } from "@/lib/role-workspace";
-import type {
-  AttendanceOverview,
-  AttendanceOverviewRow,
-  AttendancePunchRow,
-} from "@/lib/attendance-overview";
+import { AttendanceSettingsPanel } from "@/components/attendance/attendance-settings-panel";
+import type { AttendanceSettingsData } from "@/lib/attendance-settings";
 
 const STATUS_FILTERS = [
   { id: "ALL", label: "All" },
   { id: "PRESENT", label: "Present" },
+  { id: "EARLY", label: "Early" },
   { id: "LATE", label: "Late" },
   { id: "ABSENT", label: "Absent" },
   { id: "REMOTE", label: "Remote" },
@@ -47,6 +47,109 @@ const PUNCH_FILTERS = [
 
 type PunchFilterId = (typeof PUNCH_FILTERS)[number]["id"];
 type ViewTab = "live" | "history" | "punches" | "mine";
+
+function FilterPills<T extends string>({
+  items,
+  value,
+  onChange,
+  badgeFor,
+}: {
+  items: ReadonlyArray<{ id: T; label: string }>;
+  value: T;
+  onChange: (id: T) => void;
+  badgeFor?: Partial<Record<T, number>>;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((item) => {
+        const active = value === item.id;
+        const badge = badgeFor?.[item.id];
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onChange(item.id)}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap",
+              active
+                ? "bg-brand-500 text-white border-brand-500 shadow-sm"
+                : "bg-white text-gray-600 border-gray-200 hover:border-brand-200 hover:text-brand-700"
+            )}
+          >
+            {item.label}
+            {typeof badge === "number" && badge > 0 && (
+              <span
+                className={cn(
+                  "min-w-[1.125rem] px-1 py-0.5 rounded-full text-[10px] font-bold leading-none",
+                  active ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800"
+                )}
+              >
+                {badge}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AttendanceFilterBar({
+  showPunchFilters,
+  showStatusFilters,
+  punchFilter,
+  statusFilter,
+  onPunchFilter,
+  onStatusFilter,
+  unmatchedCount,
+}: {
+  showPunchFilters: boolean;
+  showStatusFilters: boolean;
+  punchFilter: PunchFilterId;
+  statusFilter: string;
+  onPunchFilter: (id: PunchFilterId) => void;
+  onStatusFilter: (id: string) => void;
+  unmatchedCount: number;
+}) {
+  if (!showPunchFilters && !showStatusFilters) return null;
+
+  return (
+    <div className="px-5 py-3 border-b border-gray-100 bg-[#fafbfc] space-y-3">
+      {showPunchFilters && (
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:gap-4">
+          <div className="flex items-center gap-2 shrink-0 lg:w-36 pt-0.5">
+            <Fingerprint className="w-3.5 h-3.5 text-brand-500" />
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+              Thumbprints
+            </span>
+          </div>
+          <FilterPills
+            items={PUNCH_FILTERS}
+            value={punchFilter}
+            onChange={onPunchFilter}
+            badgeFor={{ UNMATCHED: unmatchedCount }}
+          />
+        </div>
+      )}
+      {showStatusFilters && (
+        <div
+          className={cn(
+            "flex flex-col gap-2 lg:flex-row lg:items-start lg:gap-4",
+            showPunchFilters && "pt-3 border-t border-gray-100/80 lg:pt-0 lg:border-t-0"
+          )}
+        >
+          <div className="flex items-center gap-2 shrink-0 lg:w-36 pt-0.5">
+            <Filter className="w-3.5 h-3.5 text-brand-500" />
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+              Daily roster
+            </span>
+          </div>
+          <FilterPills items={STATUS_FILTERS} value={statusFilter} onChange={onStatusFilter} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function formatTime(value: Date | string | null) {
   if (!value) return "—";
@@ -157,6 +260,8 @@ export function AttendanceModule({
   showCheckIn,
   currentEmployeeId,
   canManageManual = false,
+  canManageSettings = false,
+  attendanceSettings,
 }: {
   overview: AttendanceOverview;
   isEmployee: boolean;
@@ -166,6 +271,8 @@ export function AttendanceModule({
   showCheckIn?: boolean;
   currentEmployeeId?: string | null;
   canManageManual?: boolean;
+  canManageSettings?: boolean;
+  attendanceSettings?: AttendanceSettingsData;
 }) {
   const [data, setData] = useState(overview);
   const [search, setSearch] = useState("");
@@ -183,31 +290,83 @@ export function AttendanceModule({
     setData(overview);
   }, [overview]);
 
-  const loadOverview = useCallback(async () => {
-    const res = await fetch("/api/attendance/overview");
-    if (!res.ok) return;
-    const next = (await res.json()) as AttendanceOverview;
-    setData(next);
-    setLiveAt(new Date());
+  const loadOverview = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await fetch("/api/attendance/overview", { signal });
+      if (!res.ok || signal?.aborted) return;
+      const next = (await res.json()) as AttendanceOverview;
+      if (signal?.aborted) return;
+      setData(next);
+      setLiveAt(new Date());
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
+    }
   }, []);
 
-  useAttendanceLive(loadOverview);
+  const refreshDeviceStatus = useCallback(async (signal: AbortSignal) => {
+    try {
+      const res = await fetch("/api/attendance/devices/status", { signal });
+      if (!res.ok || signal.aborted) return;
+      const payload = (await res.json()) as {
+        devices?: Array<{
+          id: string;
+          lastSeenAt: string | null;
+          isActive: boolean;
+          lastPunchAt: string | null;
+          lastPunchPin: string | null;
+        }>;
+      };
+      if (signal.aborted || !payload.devices?.length) return;
+      const byId = new Map(payload.devices.map((row) => [row.id, row]));
+      setData((prev) => ({
+        ...prev,
+        devices: prev.devices.map((device) => {
+          const row = byId.get(device.id);
+          if (!row) return device;
+          return {
+            ...device,
+            lastSeenAt: row.lastSeenAt,
+            isActive: row.isActive,
+            online: row.isActive && isDeviceOnline(row.lastSeenAt),
+            lastPunchAt: row.lastPunchAt,
+            lastPunchPin: row.lastPunchPin,
+            lastPunchName: row.lastPunchPin ? `PIN ${row.lastPunchPin}` : device.lastPunchName,
+          };
+        }),
+      }));
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
+    }
+  }, []);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      void loadOverview();
-    }, 4_000);
-    return () => window.clearInterval(timer);
-  }, [loadOverview]);
+  useAttendanceLive(() => {
+    void loadOverview();
+    void refreshDeviceStatus(new AbortController().signal);
+  });
+
+  usePollingFetch((signal) => loadOverview(signal), { intervalMs: 20_000 });
+
+  const pollDeviceStatus = showDevicePanel && tab === "live";
+  usePollingFetch(refreshDeviceStatus, {
+    enabled: pollDeviceStatus,
+    intervalMs: 5_000,
+  });
 
   useEffect(() => {
     if (!data.showPunches) return;
+    const controller = new AbortController();
     const pull = () => {
-      void fetch("/api/attendance/devices/live-sync", { method: "POST" });
+      void fetch("/api/attendance/devices/live-sync", {
+        method: "POST",
+        signal: controller.signal,
+      });
     };
     pull();
-    const timer = window.setInterval(pull, 25_000);
-    return () => window.clearInterval(timer);
+    const timer = window.setInterval(pull, 45_000);
+    return () => {
+      window.clearInterval(timer);
+      controller.abort();
+    };
   }, [data.showPunches]);
 
   const records = data.records;
@@ -223,6 +382,12 @@ export function AttendanceModule({
         return d.getTime();
       })();
   const isPunchToday = (value: Date | string) => new Date(value).getTime() >= todayStartMs;
+  const latestPunchDayStart = useMemo(() => {
+    const latest = punches[0]?.punchedAt;
+    if (!latest) return todayStartMs;
+    const d = new Date(latest);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  }, [punches, todayStartMs]);
 
   const myRecords = useMemo(
     () => (currentEmployeeId ? records.filter((r) => r.employee.id === currentEmployeeId) : []),
@@ -302,10 +467,11 @@ export function AttendanceModule({
     return list;
   }, [punches, branchId, deviceId, selectedDevice, punchFilter, search]);
 
-  const todayPunches = useMemo(
-    () => punchesByFilters.filter((p) => isPunchToday(p.punchedAt)),
-    [punchesByFilters, todayStartMs]
-  );
+  const todayPunches = useMemo(() => {
+    const serverToday = punchesByFilters.filter((p) => isPunchToday(p.punchedAt));
+    if (serverToday.length > 0) return serverToday;
+    return punchesByFilters.filter((p) => new Date(p.punchedAt).getTime() >= latestPunchDayStart);
+  }, [punchesByFilters, todayStartMs, latestPunchDayStart]);
 
   const historyPunches = punchesByFilters;
 
@@ -328,7 +494,7 @@ export function AttendanceModule({
   const statsSource = tab === "punches" ? liveRecords : filteredRecords;
   const stats = useMemo(() => {
     const present = statsSource.filter((r) =>
-      ["PRESENT", "REMOTE", "LATE", "HALF_DAY"].includes(r.status)
+      ["PRESENT", "REMOTE", "LATE", "EARLY", "HALF_DAY"].includes(r.status)
     ).length;
     const late = statsSource.filter((r) => r.status === "LATE").length;
     const absent = statsSource.filter((r) => r.status === "ABSENT").length;
@@ -337,7 +503,7 @@ export function AttendanceModule({
 
   const presentToday = useMemo(() => {
     const today = rosterRecords.filter(
-      (r) => isToday(r.date) && ["PRESENT", "REMOTE", "LATE", "HALF_DAY"].includes(r.status)
+      (r) => isToday(r.date) && ["PRESENT", "REMOTE", "LATE", "EARLY", "HALF_DAY"].includes(r.status)
     );
     if (branchId === "ALL") return today.length;
     return today.filter((r) => recordBranchId(r) === branchId).length;
@@ -365,6 +531,9 @@ export function AttendanceModule({
   const showPeople = mode !== "self" && tab !== "mine";
   const canCheckIn = showCheckIn ?? isEmployee;
   const showBranchFilter = mode !== "self" && branches.length > 0;
+  const showPunchFilters =
+    showPunches && (tab === "punches" || tab === "live" || tab === "history");
+  const showStatusFilters = tab !== "punches";
 
   const tabs: { id: ViewTab; label: string }[] = [];
   if (mode !== "self") tabs.push({ id: "live", label: "Live today" });
@@ -492,7 +661,8 @@ export function AttendanceModule({
       )}
 
       {tabs.length > 1 && (
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
         {tabs.map((item) => (
           <button
             key={item.id}
@@ -520,6 +690,10 @@ export function AttendanceModule({
             )}
           </button>
         ))}
+        </div>
+        {canManageSettings && attendanceSettings && (
+          <AttendanceSettingsPanel settings={attendanceSettings} />
+        )}
       </div>
       )}
 
@@ -547,135 +721,111 @@ export function AttendanceModule({
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-brand-50/30 via-white to-white">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900 inline-flex items-center gap-2">
-              {tab === "live" && "Live today"}
-              {tab === "history" && (mode === "self" ? "Your attendance log" : "Device history")}
-              {tab === "punches" && "Hardware usage"}
-              {tab === "mine" && "Your check-ins"}
-              {(tab === "live" || (tab === "history" && showPunches)) && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Real-time
-                </span>
-              )}
-            </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {tab === "live" && "Updates as soon as someone punches on a terminal."}
-              {tab === "history" &&
-                (showPunches
-                  ? "Live log from the machines · last 90 days · includes people not yet in Smart HR"
-                  : "Last 90 days · used for payroll deductions")}
-              {tab === "punches" &&
-                "Every fingerprint stored on the hardware, including PINs not yet in Smart HR."}
-              {tab === "mine" && "Last 90 days · used for payroll deductions"}
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-            {showBranchFilter && (
-              <label className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <select
-                  value={branchId}
-                  onChange={(e) => setBranchId(e.target.value)}
-                  className="pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25 min-w-[180px]"
-                >
-                  <option value="ALL">All branches</option>
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {showPunches && devices.length > 0 && (
-              <label className="relative">
-                <Fingerprint className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <select
-                  value={deviceId}
-                  onChange={(e) => setDeviceId(e.target.value)}
-                  className="pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25 min-w-[180px]"
-                >
-                  <option value="ALL">All devices</option>
-                  {devicesByBranch.map((device) => (
-                    <option key={device.id} value={device.id}>
-                      {device.name}
-                      {device.branchName ? ` · ${device.branchName}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {(showPeople || tab === "punches" || (tab === "history" && showPunches)) && (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={
-                    tab === "punches" || tab === "history"
-                      ? "Search name, PIN, or device..."
-                      : "Search employee..."
-                  }
-                  className="pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25 w-full sm:w-56"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+        <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-brand-50/30 via-white to-white">
+          <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-gray-900 inline-flex items-center gap-2 flex-wrap">
+                {tab === "live" && "Live today"}
+                {tab === "history" && (mode === "self" ? "Your attendance log" : "Device history")}
+                {tab === "punches" && "Hardware usage"}
+                {tab === "mine" && "Your check-ins"}
+                {(tab === "live" || (tab === "history" && showPunches)) && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Real-time
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5 max-w-xl">
+                {tab === "live" && "Updates as soon as someone punches on a terminal."}
+                {tab === "history" &&
+                  (showPunches
+                    ? "Live log from the machines · last 90 days · includes people not yet in Smart HR"
+                    : "Last 90 days · used for payroll deductions")}
+                {tab === "punches" &&
+                  "Every fingerprint stored on the hardware, including PINs not yet in Smart HR."}
+                {tab === "mine" && "Last 90 days · used for payroll deductions"}
+              </p>
+            </div>
+
+            {(showBranchFilter || (showPunches && devices.length > 0) || showPeople || tab === "punches") && (
+              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 xl:justify-end shrink-0">
+                {showBranchFilter && (
+                  <label className="relative min-w-[160px] flex-1 sm:flex-none">
+                    <span className="sr-only">Branch</span>
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <select
+                      value={branchId}
+                      onChange={(e) => setBranchId(e.target.value)}
+                      className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25"
+                    >
+                      <option value="ALL">All branches</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {showPunches && devices.length > 0 && (
+                  <label className="relative min-w-[160px] flex-1 sm:flex-none">
+                    <span className="sr-only">Device</span>
+                    <Fingerprint className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <select
+                      value={deviceId}
+                      onChange={(e) => setDeviceId(e.target.value)}
+                      className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25"
+                    >
+                      <option value="ALL">All devices</option>
+                      {devicesByBranch.map((device) => (
+                        <option key={device.id} value={device.id}>
+                          {device.name}
+                          {device.branchName ? ` · ${device.branchName}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {(showPeople || tab === "punches" || (tab === "history" && showPunches)) && (
+                  <div className="relative min-w-[200px] flex-1 sm:flex-none sm:min-w-[220px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder={
+                        tab === "punches" || tab === "history" || tab === "live"
+                          ? "Search name, PIN, device..."
+                          : "Search employee..."
+                      }
+                      className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25"
+                    />
+                    {search && (
+                      <button
+                        type="button"
+                        onClick={() => setSearch("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                        aria-label="Clear search"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
           </div>
         </div>
 
-        {showPunches && (tab === "punches" || tab === "history" || tab === "live") && (
-          <div className="px-5 py-3 border-b border-gray-50 flex flex-wrap items-center gap-2">
-            <Fingerprint className="w-4 h-4 text-gray-400" />
-            {PUNCH_FILTERS.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setPunchFilter(f.id)}
-                className={cn(
-                  "px-3 py-1.5 text-[12px] font-medium rounded-lg border transition-colors",
-                  punchFilter === f.id
-                    ? "bg-brand-500 text-white border-brand-500"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-brand-200"
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {tab !== "punches" && (
-          <div className="px-5 py-3 border-b border-gray-50 flex flex-wrap items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-400" />
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setStatusFilter(f.id)}
-                className={cn(
-                  "px-3 py-1.5 text-[12px] font-medium rounded-lg border transition-colors",
-                  statusFilter === f.id
-                    ? "bg-brand-500 text-white border-brand-500"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-brand-200"
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <AttendanceFilterBar
+          showPunchFilters={showPunchFilters}
+          showStatusFilters={showStatusFilters}
+          punchFilter={punchFilter}
+          statusFilter={statusFilter}
+          onPunchFilter={setPunchFilter}
+          onStatusFilter={setStatusFilter}
+          unmatchedCount={unmatchedCount}
+        />
 
         <div className="p-5">
           {tab === "punches" ? (
@@ -879,7 +1029,7 @@ export function AttendanceModule({
                 value={editForm.status}
                 onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
               >
-                {["PRESENT", "LATE", "REMOTE", "ABSENT", "HALF_DAY"].map((s) => (
+                {["PRESENT", "EARLY", "LATE", "REMOTE", "ABSENT", "HALF_DAY"].map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>

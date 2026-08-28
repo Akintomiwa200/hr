@@ -9,6 +9,8 @@ import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
 import { peopleDirectoryEmployeeWhere } from "@/lib/employee-access";
 import { canAssignRole, normalizeRole } from "@/lib/roles";
 import { parseLocalDate } from "@/lib/dates";
+import { parseEmployeeShiftFields } from "@/lib/employee-shift";
+import { replayUnprocessedPunchesForEmployee } from "@/lib/zkteco/service";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -118,7 +120,19 @@ export async function POST(request: NextRequest) {
       hireDate,
     });
 
+    const shiftFields = parseEmployeeShiftFields(body);
+    if (shiftFields.isShiftWorker) {
+      await prisma.employee.update({
+        where: { id: employee.id },
+        data: shiftFields,
+      });
+    }
+
     notifyEmployeeChange(employee.id, "created");
+
+    if (biometricPin || employee.employeeCode) {
+      void replayUnprocessedPunchesForEmployee(employee.id);
+    }
 
     const startDate = parseLocalDate(hireDate) ?? employee.hireDate;
 

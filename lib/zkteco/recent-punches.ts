@@ -7,6 +7,7 @@ export type LatestPunch = {
   error: string | null;
 };
 
+/** Latest punch per serial — one query for all devices. */
 export async function latestPunchBySerial(serials: string[]) {
   const unique = [...new Set(serials.map((sn) => sn.trim().toUpperCase()).filter(Boolean))];
   const map = new Map<string, LatestPunch>();
@@ -15,20 +16,26 @@ export async function latestPunchBySerial(serials: string[]) {
   const logs = await prisma.attendancePunchLog.findMany({
     where: { serialNumber: { in: unique } },
     orderBy: { punchedAt: "desc" },
-    take: 200,
-    select: { serialNumber: true, pin: true, punchedAt: true, processed: true, error: true },
+    select: {
+      serialNumber: true,
+      pin: true,
+      punchedAt: true,
+      processed: true,
+      error: true,
+    },
+    take: Math.max(unique.length * 4, 32),
   });
 
   for (const log of logs) {
-    const key = log.serialNumber.trim().toUpperCase();
-    if (!map.has(key)) {
-      map.set(key, {
-        pin: log.pin,
-        punchedAt: log.punchedAt,
-        processed: log.processed,
-        error: log.error,
-      });
-    }
+    const sn = log.serialNumber.trim().toUpperCase();
+    if (!unique.includes(sn) || map.has(sn)) continue;
+    map.set(sn, {
+      pin: log.pin,
+      punchedAt: log.punchedAt,
+      processed: log.processed,
+      error: log.error,
+    });
   }
+
   return map;
 }

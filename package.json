@@ -18,7 +18,7 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:import-zkteco": "tsx scripts/import-zkteco-employees.ts",
     "db:purge-demo": "tsx scripts/purge-demo-data.mjs",
     "db:setup": "node scripts/db-sync.mjs && tsx prisma/seed.ts",
     "postinstall": "prisma generate"
@@ -52,6 +52,7 @@
     "prisma": "^6.19.3",
     "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "xlsx": "^0.18.5"
   }
 }

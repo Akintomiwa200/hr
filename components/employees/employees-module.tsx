@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Download,
+  Upload,
   Eye,
   MoreVertical,
   Pencil,
@@ -98,6 +99,7 @@ export function EmployeesModule({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const [viewEmployee, setViewEmployee] = useState<EmployeeRow | null>(null);
   const [editEmployee, setEditEmployee] = useState<EmployeeRow | null>(null);
@@ -206,6 +208,37 @@ export function EmployeesModule({
     if (res.ok) {
       const data = await res.json();
       setEmployees(data);
+    }
+  }
+
+  async function importDeviceStaff(file: File) {
+    setImporting(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      if (branches[0]?.id) body.append("branchId", branches[0].id);
+      const res = await fetch("/api/employees/import", { method: "POST", body });
+      const data = (await res.json()) as {
+        error?: string;
+        created?: number;
+        updated?: number;
+        skipped?: number;
+        preview?: { count: number };
+      };
+      if (!res.ok) {
+        notify.error(data.error || "Import failed");
+        return;
+      }
+      notify.success(
+        "Device staff imported",
+        `${data.created ?? 0} added · ${data.updated ?? 0} updated · ${data.skipped ?? 0} skipped`
+      );
+      await refreshList();
+      router.refresh();
+    } catch {
+      notify.error("Import failed");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -456,6 +489,22 @@ export function EmployeesModule({
               <option value="INACTIVE">Inactive</option>
             </select>
             {canExport && (
+            <>
+            <label className="inline-flex items-center gap-1.5 px-4 py-2 text-[12px] font-medium bg-white border border-gray-200 text-gray-700 rounded-lg hover:border-brand-200 cursor-pointer">
+              <Upload className="w-3.5 h-3.5" />
+              {importing ? "Importing…" : "Import from device"}
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                disabled={importing}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void importDeviceStaff(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
             <button
               type="button"
               onClick={() => window.open("/api/dashboard/export?type=employees", "_blank")}
@@ -464,6 +513,7 @@ export function EmployeesModule({
               <Download className="w-3.5 h-3.5" />
               Export
             </button>
+            </>
             )}
           </div>
         </div>

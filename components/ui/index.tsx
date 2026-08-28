@@ -339,6 +339,7 @@ export function statusBadge(status: string) {
     PRESENT: { label: "Present", variant: "success" },
     ABSENT: { label: "Absent", variant: "error" },
     LATE: { label: "Late", variant: "warning" },
+    EARLY: { label: "Early", variant: "info" },
     REMOTE: { label: "Remote", variant: "info" },
     HALF_DAY: { label: "Half Day", variant: "warning" },
     OPEN: { label: "Open", variant: "success" },

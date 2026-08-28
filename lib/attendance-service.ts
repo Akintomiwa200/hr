@@ -3,9 +3,12 @@ import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { revalidatePath } from "next/cache";
 import type { AttendanceMethod, AttendanceStatus } from "@prisma/client";
 import { parseDeviceLocalTime } from "@/lib/zkteco/timezone";
-
-const LATE_HOUR = 9;
-const LATE_MINUTE = 15;
+import {
+  getAttendanceSettings,
+  getWorkStartRuleForEmployee,
+  type WorkStartRule,
+} from "@/lib/attendance-settings";
+import { pinMatchesEmployee } from "@/lib/zkteco/pin-match";
 
 export type AttendancePunchInput = {
   employeeId: string;
@@ -21,7 +24,7 @@ export type AttendancePunchInput = {
 export type AttendancePunchResult = {
   id: string;
   employeeId: string;
-  action: "check_in" | "check_out";
+  action: "check_in" | "check_out" | "break_start" | "break_end" | "ignored";
   checkIn: Date | null;
   checkOut: Date | null;
   status: AttendanceStatus;
@@ -48,11 +51,12 @@ function startOfDay(date: Date, timeZone?: string | null) {
 }
 
 function hourMinute(timestamp: Date, timeZone?: string | null) {
-  if (!timeZone) {
+  const tz = timeZone ?? undefined;
+  if (!tz) {
     return { hour: timestamp.getHours(), minute: timestamp.getMinutes() };
   }
   const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
+    timeZone: tz,
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
@@ -63,16 +67,21 @@ function hourMinute(timestamp: Date, timeZone?: string | null) {
   };
 }
 
-function resolveStatus(
+export function resolveStatusFromRule(
   timestamp: Date,
+  rule: WorkStartRule,
   override?: AttendanceStatus,
   timeZone?: string | null
 ): AttendanceStatus {
   if (override) return override;
-  const { hour, minute } = hourMinute(timestamp, timeZone);
-  const isLate =
-    hour > LATE_HOUR || (hour === LATE_HOUR && minute > LATE_MINUTE);
-  return isLate ? "LATE" : "PRESENT";
+  const { hour, minute } = hourMinute(timestamp, timeZone ?? rule.timezone);
+  const punchMinutes = hour * 60 + minute;
+  const startMinutes = rule.startHour * 60 + rule.startMinute;
+  const graceEnd = startMinutes + rule.graceMinutes;
+
+  if (punchMinutes < startMinutes) return "EARLY";
+  if (punchMinutes <= graceEnd) return "PRESENT";
+  return "LATE";
 }
 
 const PUNCH_DEBOUNCE_MS = 2 * 60 * 1000;
@@ -87,10 +96,14 @@ async function notifyAttendanceUpdated(employeeId: string) {
     employeeId,
     at: Date.now(),
   });
-  revalidatePath("/attendance");
-  revalidatePath("/dashboard");
-  revalidatePath("/holidays");
-  revalidatePath(`/employees/${employeeId}/attendance`);
+  try {
+    revalidatePath("/attendance");
+    revalidatePath("/dashboard");
+    revalidatePath("/holidays");
+    revalidatePath(`/employees/${employeeId}/attendance`);
+  } catch {
+    // Device ingest and scripts run outside a Next.js request — SSE still updates the UI.
+  }
 }
 
 export async function resolveEmployeeId(input: {
@@ -135,10 +148,6 @@ export async function resolveEmployeeId(input: {
     return emp?.id ?? null;
   }
   if (input.pin?.trim()) {
-    const { normalizePin } = await import("@/lib/zkteco/pin");
-    const pin = normalizePin(input.pin);
-    if (!pin) return null;
-
     const pinRaw = input.pin.trim();
     const people = await prisma.employee.findMany({
       where: { status: "ACTIVE", ...companyFilter },
@@ -150,10 +159,7 @@ export async function resolveEmployeeId(input: {
       },
     });
 
-    const matches = people.filter((person) => {
-      const stored = normalizePin(person.biometricPin) ?? normalizePin(person.employeeCode);
-      return stored === pin || person.biometricPin === pinRaw;
-    });
+    const matches = people.filter((person) => pinMatchesEmployee(pinRaw, person));
     if (matches.length === 0) return null;
     if (input.preferBranchId) {
       const atBranch = matches.find((p) => p.branchId === input.preferBranchId);
@@ -168,7 +174,8 @@ export async function recordCheckIn(
   input: AttendancePunchInput
 ): Promise<AttendancePunchResult> {
   const timestamp = input.timestamp ?? new Date();
-  const day = startOfDay(timestamp, input.timeZone);
+  const rule = await getWorkStartRuleForEmployee(input.employeeId);
+  const day = startOfDay(timestamp, input.timeZone ?? rule.timezone);
 
   if (input.externalId) {
     const existing = await prisma.attendance.findUnique({
@@ -188,7 +195,12 @@ export async function recordCheckIn(
     }
   }
 
-  const status = resolveStatus(timestamp, input.statusOverride, input.timeZone);
+  const status = resolveStatusFromRule(
+    timestamp,
+    rule,
+    input.statusOverride,
+    input.timeZone ?? rule.timezone
+  );
 
   const existingDay = await prisma.attendance.findUnique({
     where: {
@@ -254,7 +266,8 @@ export async function recordCheckOut(
   input: AttendancePunchInput
 ): Promise<AttendancePunchResult> {
   const timestamp = input.timestamp ?? new Date();
-  const day = startOfDay(timestamp, input.timeZone);
+  const rule = await getWorkStartRuleForEmployee(input.employeeId);
+  const day = startOfDay(timestamp, input.timeZone ?? rule.timezone);
 
   if (input.externalId) {
     const existing = await prisma.attendance.findUnique({
@@ -287,7 +300,20 @@ export async function recordCheckOut(
     throw new Error("NO_CHECK_IN");
   }
 
-  if (isDebounced(existing.checkIn, timestamp) && !existing.checkOut) {
+  if (existing.checkOut) {
+    return {
+      id: existing.id,
+      employeeId: existing.employeeId,
+      action: "check_out",
+      checkIn: existing.checkIn,
+      checkOut: existing.checkOut,
+      status: existing.status,
+      method: existing.checkOutMethod ?? input.method,
+      duplicate: true,
+    };
+  }
+
+  if (isDebounced(existing.checkIn, timestamp)) {
     return {
       id: existing.id,
       employeeId: existing.employeeId,
@@ -325,7 +351,8 @@ export async function recordCheckOut(
 }
 
 export async function recordDeviceToggle(input: AttendancePunchInput) {
-  const day = startOfDay(input.timestamp ?? new Date(), input.timeZone);
+  const rule = await getWorkStartRuleForEmployee(input.employeeId);
+  const day = startOfDay(input.timestamp ?? new Date(), input.timeZone ?? rule.timezone);
   const existing = await prisma.attendance.findUnique({
     where: {
       employeeId_date: {
@@ -356,6 +383,113 @@ export async function recordDeviceToggle(input: AttendancePunchInput) {
   throw new Error("ALREADY_COMPLETED");
 }
 
+export async function recordBreakStart(input: AttendancePunchInput) {
+  const timestamp = input.timestamp ?? new Date();
+  const rule = await getWorkStartRuleForEmployee(input.employeeId);
+  const day = startOfDay(timestamp, input.timeZone ?? rule.timezone);
+
+  const attendance = await prisma.attendance.findUnique({
+    where: { employeeId_date: { employeeId: input.employeeId, date: day } },
+  });
+  if (!attendance?.checkIn) {
+    throw new Error("NO_CHECK_IN");
+  }
+  if (!attendance.checkOut) {
+    const openBreak = await prisma.attendanceBreak.findFirst({
+      where: { employeeId: input.employeeId, date: day, breakEnd: null },
+    });
+    if (openBreak) {
+      return {
+        id: attendance.id,
+        employeeId: input.employeeId,
+        action: "break_start" as const,
+        checkIn: attendance.checkIn,
+        checkOut: attendance.checkOut,
+        status: attendance.status,
+        method: input.method,
+        duplicate: true,
+      };
+    }
+    await prisma.attendanceBreak.create({
+      data: {
+        employeeId: input.employeeId,
+        attendanceId: attendance.id,
+        date: day,
+        breakStart: timestamp,
+      },
+    });
+    await notifyAttendanceUpdated(input.employeeId);
+  }
+
+  return {
+    id: attendance.id,
+    employeeId: input.employeeId,
+    action: "break_start" as const,
+    checkIn: attendance.checkIn,
+    checkOut: attendance.checkOut,
+    status: attendance.status,
+    method: input.method,
+  };
+}
+
+export async function recordBreakEnd(input: AttendancePunchInput) {
+  const timestamp = input.timestamp ?? new Date();
+  const rule = await getWorkStartRuleForEmployee(input.employeeId);
+  const day = startOfDay(timestamp, input.timeZone ?? rule.timezone);
+
+  const attendance = await prisma.attendance.findUnique({
+    where: { employeeId_date: { employeeId: input.employeeId, date: day } },
+  });
+  if (!attendance?.checkIn) {
+    throw new Error("NO_CHECK_IN");
+  }
+
+  const openBreak = await prisma.attendanceBreak.findFirst({
+    where: { employeeId: input.employeeId, date: day, breakEnd: null },
+    orderBy: { breakStart: "desc" },
+  });
+  if (!openBreak) {
+    return {
+      id: attendance.id,
+      employeeId: input.employeeId,
+      action: "break_end" as const,
+      checkIn: attendance.checkIn,
+      checkOut: attendance.checkOut,
+      status: attendance.status,
+      method: input.method,
+      duplicate: true,
+    };
+  }
+
+  const employee = await prisma.employee.findUnique({
+    where: { id: input.employeeId },
+    select: { user: { select: { companyId: true } } },
+  });
+  const settings = await getAttendanceSettings(employee?.user?.companyId);
+  const durationMs = timestamp.getTime() - openBreak.breakStart.getTime();
+  const maxMs = settings.maxBreakMinutes * 60 * 1000;
+  const breakEnd =
+    settings.maxBreakMinutes > 0 && durationMs > maxMs
+      ? new Date(openBreak.breakStart.getTime() + maxMs)
+      : timestamp;
+
+  await prisma.attendanceBreak.update({
+    where: { id: openBreak.id },
+    data: { breakEnd },
+  });
+  await notifyAttendanceUpdated(input.employeeId);
+
+  return {
+    id: attendance.id,
+    employeeId: input.employeeId,
+    action: "break_end" as const,
+    checkIn: attendance.checkIn,
+    checkOut: attendance.checkOut,
+    status: attendance.status,
+    method: input.method,
+  };
+}
+
 export async function getTodayAttendance(employeeId: string) {
   const today = startOfDay(new Date());
   return prisma.attendance.findUnique({
@@ -372,10 +506,13 @@ export async function upsertManualAttendance(input: {
   checkOut?: Date | null;
   status?: AttendanceStatus;
 }) {
-  const day = startOfDay(input.date);
+  const rule = await getWorkStartRuleForEmployee(input.employeeId);
+  const day = startOfDay(input.date, rule.timezone);
   const status =
     input.status ??
-    (input.checkIn ? resolveStatus(input.checkIn, undefined, null) : "ABSENT");
+    (input.checkIn
+      ? resolveStatusFromRule(input.checkIn, rule, undefined, rule.timezone)
+      : "ABSENT");
 
   const existing = await prisma.attendance.findUnique({
     where: {

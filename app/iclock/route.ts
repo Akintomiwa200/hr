@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { iclockOk } from "@/lib/zkteco/protocol";
-import { heartbeatBySerial } from "@/lib/zkteco/service";
+import { heartbeatBySerial, ingestAttLog } from "@/lib/zkteco/service";
+import { looksLikeAttLog } from "@/lib/zkteco/protocol";
 import { parsePeerIpv4 } from "@/lib/zkteco/device-ip";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,14 @@ function peerIpFrom(request: NextRequest) {
   );
 }
 
+async function readBody(request: NextRequest) {
+  try {
+    return await request.text();
+  } catch {
+    return "";
+  }
+}
+
 /** Some firmware probes /iclock before /iclock/cdata. */
 export async function GET(request: NextRequest) {
   const sn = request.nextUrl.searchParams.get("SN")?.trim();
@@ -24,6 +33,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const sn = request.nextUrl.searchParams.get("SN")?.trim();
-  if (sn) void heartbeatBySerial(sn, peerIpFrom(request)).catch(() => undefined);
+  const peerIp = peerIpFrom(request);
+  const body = await readBody(request);
+  const table = (request.nextUrl.searchParams.get("table") ?? "").toUpperCase();
+  const stamp = request.nextUrl.searchParams.get("Stamp") ?? undefined;
+
+  if (sn && (table === "ATTLOG" || looksLikeAttLog(body))) {
+    await ingestAttLog(sn, body, stamp, peerIp);
+    return iclockOk();
+  }
+
+  if (sn) void heartbeatBySerial(sn, peerIp).catch(() => undefined);
   return iclockOk();
 }

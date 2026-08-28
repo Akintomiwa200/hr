@@ -4,8 +4,11 @@ import {
   recordCheckIn,
   recordCheckOut,
   recordDeviceToggle,
+  recordBreakStart,
+  recordBreakEnd,
   resolveEmployeeId,
 } from "@/lib/attendance-service";
+import { isBreakTrackingEnabled } from "@/lib/attendance-settings";
 import {
   buildHandshakeOptions,
   parseAttLogBody,
@@ -18,8 +21,13 @@ import { calendarDateInZone, parseDeviceLocalTime, wallClockInZone } from "@/lib
 import { DEFAULT_BRANCH_TIMEZONE } from "@/lib/zkteco/timezones";
 import { rememberDevicePeerIp } from "@/lib/zkteco/device-endpoint-store";
 import { parsePeerIpv4 } from "@/lib/zkteco/device-ip";
+import {
+  buildEmployeePinIndex,
+  lookupEmployeeFromPinIndex,
+  type EmployeePinIndex,
+} from "@/lib/zkteco/pin-index";
 
-const PING_THROTTLE_MS = 30_000;
+const PING_THROTTLE_MS = 10_000;
 
 export type ZkDeviceContext = {
   id: string;
@@ -152,6 +160,13 @@ export async function heartbeatBySerial(serialNumber: string, _peerIp?: string |
   if (!sn) return;
   const device = await loadDeviceBySn(sn);
   if (!device?.isActive) return;
+  const attStamp = sanitizeZkStamp(device.attStamp);
+  const opStamp = sanitizeZkStamp(device.opStamp);
+  if (attStamp !== (device.attStamp || "0") || opStamp !== (device.opStamp || "0")) {
+    await touchDevice(device, { attStamp, opStamp });
+    deviceBySnCache.delete(sn);
+    return;
+  }
   await touchDevice(device);
 }
 
@@ -188,15 +203,14 @@ export async function pendingDeviceCommands(serialNumber: string, _peerIp?: stri
   if (!device?.isActive) return "OK";
   void touchDevice(device).catch(() => undefined);
 
-  const skipUntil = skipCommandPollUntil.get(device.id) ?? 0;
-  if (skipUntil > Date.now()) return "OK";
-
   const pending = await prisma.attendanceDeviceCommand.findMany({
     where: { deviceId: device.id, status: "PENDING" },
     orderBy: { cmdId: "asc" },
     take: 8,
   });
   if (pending.length === 0) {
+    const skipUntil = skipCommandPollUntil.get(device.id) ?? 0;
+    if (skipUntil > Date.now()) return "OK";
     skipCommandPollUntil.set(device.id, Date.now() + EMPTY_COMMAND_POLL_MS);
     return "OK";
   }
@@ -251,7 +265,10 @@ export async function queueRealtimePushCommands(deviceId: string, admsUrl: strin
     `DATA UPDATE OPTIONS IclockSvrFun=1,IclockSvrUrl=${admsUrl},Realtime=1,TransInterval=1,Delay=10,ErrorDelay=30,TransTimes=00:00;14:05,SupportPing=1,PushPingTime=60`
   );
   const device = await loadDeviceById(deviceId);
-  await queueTodayAttLogQuery(deviceId, device?.timezone || DEFAULT_BRANCH_TIMEZONE);
+  const timeZone = device?.timezone || DEFAULT_BRANCH_TIMEZONE;
+  await enqueueDeviceCommand(deviceId, `SET TIME ${wallClockInZone(new Date(), timeZone)}`);
+  todayAttlogQueued.delete(deviceId);
+  await queueTodayAttLogQuery(deviceId, timeZone);
 }
 
 export async function ackDeviceCommands(serialNumber: string, body: string) {
@@ -285,7 +302,7 @@ export async function recordDeviceInfo(serialNumber: string, body: string) {
 async function applyPunchRow(
   device: ZkDeviceContext,
   row: ReturnType<typeof parseAttLogBody>[number],
-  options?: { stamp?: string; punchedAt?: Date }
+  options?: { stamp?: string; punchedAt?: Date; forceReplay?: boolean; pinIndex?: EmployeePinIndex }
 ) {
   const punchedAt =
     options?.punchedAt ?? parseDeviceLocalTime(row.timestamp, device.timezone);
@@ -307,6 +324,15 @@ async function applyPunchRow(
     return { ok: true, duplicate: true };
   }
 
+  if (
+    existingLog &&
+    !existingLog.processed &&
+    existingLog.error === "EMPLOYEE_NOT_FOUND" &&
+    !options?.forceReplay
+  ) {
+    return { ok: false, error: "EMPLOYEE_NOT_FOUND" };
+  }
+
   if (!existingLog) {
     await prisma.attendancePunchLog.create({
       data: {
@@ -320,18 +346,24 @@ async function applyPunchRow(
         rawLine: row.rawLine,
       },
     });
-  } else if (!existingLog.deviceId) {
+  } else if (
+    !existingLog.processed ||
+    !existingLog.deviceId ||
+    existingLog.error?.includes("revalidatePath")
+  ) {
     await prisma.attendancePunchLog.update({
       where: { id: existingLog.id },
       data: { deviceId: device.id, error: null },
     });
   }
 
-  const employeeId = await resolveEmployeeId({
-    pin: row.pin,
-    companyId: device.companyId,
-    preferBranchId: device.branchId,
-  });
+  const employeeId = options?.pinIndex
+    ? lookupEmployeeFromPinIndex(row.pin, options.pinIndex, device.branchId)
+    : await resolveEmployeeId({
+        pin: row.pin,
+        companyId: device.companyId,
+        preferBranchId: device.branchId,
+      });
 
   const logWhere = {
     serialNumber: device.serialNumber,
@@ -358,17 +390,33 @@ async function applyPunchRow(
     timeZone: device.timezone,
   };
 
-  const declared = punchActionFromStatus(row.statusCode);
+  const declared = punchActionFromStatus(
+    row.statusCode,
+    await isBreakTrackingEnabled(device.companyId)
+  );
 
   try {
     let result;
-    if (declared === "check_out") {
+    if (declared === "ignore") {
+      await prisma.attendancePunchLog.updateMany({
+        where: logWhere,
+        data: { processed: true, duplicate: true, employeeId, error: null },
+      });
+      return { ok: true, duplicate: true };
+    }
+    if (declared === "break_start") {
+      result = await recordBreakStart(punchInput);
+    } else if (declared === "break_end") {
+      result = await recordBreakEnd(punchInput);
+    } else if (declared === "check_out") {
       result = await recordCheckOut(punchInput).catch(async (err) => {
         if (err instanceof Error && err.message === "NO_CHECK_IN") {
           return recordCheckIn(punchInput);
         }
         throw err;
       });
+    } else if (declared === "check_in") {
+      result = await recordCheckIn(punchInput);
     } else {
       result = await recordDeviceToggle(punchInput);
     }
@@ -496,11 +544,17 @@ export async function ingestPullAttendance(
 
   await touchDevice(device);
 
+  const pinIndex = await buildEmployeePinIndex(device.companyId);
+
   let processed = 0;
   let unmatched = 0;
   let skipped = 0;
 
-  for (const punch of punches) {
+  const ordered = [...punches].sort(
+    (a, b) => a.punchedAt.getTime() - b.punchedAt.getTime()
+  );
+
+  for (const punch of ordered) {
     const punchedAt = punch.punchedAt;
     const wall = wallClockInZone(punchedAt, device.timezone);
     const statusCode = punch.statusCode ?? 0;
@@ -514,7 +568,7 @@ export async function ingestPullAttendance(
         workCode: 0,
         rawLine: punch.rawLine ?? `pull:${punch.pin}:${wall}`,
       },
-      { punchedAt }
+      { punchedAt, pinIndex }
     );
     if (result.ok) processed += 1;
     else if (result.error === "EMPLOYEE_NOT_FOUND") unmatched += 1;
@@ -533,35 +587,86 @@ export async function ingestPullAttendance(
   return { processed, unmatched, skipped };
 }
 
-export async function replayUnprocessedPunches(serialNumber: string) {
+export async function replayUnprocessedPunches(serialNumber: string, pinFilter?: string[]) {
   const device = await loadDeviceBySn(serialNumber);
   if (!device?.isActive) return { processed: 0 };
 
-  const logs = await prisma.attendancePunchLog.findMany({
-    where: {
-      serialNumber,
-      processed: false,
-      error: { in: ["UNREGISTERED_DEVICE", "EMPLOYEE_NOT_FOUND"] },
+  const pinIndex = await buildEmployeePinIndex(device.companyId);
+  let processed = 0;
+  const batchSize = 500;
+
+  while (true) {
+    const logs = await prisma.attendancePunchLog.findMany({
+      where: {
+        serialNumber,
+        processed: false,
+        ...(pinFilter?.length ? { pin: { in: pinFilter } } : {}),
+        OR: [
+          { error: { in: ["UNREGISTERED_DEVICE", "EMPLOYEE_NOT_FOUND"] } },
+          { error: { contains: "revalidatePath" } },
+        ],
+      },
+      orderBy: { punchedAt: "asc" },
+      take: batchSize,
+    });
+    if (logs.length === 0) break;
+
+    for (const log of logs) {
+      const result = await applyPunchRow(
+        device,
+        {
+          pin: log.pin,
+          timestamp: log.punchedAt.toISOString().replace("T", " ").slice(0, 19),
+          statusCode: log.statusCode,
+          verifyType: log.verifyType ?? 1,
+          workCode: log.workCode ?? 0,
+          rawLine: log.rawLine,
+        },
+        { punchedAt: log.punchedAt, forceReplay: true, pinIndex }
+      );
+      if (result.ok) processed += 1;
+    }
+
+    if (logs.length < batchSize) break;
+  }
+
+  return { processed };
+}
+
+/** Re-link device punches after an employee PIN / code / branch update. */
+export async function replayUnprocessedPunchesForEmployee(employeeId: string) {
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: {
+      status: true,
+      biometricPin: true,
+      employeeCode: true,
     },
-    orderBy: { punchedAt: "asc" },
-    take: 500,
+  });
+  if (!employee || employee.status !== "ACTIVE") return { processed: 0 };
+
+  const { pinSearchVariants } = await import("@/lib/zkteco/pin-match");
+  const pinFilter = pinSearchVariants(employee.biometricPin, employee.employeeCode);
+
+  const devices = await prisma.attendanceDevice.findMany({
+    where: { isActive: true },
+    select: { serialNumber: true },
   });
 
   let processed = 0;
-  for (const log of logs) {
-    const result = await applyPunchRow(
-      device,
-      {
-        pin: log.pin,
-        timestamp: log.punchedAt.toISOString().replace("T", " ").slice(0, 19),
-        statusCode: log.statusCode,
-        verifyType: log.verifyType ?? 1,
-        workCode: log.workCode ?? 0,
-        rawLine: log.rawLine,
-      },
-      { punchedAt: log.punchedAt }
-    );
-    if (result.ok) processed += 1;
+  for (const device of devices) {
+    if (!device.serialNumber) continue;
+    const result = await replayUnprocessedPunches(device.serialNumber, pinFilter);
+    processed += result.processed;
   }
+
+  if (processed > 0) {
+    broadcastAppEvent("attendance_updated", {
+      action: "employee_pin_replay",
+      employeeId,
+      processed,
+    });
+  }
+
   return { processed };
 }

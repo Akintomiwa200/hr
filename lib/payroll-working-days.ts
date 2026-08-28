@@ -44,6 +44,7 @@ export function countExpectedWorkingDays(input: {
 export function attendanceDayWeight(status: string) {
   switch (status) {
     case "PRESENT":
+    case "EARLY":
     case "LATE":
     case "REMOTE":
       return 1;

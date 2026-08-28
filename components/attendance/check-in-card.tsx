@@ -147,7 +147,13 @@ export function CheckInCard({
       {todayRecord?.status === "LATE" && (
         <p className="mt-4 text-xs text-amber-700 flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5" />
-          Marked late — after 9:15 AM check-in threshold
+          Marked late based on your company attendance settings.
+        </p>
+      )}
+      {todayRecord?.status === "EARLY" && (
+        <p className="mt-4 text-xs text-sky-700 flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5" />
+          Arrived before official start time.
         </p>
       )}
     </div>

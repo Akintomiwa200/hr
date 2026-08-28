@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui";
 import { Sheet } from "@/components/ui/sheet";
 import { LiveTerminalCard } from "@/components/attendance/live-terminal-card";
 import { useDeviceLive } from "@/hooks/use-attendance-live";
+import { usePollingFetch } from "@/hooks/use-polling-fetch";
 import { notify, readApiError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { isDeviceOnline, type AttendanceDeviceSpec } from "@/lib/attendance-device-spec";
@@ -113,6 +114,30 @@ function cloudServerForThisPlace(
   }
 }
 
+type DeviceStatusRow = {
+  id: string;
+  lastSeenAt: string | null;
+  isActive: boolean;
+  lastPunchAt: string | null;
+  lastPunchPin: string | null;
+};
+
+function mergeDeviceStatus(devices: DeviceRow[], statusRows: DeviceStatusRow[]) {
+  if (statusRows.length === 0) return devices;
+  const byId = new Map(statusRows.map((row) => [row.id, row]));
+  return devices.map((device) => {
+    const row = byId.get(device.id);
+    if (!row) return device;
+    return {
+      ...device,
+      lastSeenAt: row.lastSeenAt,
+      isActive: row.isActive,
+      lastPunchAt: row.lastPunchAt,
+      lastPunchPin: row.lastPunchPin,
+    };
+  });
+}
+
 export function DeviceIntegrationHub() {
   const [docs, setDocs] = useState<DocsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,17 +159,23 @@ export function DeviceIntegrationHub() {
   const [sheetIp, setSheetIp] = useState("");
   const [sheetPort, setSheetPort] = useState(String(DEFAULT_ZK_PORT));
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [pullingId, setPullingId] = useState<string | null>(null);
   const [connectNote, setConnectNote] = useState<string | null>(null);
+  const connectAbortRef = useRef<AbortController | null>(null);
 
-  const loadDocs = useCallback(async (silent = false) => {
+  const loadDocsAbortRef = useRef<AbortController | null>(null);
+
+  const loadDocs = useCallback(async (silent = false, signal?: AbortSignal) => {
     if (!silent) setLoading(true);
     try {
-      const res = await fetch("/api/attendance/device/docs");
+      const res = await fetch("/api/attendance/device/docs", { signal });
+      if (signal?.aborted) return;
       if (!res.ok) {
         notify.error(await readApiError(res, "Failed to load ZKTeco console"));
         return;
       }
       const data = (await res.json()) as Partial<DocsResponse>;
+      if (signal?.aborted) return;
       if (!data.spec) {
         notify.error("Failed to load ZKTeco console");
         return;
@@ -167,29 +198,63 @@ export function DeviceIntegrationHub() {
         if (!prev) return prev;
         return (data.devices ?? []).find((d) => d.id === prev.id) ?? prev;
       });
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       notify.error("Failed to load ZKTeco console");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, []);
+
+  const refreshStatus = useCallback(async (signal: AbortSignal) => {
+    try {
+      const res = await fetch("/api/attendance/devices/status", { signal });
+      if (!res.ok || signal.aborted) return;
+      const payload = (await res.json()) as { devices?: DeviceStatusRow[] };
+      if (signal.aborted || !payload.devices?.length) return;
+      setDocs((prev) => {
+        if (!prev) return prev;
+        return { ...prev, devices: mergeDeviceStatus(prev.devices, payload.devices!) };
+      });
+      setConnectDevice((prev) => {
+        if (!prev) return prev;
+        const row = payload.devices!.find((d) => d.id === prev.id);
+        if (!row) return prev;
+        return {
+          ...prev,
+          lastSeenAt: row.lastSeenAt,
+          isActive: row.isActive,
+          lastPunchAt: row.lastPunchAt ?? undefined,
+          lastPunchPin: row.lastPunchPin ?? undefined,
+        };
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
     }
   }, []);
 
   useEffect(() => {
-    loadDocs();
+    loadDocsAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadDocsAbortRef.current = controller;
+    void loadDocs(false, controller.signal);
+    return () => {
+      controller.abort();
+      loadDocsAbortRef.current = null;
+    };
   }, [loadDocs]);
 
   useDeviceLive(
     useCallback(() => {
-      void loadDocs(true);
-    }, [loadDocs])
+      void refreshStatus(new AbortController().signal);
+    }, [refreshStatus])
   );
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      void loadDocs(true);
-    }, 10_000);
-    return () => window.clearInterval(timer);
-  }, [loadDocs]);
+  usePollingFetch(refreshStatus, { intervalMs: 5_000 });
+  usePollingFetch(
+    (signal) => loadDocs(true, signal),
+    { intervalMs: 60_000 }
+  );
 
   const onlineCount = useMemo(
     () => docs?.devices.filter((d) => d.isActive && isOnline(d.lastSeenAt)).length ?? 0,
@@ -309,56 +374,108 @@ export function DeviceIntegrationHub() {
       return;
     }
     setSyncingId(connectDevice.id);
-    setConnectNote(null);
-    const res = await fetch(`/api/attendance/devices/${connectDevice.id}/connect`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: sheetName.trim(),
-        serialNumber: sheetSn.trim(),
-        branchId: sheetBranchId,
-        ipAddress: sheetIp.trim(),
-        commPort: Number(sheetPort) || DEFAULT_ZK_PORT,
-      }),
-    });
-    setSyncingId(null);
-    if (!res.ok) {
-      notify.error(await readApiError(res, "Could not connect the terminal"));
+    setConnectNote(`Checking ${sheetIp.trim()}:${Number(sheetPort) || DEFAULT_ZK_PORT}…`);
+    connectAbortRef.current?.abort();
+    const controller = new AbortController();
+    connectAbortRef.current = controller;
+    const timer = window.setTimeout(() => controller.abort(), 18_000);
+    try {
+      const res = await fetch(`/api/attendance/devices/${connectDevice.id}/connect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          name: sheetName.trim(),
+          serialNumber: sheetSn.trim(),
+          branchId: sheetBranchId,
+          ipAddress: sheetIp.trim(),
+          commPort: Number(sheetPort) || DEFAULT_ZK_PORT,
+        }),
+      });
+      if (connectAbortRef.current !== controller) return;
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Could not save the terminal"));
+        setConnectNote("Confirm failed. Nothing new was applied — try again.");
+        return;
+      }
+      const data = (await res.json()) as {
+        reachedDevice?: boolean;
+        realtime?: "live" | "waiting";
+        processed?: number;
+        unmatched?: number;
+        logsDownloaded?: number;
+        ipAddress?: string | null;
+        commPort?: number | null;
+        serialNumber?: string | null;
+        message?: string;
+        probe?: string;
+      };
+      if (connectAbortRef.current !== controller) return;
+      if (data.ipAddress) setSheetIp(data.ipAddress);
+      if (data.commPort) setSheetPort(String(data.commPort));
+      void loadDocs(true);
+      const outcome =
+        data.message ||
+        (data.reachedDevice
+          ? "Reached the terminal. Real-time PUSH is on."
+          : "Device IP saved. Could not reach port 4370 from this PC.");
+      setConnectNote(outcome);
+      if (data.reachedDevice || data.realtime === "live") {
+        notify.success("Connected", outcome);
+      } else {
+        notify.success("Saved", outcome);
+      }
+    } catch (err) {
+      if (connectAbortRef.current !== controller) return;
+      const timedOut = err instanceof Error && err.name === "AbortError";
+      const outcome = timedOut
+        ? "Confirm timed out after 18 seconds. If Last seen updates, the save still went through."
+        : "Could not reach Smart HR to confirm. Check the page is still online and try again.";
+      setConnectNote(outcome);
+      notify.error(timedOut ? "Confirm timed out" : "Confirm failed", outcome);
+    } finally {
+      window.clearTimeout(timer);
+      if (connectAbortRef.current === controller) {
+        connectAbortRef.current = null;
+        setSyncingId(null);
+      }
+    }
+  };
+
+  const syncDeviceLogs = async (device: DeviceRow) => {
+    if (!device.ipAddress && !device.id) {
+      notify.error("Enter Device IP on Connect first");
       return;
     }
-    const data = (await res.json()) as {
-      reachedDevice?: boolean;
-      realtime?: "live" | "waiting";
-      processed?: number;
-      unmatched?: number;
-      logsDownloaded?: number;
-      ipAddress?: string | null;
-      commPort?: number | null;
-      listenHost?: string;
-      listenUrl?: string;
-      serialNumber?: string | null;
-      message?: string;
-    };
-    if (data.ipAddress) setSheetIp(data.ipAddress);
-    if (data.commPort) setSheetPort(String(data.commPort));
-    await loadDocs();
-    const sn = data.serialNumber || sheetSn || connectDevice.serialNumber || "this terminal";
-    const hardware = `${data.ipAddress ?? sheetIp}:${data.commPort ?? sheetPort}`;
-    if (data.realtime === "live" || data.reachedDevice) {
-      const unmatched =
-        data.unmatched && data.unmatched > 0
-          ? ` · ${data.unmatched} PIN(s) not matched to staff`
-          : "";
+    setPullingId(device.id);
+    try {
+      const res = await fetch(`/api/attendance/devices/${device.id}/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ipAddress: device.ipAddress ?? undefined,
+          commPort: device.commPort ?? DEFAULT_ZK_PORT,
+        }),
+      });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Could not download device logs"));
+        return;
+      }
+      const data = (await res.json()) as {
+        logsDownloaded?: number;
+        processed?: number;
+        unmatched?: number;
+      };
       notify.success(
-        "Real-time connected",
-        `${data.processed ?? 0} punch${(data.processed ?? 0) === 1 ? "" : "es"} imported${unmatched}`
+        "Device logs synced",
+        `${data.logsDownloaded ?? 0} downloaded · ${data.processed ?? 0} matched · ${data.unmatched ?? 0} on device only`
       );
-      setConnectNote(`Live on ${hardware} (SN ${sn}). New punches appear on Attendance as they happen.`);
-    } else {
-      setConnectNote(
-        `Device IP ${hardware} saved. Transfer is real-time PUSH for SN ${sn}. Punches appear on Attendance as they happen.`
-      );
-      notify.success("Device IP saved", "Real-time PUSH is on for this serial number.");
+      void loadDocs(true);
+      void refreshStatus(new AbortController().signal);
+    } catch {
+      notify.error("Could not download device logs");
+    } finally {
+      setPullingId(null);
     }
   };
 
@@ -388,6 +505,15 @@ export function DeviceIntegrationHub() {
               disabled={!live.isActive}
             >
               Connect
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void syncDeviceLogs(live)}
+              disabled={!live.isActive || pullingId === live.id}
+              loading={pullingId === live.id}
+            >
+              Sync logs
             </Button>
             <button
               type="button"
@@ -448,7 +574,7 @@ export function DeviceIntegrationHub() {
           <ArrowLeft className="w-4 h-4" />
           Back to attendance
         </Link>
-        <Button variant="secondary" size="sm" onClick={loadDocs}>
+        <Button variant="secondary" size="sm" onClick={() => void loadDocs()}>
           <RefreshCw className="w-4 h-4" />
           Refresh
         </Button>
@@ -636,8 +762,9 @@ export function DeviceIntegrationHub() {
           Live terminals ({docs.devices.length})
         </h3>
         <p className="text-xs text-gray-500 mb-4">
-          Device IP is the hardware address. Status and thumbprints update here and on Attendance in
-          real time.
+          Device IP is the hardware address. Everyone on the terminal appears in Attendance
+          thumbprints — matched staff also show on the daily roster. Use Sync logs for a full
+          download from the machine.
         </p>
         {docs.devices.length === 0 ? (
           <p className="text-sm text-gray-500">No ZKTeco terminals registered yet.</p>
@@ -767,7 +894,18 @@ export function DeviceIntegrationHub() {
             </p>
           )}
           {connectNote && (
-            <p className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+            <p
+              className={cn(
+                "text-xs rounded-xl px-3 py-2 border",
+                connectNote.toLowerCase().includes("fail") ||
+                  connectNote.toLowerCase().includes("timed out") ||
+                  connectNote.toLowerCase().includes("no reply") ||
+                  connectNote.toLowerCase().includes("cannot reach") ||
+                  connectNote.toLowerCase().includes("refused")
+                  ? "text-amber-900 bg-amber-50 border-amber-100"
+                  : "text-emerald-800 bg-emerald-50 border-emerald-100"
+              )}
+            >
               {connectNote}
             </p>
           )}
@@ -775,17 +913,20 @@ export function DeviceIntegrationHub() {
         <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
           <Button
             variant="secondary"
-            onClick={() => setConnectDevice(null)}
-            disabled={Boolean(syncingId)}
+            onClick={() => {
+              connectAbortRef.current?.abort();
+              setSyncingId(null);
+              setConnectDevice(null);
+            }}
           >
             Cancel
           </Button>
           <Button
             onClick={() => void connectRealtime()}
             loading={Boolean(syncingId)}
-            disabled={!connectDevice?.isActive}
+            disabled={!connectDevice?.isActive || Boolean(syncingId)}
           >
-            Confirm
+            {syncingId ? "Checking device…" : "Confirm"}
           </Button>
         </div>
       </Sheet>
