@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Fingerprint, Wifi } from "lucide-react";
 import { useDeviceLive } from "@/hooks/use-attendance-live";
 import { cn } from "@/lib/utils";
+import { isDeviceOnline } from "@/lib/attendance-device-spec";
 
 type DeviceSummary = {
   id: string;
@@ -15,8 +16,7 @@ type DeviceSummary = {
 };
 
 function isOnline(lastSeenAt: string | null) {
-  if (!lastSeenAt) return false;
-  return Date.now() - new Date(lastSeenAt).getTime() < 5 * 60 * 1000;
+  return isDeviceOnline(lastSeenAt);
 }
 
 export function DeviceIntegrationPanel({ appUrl }: { appUrl: string }) {

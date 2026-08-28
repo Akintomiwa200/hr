@@ -136,7 +136,7 @@ export function buildAttendanceDeviceSpec(appUrl: string): AttendanceDeviceSpec 
       setup: [
         "Create a branch for each office location with the local timezone",
         "Register the ZKTeco terminal with its Serial Number and assign it to that branch",
-        "On the device: COMM → Cloud Server / ADMS → enable, set Server Address and Port",
+        "Enter the hardware Device IP (the machine’s own address) and Confirm — transfer is real-time PUSH",
         "Enroll staff on the terminal using their biometric PIN from the employee profile",
         "Punches appear on Attendance in real time, tagged with the branch device",
       ],
@@ -187,7 +187,15 @@ export function buildAttendanceDeviceSpec(appUrl: string): AttendanceDeviceSpec 
   };
 }
 
-export function isDeviceOnline(lastSeenAt: Date | string | null, windowMs = 5 * 60 * 1000) {
+export const DEVICE_LIVE_MS = 3 * 60 * 1000;
+/** Stay connected between punches. Only drop after a long silence (off / no internet). */
+export const DEVICE_CONNECTED_MS = 18 * 60 * 60 * 1000;
+
+export function isDeviceLive(lastSeenAt: Date | string | null) {
+  return isDeviceOnline(lastSeenAt, DEVICE_LIVE_MS);
+}
+
+export function isDeviceOnline(lastSeenAt: Date | string | null, windowMs = DEVICE_CONNECTED_MS) {
   if (!lastSeenAt) return false;
   return Date.now() - new Date(lastSeenAt).getTime() < windowMs;
 }

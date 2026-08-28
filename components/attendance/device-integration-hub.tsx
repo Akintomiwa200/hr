@@ -5,23 +5,22 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Building2,
-  Check,
-  Copy,
   Fingerprint,
   Loader2,
   MapPin,
   Plus,
   RefreshCw,
   Trash2,
-  Wifi,
-  WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui";
+import { Sheet } from "@/components/ui/sheet";
+import { LiveTerminalCard } from "@/components/attendance/live-terminal-card";
 import { useDeviceLive } from "@/hooks/use-attendance-live";
 import { notify, readApiError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import type { AttendanceDeviceSpec } from "@/lib/attendance-device-spec";
+import { isDeviceOnline, type AttendanceDeviceSpec } from "@/lib/attendance-device-spec";
 import { BRANCH_TIMEZONES } from "@/lib/zkteco/timezones";
+import { DEFAULT_ZK_PORT } from "@/lib/zkteco/device-ip";
 
 type BranchRow = {
   id: string;
@@ -44,6 +43,10 @@ type DeviceRow = {
   online?: boolean;
   branchId: string | null;
   branch: { id: string; name: string; location: string; timezone: string } | null;
+  ipAddress?: string | null;
+  commPort?: number | null;
+  lastPunchAt?: string | null;
+  lastPunchPin?: string | null;
 };
 
 type DocsResponse = {
@@ -64,8 +67,7 @@ const inputClass =
   "w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25";
 
 function isOnline(lastSeenAt: string | null) {
-  if (!lastSeenAt) return false;
-  return Date.now() - new Date(lastSeenAt).getTime() < 5 * 60 * 1000;
+  return isDeviceOnline(lastSeenAt);
 }
 
 function isLoopbackHost(hostname: string) {
@@ -114,7 +116,6 @@ function cloudServerForThisPlace(
 export function DeviceIntegrationHub() {
   const [docs, setDocs] = useState<DocsResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState<string | null>(null);
   const [creatingBranch, setCreatingBranch] = useState(false);
   const [creatingDevice, setCreatingDevice] = useState(false);
   const [branchName, setBranchName] = useState("");
@@ -122,8 +123,18 @@ export function DeviceIntegrationHub() {
   const [branchTimezone, setBranchTimezone] = useState("Africa/Lagos");
   const [deviceName, setDeviceName] = useState("");
   const [deviceSn, setDeviceSn] = useState("");
+  const [deviceIp, setDeviceIp] = useState("");
+  const [devicePort, setDevicePort] = useState(String(DEFAULT_ZK_PORT));
   const [deviceBranchId, setDeviceBranchId] = useState("");
   const [deviceModel, setDeviceModel] = useState("");
+  const [connectDevice, setConnectDevice] = useState<DeviceRow | null>(null);
+  const [sheetName, setSheetName] = useState("");
+  const [sheetSn, setSheetSn] = useState("");
+  const [sheetBranchId, setSheetBranchId] = useState("");
+  const [sheetIp, setSheetIp] = useState("");
+  const [sheetPort, setSheetPort] = useState(String(DEFAULT_ZK_PORT));
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [connectNote, setConnectNote] = useState<string | null>(null);
 
   const loadDocs = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -152,6 +163,10 @@ export function DeviceIntegrationHub() {
         masterKeyConfigured: Boolean(data.masterKeyConfigured),
       });
       setDeviceBranchId((prev) => prev || data.branches?.[0]?.id || "");
+      setConnectDevice((prev) => {
+        if (!prev) return prev;
+        return (data.devices ?? []).find((d) => d.id === prev.id) ?? prev;
+      });
     } catch {
       notify.error("Failed to load ZKTeco console");
     } finally {
@@ -169,17 +184,17 @@ export function DeviceIntegrationHub() {
     }, [loadDocs])
   );
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadDocs(true);
+    }, 10_000);
+    return () => window.clearInterval(timer);
+  }, [loadDocs]);
+
   const onlineCount = useMemo(
     () => docs?.devices.filter((d) => d.isActive && isOnline(d.lastSeenAt)).length ?? 0,
     [docs]
   );
-
-  const copy = async (text: string, key: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(key);
-    notify.success("Copied to clipboard");
-    setTimeout(() => setCopied(null), 2000);
-  };
 
   const createBranch = async () => {
     if (!branchName.trim() || !branchLocation.trim()) {
@@ -234,6 +249,8 @@ export function DeviceIntegrationHub() {
         serialNumber: deviceSn.trim(),
         branchId: deviceBranchId,
         model: deviceModel.trim() || null,
+        ipAddress: deviceIp.trim() || null,
+        commPort: devicePort.trim() ? Number(devicePort) : DEFAULT_ZK_PORT,
       }),
     });
     setCreatingDevice(false);
@@ -241,10 +258,12 @@ export function DeviceIntegrationHub() {
       notify.error(await readApiError(res, "Failed to register terminal"));
       return;
     }
-    notify.success("ZKTeco terminal registered", "Configure Cloud Server / ADMS on the device.");
+    notify.success("ZKTeco terminal registered", "Open Connect and enter the hardware IP.");
     setDeviceName("");
     setDeviceSn("");
     setDeviceModel("");
+    setDeviceIp("");
+    setDevicePort(String(DEFAULT_ZK_PORT));
     await loadDocs();
   };
 
@@ -273,6 +292,124 @@ export function DeviceIntegrationHub() {
     await loadDocs();
   };
 
+  const openConnect = (device: DeviceRow) => {
+    setConnectDevice(device);
+    setSheetName(device.name);
+    setSheetSn(device.serialNumber ?? "");
+    setSheetBranchId(device.branchId ?? "");
+    setSheetIp(device.ipAddress ?? "");
+    setSheetPort(String(device.commPort || DEFAULT_ZK_PORT));
+    setConnectNote(null);
+  };
+
+  const connectRealtime = async () => {
+    if (!connectDevice) return;
+    if (!sheetIp.trim()) {
+      notify.error("Enter the hardware IP address");
+      return;
+    }
+    setSyncingId(connectDevice.id);
+    setConnectNote(null);
+    const res = await fetch(`/api/attendance/devices/${connectDevice.id}/connect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: sheetName.trim(),
+        serialNumber: sheetSn.trim(),
+        branchId: sheetBranchId,
+        ipAddress: sheetIp.trim(),
+        commPort: Number(sheetPort) || DEFAULT_ZK_PORT,
+      }),
+    });
+    setSyncingId(null);
+    if (!res.ok) {
+      notify.error(await readApiError(res, "Could not connect the terminal"));
+      return;
+    }
+    const data = (await res.json()) as {
+      reachedDevice?: boolean;
+      realtime?: "live" | "waiting";
+      processed?: number;
+      unmatched?: number;
+      logsDownloaded?: number;
+      ipAddress?: string | null;
+      commPort?: number | null;
+      listenHost?: string;
+      listenUrl?: string;
+      serialNumber?: string | null;
+      message?: string;
+    };
+    if (data.ipAddress) setSheetIp(data.ipAddress);
+    if (data.commPort) setSheetPort(String(data.commPort));
+    await loadDocs();
+    const sn = data.serialNumber || sheetSn || connectDevice.serialNumber || "this terminal";
+    const hardware = `${data.ipAddress ?? sheetIp}:${data.commPort ?? sheetPort}`;
+    if (data.realtime === "live" || data.reachedDevice) {
+      const unmatched =
+        data.unmatched && data.unmatched > 0
+          ? ` · ${data.unmatched} PIN(s) not matched to staff`
+          : "";
+      notify.success(
+        "Real-time connected",
+        `${data.processed ?? 0} punch${(data.processed ?? 0) === 1 ? "" : "es"} imported${unmatched}`
+      );
+      setConnectNote(`Live on ${hardware} (SN ${sn}). New punches appear on Attendance as they happen.`);
+    } else {
+      setConnectNote(
+        `Device IP ${hardware} saved. Transfer is real-time PUSH for SN ${sn}. Punches appear on Attendance as they happen.`
+      );
+      notify.success("Device IP saved", "Real-time PUSH is on for this serial number.");
+    }
+  };
+
+  const renderTerminalRow = (device: DeviceRow) => {
+    const live = docs?.devices.find((d) => d.id === device.id) ?? device;
+    return (
+      <LiveTerminalCard
+        key={device.id}
+        device={{
+          id: live.id,
+          name: live.name,
+          serialNumber: live.serialNumber,
+          ipAddress: live.ipAddress,
+          commPort: live.commPort,
+          lastSeenAt: live.lastSeenAt,
+          isActive: live.isActive,
+          branchName: live.branch?.name ?? null,
+          lastPunchAt: live.lastPunchAt,
+          lastPunchPin: live.lastPunchPin,
+        }}
+        actions={
+          <div className="flex flex-col gap-1 shrink-0 items-end">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => openConnect(live)}
+              disabled={!live.isActive}
+            >
+              Connect
+            </Button>
+            <button
+              type="button"
+              onClick={() => toggleDevice(live)}
+              className="text-[11px] text-brand-600 hover:underline"
+            >
+              {live.isActive ? "Disable" : "Enable"}
+            </button>
+            <button
+              type="button"
+              onClick={() => removeDevice(live)}
+              className="text-[11px] text-red-500 hover:underline inline-flex items-center gap-0.5"
+            >
+              <Trash2 className="w-3 h-3" />
+              Delete
+            </button>
+          </div>
+        }
+      />
+    );
+  };
+
   if (loading && !docs) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-500">
@@ -295,7 +432,6 @@ export function DeviceIntegrationHub() {
 
   const { spec, appUrl, status } = docs;
   const cloud = cloudServerForThisPlace(spec.zkteco?.cloudServer, appUrl);
-  const setupSteps = spec.zkteco?.setup ?? [];
   const grouped = (docs.branches ?? []).map((branch) => ({
     branch,
     devices: docs.devices.filter((d) => d.branchId === branch.id),
@@ -328,7 +464,7 @@ export function DeviceIntegrationHub() {
               <div>
                 <h2 className="text-xl font-bold text-gray-900">ZKTeco branch terminals</h2>
                 <p className="text-sm text-gray-500">
-                  Real-time ADMS push from every office location — fingerprint, face, and card
+                  Enter the hardware Device IP. Transfer mode is real-time PUSH.
                 </p>
               </div>
             </div>
@@ -351,44 +487,10 @@ export function DeviceIntegrationHub() {
             </div>
           </div>
           <div className="text-right text-xs text-gray-500">
-            <p>ADMS {spec.zkteco?.protocol ?? "iclock"}</p>
+            <p>PUSH · Real-time</p>
             <p className="mt-1">{cloud.origin || appUrl}</p>
           </div>
         </div>
-      </div>
-
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-900 mb-1">Cloud server for every terminal</h3>
-        <p className="text-xs text-gray-500 mb-4">
-          These values follow the address you used to open Smart HR — public domain, public IP, or
-          this office LAN — not localhost on the device. Every branch terminal points here; serial
-          number maps the punch to that office.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {[
-            { key: "host", label: "Server address", value: cloud.host },
-            { key: "port", label: "Port", value: cloud.portHint },
-            { key: "path", label: "Server path", value: cloud.path },
-          ].map((item) => (
-            <div key={item.key} className="rounded-xl border border-gray-100 p-3">
-              <p className="text-[11px] font-semibold uppercase text-gray-400">{item.label}</p>
-              <code className="text-sm text-gray-900 break-all">{item.value}</code>
-              <button
-                type="button"
-                onClick={() => copy(item.value, item.key)}
-                className="mt-2 inline-flex items-center gap-1 text-xs text-brand-600"
-              >
-                {copied === item.key ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                Copy
-              </button>
-            </div>
-          ))}
-        </div>
-        <ol className="mt-4 space-y-1.5 text-xs text-gray-600 list-decimal pl-4">
-          {setupSteps.map((step) => (
-            <li key={step}>{step}</li>
-          ))}
-        </ol>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -469,7 +571,8 @@ export function DeviceIntegrationHub() {
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Register ZKTeco terminal</h3>
           <p className="text-xs text-gray-500 mb-3">
-            Serial number is on the back of the device or under System → Device Info.
+            Serial number is on the back of the device. Device IP is the hardware address, e.g.
+            102.88.54.109.
           </p>
           <div className="space-y-3">
             <input
@@ -484,6 +587,24 @@ export function DeviceIntegrationHub() {
               value={deviceSn}
               onChange={(e) => setDeviceSn(e.target.value)}
             />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input
+                className={cn(inputClass, "sm:col-span-2")}
+                placeholder="Device IP (e.g. 102.88.54.109)"
+                value={deviceIp}
+                onChange={(e) => setDeviceIp(e.target.value)}
+                inputMode="decimal"
+                autoComplete="off"
+              />
+              <input
+                className={inputClass}
+                placeholder="Port"
+                value={devicePort}
+                onChange={(e) => setDevicePort(e.target.value)}
+                inputMode="numeric"
+                autoComplete="off"
+              />
+            </div>
             <select
               className={inputClass}
               value={deviceBranchId}
@@ -511,9 +632,13 @@ export function DeviceIntegrationHub() {
       </div>
 
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">
+        <h3 className="text-sm font-semibold text-gray-900 mb-1">
           Live terminals ({docs.devices.length})
         </h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Device IP is the hardware address. Status and thumbprints update here and on Attendance in
+          real time.
+        </p>
         {docs.devices.length === 0 ? (
           <p className="text-sm text-gray-500">No ZKTeco terminals registered yet.</p>
         ) : (
@@ -526,57 +651,8 @@ export function DeviceIntegrationHub() {
                 {devices.length === 0 ? (
                   <p className="text-sm text-gray-400 pl-1">No terminal at this branch yet.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {devices.map((device) => {
-                      const online = device.isActive && isOnline(device.lastSeenAt);
-                      return (
-                        <div
-                          key={device.id}
-                          className="flex items-start justify-between gap-3 p-3 rounded-xl border border-gray-100"
-                        >
-                          <div className="flex items-start gap-3 min-w-0">
-                            <div
-                              className={cn(
-                                "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                                online ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-400"
-                              )}
-                            >
-                              {online ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-gray-900">{device.name}</p>
-                              <p className="text-[11px] text-gray-500 truncate">
-                                SN {device.serialNumber ?? "—"}
-                                {device.model ? ` · ${device.model}` : ""}
-                                {!device.isActive && " · Disabled"}
-                              </p>
-                              <p className="text-[10px] text-gray-400 mt-0.5">
-                                {device.lastSeenAt
-                                  ? `Last seen ${new Date(device.lastSeenAt).toLocaleString()}`
-                                  : "Never connected"}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex flex-col gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => toggleDevice(device)}
-                              className="text-[11px] text-brand-600 hover:underline"
-                            >
-                              {device.isActive ? "Disable" : "Enable"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeDevice(device)}
-                              className="text-[11px] text-red-500 hover:underline inline-flex items-center gap-0.5"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                    {devices.map((device) => renderTerminalRow(device))}
                   </div>
                 )}
               </div>
@@ -586,16 +662,133 @@ export function DeviceIntegrationHub() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
                   Unassigned
                 </p>
-                {unassigned.map((device) => (
-                  <p key={device.id} className="text-sm text-gray-600">
-                    {device.name} · SN {device.serialNumber ?? "—"}
-                  </p>
-                ))}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {unassigned.map((device) => renderTerminalRow(device))}
+                </div>
               </div>
             )}
           </div>
         )}
       </div>
+
+      <Sheet
+        open={Boolean(connectDevice)}
+        onClose={() => {
+          if (syncingId) return;
+          setConnectDevice(null);
+        }}
+        title="Edit device"
+        description="Device IP is the hardware address. Transfer mode is real-time PUSH."
+        width="md"
+      >
+        <div className="p-6 space-y-4">
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Device name
+            </span>
+            <input
+              className={inputClass}
+              value={sheetName}
+              onChange={(e) => setSheetName(e.target.value)}
+              disabled={Boolean(syncingId)}
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Serial number
+            </span>
+            <input
+              className={inputClass}
+              value={sheetSn}
+              onChange={(e) => setSheetSn(e.target.value)}
+              disabled={Boolean(syncingId)}
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Area / branch
+            </span>
+            <select
+              className={inputClass}
+              value={sheetBranchId}
+              onChange={(e) => setSheetBranchId(e.target.value)}
+              disabled={Boolean(syncingId)}
+            >
+              <option value="">Select branch</option>
+              {docs.branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name} — {branch.location}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="grid grid-cols-3 gap-3">
+            <label className="block space-y-1.5 col-span-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Device IP
+              </span>
+              <input
+                className={inputClass}
+                placeholder="102.88.54.109"
+                value={sheetIp}
+                onChange={(e) => setSheetIp(e.target.value)}
+                inputMode="decimal"
+                autoComplete="off"
+                disabled={Boolean(syncingId)}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Port
+              </span>
+              <input
+                className={inputClass}
+                placeholder={String(DEFAULT_ZK_PORT)}
+                value={sheetPort}
+                onChange={(e) => setSheetPort(e.target.value)}
+                inputMode="numeric"
+                autoComplete="off"
+                disabled={Boolean(syncingId)}
+              />
+            </label>
+          </div>
+          <div className="rounded-xl border border-gray-100 px-3 py-2.5 text-sm text-gray-600">
+            Device type <span className="font-medium text-gray-900">PUSH</span>
+            <span className="text-gray-300 mx-2">·</span>
+            Transfer mode <span className="font-medium text-gray-900">Real-time</span>
+            <span className="text-gray-300 mx-2">·</span>
+            Interval <span className="font-medium text-gray-900">1</span>
+            <span className="text-gray-300 mx-2">·</span>
+            Transfer time <span className="font-medium text-gray-900">00:00;14:05</span>
+          </div>
+          {connectDevice?.lastSeenAt && (
+            <p className="text-xs text-emerald-700">
+              Last seen {new Date(connectDevice.lastSeenAt).toLocaleString()}
+            </p>
+          )}
+          {connectNote && (
+            <p className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+              {connectNote}
+            </p>
+          )}
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setConnectDevice(null)}
+            disabled={Boolean(syncingId)}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void connectRealtime()}
+            loading={Boolean(syncingId)}
+            disabled={!connectDevice?.isActive}
+          >
+            Confirm
+          </Button>
+        </div>
+      </Sheet>
     </div>
   );
 }

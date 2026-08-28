@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { randomBytes } from "crypto";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { replayUnprocessedPunches } from "@/lib/zkteco/service";
+import { parseHostAndPort } from "@/lib/zkteco/device-ip";
+import { loadDeviceEndpoint, saveDeviceEndpoint } from "@/lib/zkteco/device-endpoint-store";
 import { getCompanyScope, deviceCompanyWhere } from "@/lib/company-scope";
 
 function generateDeviceApiKey() {
@@ -71,12 +73,35 @@ export async function PATCH(
     data.apiKey = generateDeviceApiKey();
   }
 
+  let endpointUpdate: { ip: string | null; port: number } | null = null;
+  if (typeof body.ipAddress === "string" || body.commPort != null || body.port != null) {
+    const current = await loadDeviceEndpoint(id);
+    if (typeof body.ipAddress === "string" && !body.ipAddress.trim()) {
+      endpointUpdate = { ip: null, port: current.commPort };
+    } else {
+      const parsed = parseHostAndPort(
+        typeof body.ipAddress === "string" ? body.ipAddress : current.ipAddress,
+        body.commPort ?? body.port,
+        current.commPort
+      );
+      if ("error" in parsed) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      endpointUpdate = parsed;
+    }
+  }
+
   try {
     const device = await prisma.attendanceDevice.update({
       where: { id },
       data,
       include: { branch: { select: { id: true, name: true, location: true, timezone: true } } },
     });
+
+    if (endpointUpdate) {
+      await saveDeviceEndpoint(id, endpointUpdate.ip, endpointUpdate.port);
+    }
+    const endpoint = await loadDeviceEndpoint(id);
 
     if (device.serialNumber && (data.serialNumber || data.isActive === true)) {
       await replayUnprocessedPunches(device.serialNumber);
@@ -92,6 +117,8 @@ export async function PATCH(
         vendor: device.vendor,
         serialNumber: device.serialNumber,
         model: device.model,
+        ipAddress: endpoint.ipAddress,
+        commPort: endpoint.commPort,
         isActive: device.isActive,
         branchId: device.branchId,
         branch: device.branch,

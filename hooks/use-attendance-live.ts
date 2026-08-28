@@ -21,18 +21,24 @@ export function useDeviceLive(onDevicePing?: (data: DevicePingData) => void) {
         return;
       }
       if (type === "attendance_updated") {
+        onDevicePing?.({});
         scheduleRouterRefresh(() => router.refresh());
       }
     },
   });
 }
 
-export function useAttendanceLive() {
+/** Immediate live callback for attendance UIs. Falls back to a coalesced page refresh. */
+export function useAttendanceLive(onLive?: () => void) {
   const router = useRouter();
   useAppEvents({
-    types: ["attendance_updated", "leave_updated"],
+    types: ["attendance_updated", "leave_updated", "device_ping"],
     onEvent: (type) => {
       if (!type) return;
+      if (onLive) {
+        onLive();
+        return;
+      }
       scheduleRouterRefresh(() => router.refresh());
     },
   });

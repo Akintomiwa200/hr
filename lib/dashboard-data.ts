@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { resolveEmploymentType } from "@/lib/employment";
+import { isDeviceOnline } from "@/lib/attendance-device-spec";
 import {
   getPreviousPeriod,
   parseDashboardRangeKey,
@@ -224,9 +225,7 @@ export async function getHrDashboardData(
     label: device.name,
     value: usageByDeviceId.get(device.id) ?? 0,
     color: deviceColors[index % deviceColors.length],
-    online: device.lastSeenAt
-      ? Date.now() - new Date(device.lastSeenAt).getTime() < 5 * 60 * 1000
-      : false,
+    online: isDeviceOnline(device.lastSeenAt),
   }));
   const todayDevicesTotal = deviceBreakdown.reduce((sum, item) => sum + item.value, 0);
 

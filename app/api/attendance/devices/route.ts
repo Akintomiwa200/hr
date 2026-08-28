@@ -7,6 +7,8 @@ import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { getCompanyScope, deviceCompanyWhere, requireOrgCompanyId } from "@/lib/company-scope";
 import { isDeviceOnline } from "@/lib/attendance-device-spec";
 import { replayUnprocessedPunches } from "@/lib/zkteco/service";
+import { parseHostAndPort, parseOptionalDeviceEndpoint } from "@/lib/zkteco/device-ip";
+import { loadDeviceEndpoints, saveDeviceEndpoint, withDeviceEndpoint } from "@/lib/zkteco/device-endpoint-store";
 
 function generateDeviceApiKey() {
   return `dev_${randomBytes(24).toString("hex")}`;
@@ -54,9 +56,10 @@ export async function GET() {
     orderBy: { name: "asc" },
     select: deviceSelect,
   });
+  const endpoints = await loadDeviceEndpoints(devices.map((d) => d.id));
 
   return NextResponse.json({
-    devices: devices.map(serializeDevice),
+    devices: devices.map((d) => serializeDevice(withDeviceEndpoint(d, endpoints.get(d.id)))),
   });
 }
 
@@ -73,6 +76,14 @@ export async function POST(request: Request) {
     typeof body.serialNumber === "string" ? body.serialNumber.trim().toUpperCase() : "";
   const branchId = typeof body.branchId === "string" ? body.branchId.trim() : "";
   const model = typeof body.model === "string" ? body.model.trim() : "";
+  const parsedEndpoint =
+    typeof body.ipAddress === "string" && body.ipAddress.trim()
+      ? parseHostAndPort(body.ipAddress, body.commPort ?? body.port)
+      : parseOptionalDeviceEndpoint("", 4370);
+  if ("error" in parsedEndpoint) {
+    return NextResponse.json({ error: parsedEndpoint.error }, { status: 400 });
+  }
+  const endpoint = parsedEndpoint;
 
   if (!name) {
     return NextResponse.json({ error: "Device name is required" }, { status: 400 });
@@ -124,12 +135,13 @@ export async function POST(request: Request) {
     select: deviceSelect,
   });
 
+  await saveDeviceEndpoint(device.id, endpoint.ip, endpoint.port);
   await replayUnprocessedPunches(serialNumber);
   broadcastAppEvent("attendance_updated", { id: device.id, action: "device_created" });
 
   return NextResponse.json({
     device: {
-      ...serializeDevice(device),
+      ...serializeDevice(withDeviceEndpoint(device, { ipAddress: endpoint.ip, commPort: endpoint.port })),
       apiKey,
     },
   });

@@ -7,11 +7,17 @@ import {
 import {
   ackDeviceCommands,
   handshakeOptions,
+  heartbeatBySerial,
   ingestAttLog,
   ingestOperLog,
   pendingDeviceCommands,
   recordDeviceInfo,
 } from "@/lib/zkteco/service";
+import { looksLikeAttLog } from "@/lib/zkteco/protocol";
+import { parsePeerIpv4 } from "@/lib/zkteco/device-ip";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function serialFrom(request: NextRequest) {
   return request.nextUrl.searchParams.get("SN")?.trim() || "";
@@ -19,6 +25,16 @@ function serialFrom(request: NextRequest) {
 
 function tableFrom(request: NextRequest) {
   return (request.nextUrl.searchParams.get("table") ?? "").toUpperCase();
+}
+
+function peerIpFrom(request: NextRequest) {
+  const fromQuery =
+    parsePeerIpv4(request.nextUrl.searchParams.get("IP")) ||
+    parsePeerIpv4(request.nextUrl.searchParams.get("ip"));
+  if (fromQuery) return fromQuery;
+
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return parsePeerIpv4(forwarded) || parsePeerIpv4(request.headers.get("x-real-ip"));
 }
 
 async function readBody(request: NextRequest) {
@@ -35,15 +51,16 @@ async function handleCdata(request: NextRequest) {
 
   const table = tableFrom(request);
   const stamp = request.nextUrl.searchParams.get("Stamp") ?? undefined;
+  const peerIp = peerIpFrom(request);
 
   if (request.method === "GET" || request.nextUrl.searchParams.has("options")) {
-    return iclockText(await handshakeOptions(sn));
+    return iclockText(await handshakeOptions(sn, peerIp));
   }
 
   const body = await readBody(request);
 
-  if (table === "ATTLOG" || (!table && body.includes("\t"))) {
-    await ingestAttLog(sn, body, stamp);
+  if (table === "ATTLOG" || looksLikeAttLog(body)) {
+    await ingestAttLog(sn, body, stamp, peerIp);
     return iclockOk();
   }
   if (table === "OPERLOG") {
@@ -51,10 +68,13 @@ async function handleCdata(request: NextRequest) {
     return iclockOk();
   }
   if (table === "ATTPHOTO" || table === "USERPIC") {
+    await heartbeatBySerial(sn, peerIp);
     return iclockOk();
   }
   if (body) {
     await recordDeviceInfo(sn, body);
+  } else {
+    await heartbeatBySerial(sn, peerIp);
   }
   return iclockOk();
 }
@@ -66,23 +86,25 @@ export async function GET(
   const { path } = await params;
   const action = normalizeIclockPath(path ?? []);
   const sn = serialFrom(request);
+  const peerIp = peerIpFrom(request);
 
   if (action === "cdata" || action === "push") {
     return handleCdata(request);
   }
   if (action === "getrequest" || action === "getreq") {
     if (!sn) return iclockOk();
-    return iclockText(await pendingDeviceCommands(sn));
+    return iclockText(await pendingDeviceCommands(sn, peerIp));
   }
   if (action === "ping") {
-    if (sn) await handshakeOptions(sn);
+    if (sn) void heartbeatBySerial(sn, peerIp).catch(() => undefined);
     return iclockOk();
   }
   if (action === "registry") {
-    if (sn) return iclockText(await handshakeOptions(sn));
+    if (sn) return iclockText(await handshakeOptions(sn, peerIp));
     return iclockOk();
   }
 
+  if (sn) await heartbeatBySerial(sn, peerIp);
   return iclockOk();
 }
 
@@ -93,12 +115,21 @@ export async function POST(
   const { path } = await params;
   const action = normalizeIclockPath(path ?? []);
   const sn = serialFrom(request);
+  const peerIp = peerIpFrom(request);
 
   if (action === "cdata" || action === "push") {
     return handleCdata(request);
   }
+  if (action === "getrequest" || action === "getreq") {
+    if (!sn) return iclockOk();
+    return iclockText(await pendingDeviceCommands(sn, peerIp));
+  }
   if (action === "devicecmd") {
     if (sn) await ackDeviceCommands(sn, await readBody(request));
+    return iclockOk();
+  }
+  if (action === "ping") {
+    if (sn) void heartbeatBySerial(sn, peerIp).catch(() => undefined);
     return iclockOk();
   }
   if (action === "registry") {
@@ -106,5 +137,6 @@ export async function POST(
     return iclockOk();
   }
 
+  if (sn) await heartbeatBySerial(sn, peerIp);
   return iclockOk();
 }

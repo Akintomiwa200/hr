@@ -194,12 +194,12 @@ export const helpArticles: HelpArticle[] = [
     moduleHref: "/attendance",
     sections: [
       {
-        heading: "Daily check-in",
-        body: "Employees use the Check In button on the Attendance page to record arrival. Check out when leaving for the day. Punches from ZKTeco terminals at each branch sync in real time and appear with the branch device name.",
+        heading: "Live today, history, and branches",
+        body: "Attendance opens on Live today and updates as soon as a terminal punch arrives. Use History for the last 90 days, filter by branch, and open Machine punches to see every thumbprint — including PINs that are not yet matched to an employee.",
       },
       {
         heading: "ZKTeco hardware",
-        body: "Smart HR talks the native ZKTeco ADMS / iclock protocol. Each company branch (office location) has its own timezone and one or more terminals. Register the device serial number, point Cloud Server / ADMS at this app’s host, and enroll staff using their ZKTeco PIN. Fingerprint, face, and card punches push immediately — no local PC or BioTime server required.",
+        body: "Each branch can have one or more terminals. In Attendance → ZKTeco, enter the hardware Device IP (the same value BioTime shows, e.g. 102.88.54.109) and Confirm. Transfer is real-time PUSH — punches appear on Attendance as they happen.",
       },
       {
         heading: "Branches and locations",
@@ -249,8 +249,12 @@ export const helpArticles: HelpArticle[] = [
         body: "On the terminal, open System Info or check the sticker for SN. Register it in Attendance → ZKTeco and assign the device to the correct branch.",
       },
       {
-        heading: "Point ADMS at Smart HR",
-        body: "COMM → Cloud Server / ADMS: enable the service, set Server Address to this app’s host, Port 443 (HTTPS) or 80 (HTTP), and path /iclock. After a minute the terminal shows online.",
+        heading: "Enter the hardware Device IP",
+        body: "Open Connect on the terminal. Device IP is the machine’s own address (for example 102.88.54.109), not a Smart HR server value. Device type is PUSH and transfer mode is real-time. Confirm saves the IP and turns real-time punches on.",
+      },
+      {
+        heading: "Real-time PUSH",
+        body: "Smart HR listens for punches from the serial number you registered. On an office LAN, Confirm also writes real-time options to the terminal. Over the internet, punches arrive as soon as that serial number is live.",
       },
       {
         heading: "Enroll employees",

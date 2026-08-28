@@ -103,3 +103,7 @@ export function isPortalTemplateModelReady() {
     hasDelegate(client, "portalDocument", "findMany")
   );
 }
+
+export function isBranchModelsReady() {
+  return hasDelegate(getPrismaClient(), "branch", "findMany");
+}

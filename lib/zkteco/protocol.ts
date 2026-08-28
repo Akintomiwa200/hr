@@ -18,13 +18,23 @@ export function punchActionFromStatus(statusCode: number): ZkPunchAction {
   return "toggle";
 }
 
+export function sanitizeZkStamp(value?: string | null) {
+  const v = (value ?? "").trim();
+  return /^\d+$/.test(v) ? v : "0";
+}
+
 export function parseAttLogBody(body: string): ZkAttLogRow[] {
   const rows: ZkAttLogRow[] = [];
   for (const raw of body.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
-    const parts = line.split(/\t+/);
-    const fields = parts.length >= 3 ? parts : line.split(/\s+/);
+    const tabbed = line.split(/\t+/);
+    const fields =
+      tabbed.length >= 3
+        ? tabbed
+        : line.includes(",") && /,/.test(line)
+          ? line.split(/,/)
+          : line.split(/\s+/);
     const pin = fields[0]?.trim();
     const timestamp = fields[1]?.trim();
     if (!pin || !timestamp || !/^\d{4}-\d{2}-\d{2}/.test(timestamp)) continue;
@@ -35,14 +45,18 @@ export function parseAttLogBody(body: string): ZkAttLogRow[] {
     const statusIndex = fields[2] && /^\d{2}:\d{2}/.test(fields[2]) ? 3 : 2;
     rows.push({
       pin,
-      timestamp: time,
+      timestamp: time.replace("T", " "),
       statusCode: Number.parseInt(fields[statusIndex] ?? "0", 10) || 0,
-      verifyType: Number.parseInt(fields[statusIndex + 1] ?? "1", 10) || 0,
+      verifyType: Number.parseInt(fields[statusIndex + 1] ?? "1", 10) || 1,
       workCode: Number.parseInt(fields[statusIndex + 2] ?? "0", 10) || 0,
       rawLine: line,
     });
   }
   return rows;
+}
+
+export function looksLikeAttLog(body: string) {
+  return parseAttLogBody(body).length > 0;
 }
 
 export function parseDeviceInfo(body: string): {
@@ -86,19 +100,27 @@ export function buildHandshakeOptions(input: {
   timeZone: string;
 }): string {
   const offset = gmtOffsetHours(input.timeZone);
+  const stamp = sanitizeZkStamp(input.attStamp);
+  const opStamp = sanitizeZkStamp(input.opStamp);
   return [
     `GET OPTION FROM: ${input.serialNumber}`,
-    `Stamp=${input.attStamp || "0"}`,
-    `OpStamp=${input.opStamp || "0"}`,
+    `Stamp=${stamp}`,
+    `OpStamp=${opStamp}`,
+    `ATTLOGStamp=${stamp}`,
+    `OPERLOGStamp=${opStamp}`,
     "PhotoStamp=0",
+    "ATTPHOTOStamp=0",
     "ErrorDelay=30",
     "Delay=10",
-    "TransTimes=00:00;12:00",
+    "TransTimes=00:00;14:05",
     "TransInterval=1",
-    "TransFlag=TransData AttLog OpLog EnrollUser ChgUser EnrollFP ChgFP",
+    "TransFlag=TransData AttLog OpLog EnrollUser ChgUser EnrollFP ChgFP UserPic",
     `TimeZone=${offset}`,
     "Realtime=1",
     "Encrypt=0",
+    "SupportPing=1",
+    "PushPingTime=60",
+    "IclockSvrFun=1",
   ].join("\n");
 }
 

@@ -32,7 +32,8 @@ export function gmtOffsetHours(timeZone: string, at = new Date()): number {
 export function parseDeviceLocalTime(local: string, timeZone: string): Date {
   const match = local
     .trim()
-    .match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+    .replace("T", " ")
+    .match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
   if (!match) {
     const fallback = new Date(local);
     return Number.isNaN(fallback.getTime()) ? new Date() : fallback;
@@ -43,7 +44,7 @@ export function parseDeviceLocalTime(local: string, timeZone: string): Date {
   const day = Number(match[3]);
   const hour = Number(match[4]);
   const minute = Number(match[5]);
-  const second = Number(match[6]);
+  const second = Number(match[6] ?? 0);
   const utcGuess = Date.UTC(year, month - 1, day, hour, minute, second);
 
   const offset = tzOffsetMs(new Date(utcGuess), timeZone);
@@ -51,6 +52,30 @@ export function parseDeviceLocalTime(local: string, timeZone: string): Date {
   const offset2 = tzOffsetMs(new Date(utc), timeZone);
   if (offset2 !== offset) utc = utcGuess - offset2;
   return new Date(utc);
+}
+
+export function wallClockInZone(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
+}
+
+export function calendarDateInZone(date: Date, timeZone: string): string {
+  return wallClockInZone(date, timeZone).slice(0, 10);
+}
+
+export function startOfDayInZone(timeZone: string, at = new Date()): Date {
+  return parseDeviceLocalTime(`${calendarDateInZone(at, timeZone)} 00:00:00`, timeZone);
 }
 
 export function hourMinuteInZone(date: Date, timeZone: string) {

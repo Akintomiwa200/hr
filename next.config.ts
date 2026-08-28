@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["node-zklib"],
   typescript: {
     // Typecheck in CI/local; skipping on Render avoids OOM on small build instances.
     ignoreBuildErrors: process.env.RENDER === "true",

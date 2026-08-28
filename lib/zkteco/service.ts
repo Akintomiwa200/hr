@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { broadcastEvent } from "@/lib/events";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import {
   recordCheckIn,
   recordCheckOut,
@@ -12,9 +12,12 @@ import {
   parseCommandAck,
   parseDeviceInfo,
   punchActionFromStatus,
+  sanitizeZkStamp,
 } from "@/lib/zkteco/protocol";
-import { parseDeviceLocalTime } from "@/lib/zkteco/timezone";
+import { calendarDateInZone, parseDeviceLocalTime, wallClockInZone } from "@/lib/zkteco/timezone";
 import { DEFAULT_BRANCH_TIMEZONE } from "@/lib/zkteco/timezones";
+import { rememberDevicePeerIp } from "@/lib/zkteco/device-endpoint-store";
+import { parsePeerIpv4 } from "@/lib/zkteco/device-ip";
 
 const PING_THROTTLE_MS = 30_000;
 
@@ -39,12 +42,20 @@ function deviceDisplayName(device: {
   return device.branchName ? `${device.branchName} · ${device.name}` : device.name;
 }
 
-async function loadDeviceBySn(serialNumber: string): Promise<ZkDeviceContext | null> {
-  const device = await prisma.attendanceDevice.findUnique({
-    where: { serialNumber },
-    include: { branch: { select: { name: true, timezone: true, location: true } } },
-  });
-  if (!device) return null;
+function toDeviceContext(device: {
+  id: string;
+  name: string;
+  companyId: string | null;
+  branchId: string | null;
+  location: string | null;
+  serialNumber: string | null;
+  timezone: string | null;
+  attStamp: string | null;
+  opStamp: string | null;
+  isActive: boolean;
+  branch: { name: string; timezone: string; location: string } | null;
+}): ZkDeviceContext | null {
+  if (!device.serialNumber) return null;
   return {
     id: device.id,
     name: device.name,
@@ -52,7 +63,7 @@ async function loadDeviceBySn(serialNumber: string): Promise<ZkDeviceContext | n
     branchId: device.branchId,
     branchName: device.branch?.name ?? null,
     location: device.branch?.location ?? device.location,
-    serialNumber: device.serialNumber ?? serialNumber,
+    serialNumber: device.serialNumber,
     timezone: device.timezone || device.branch?.timezone || DEFAULT_BRANCH_TIMEZONE,
     attStamp: device.attStamp,
     opStamp: device.opStamp,
@@ -60,12 +71,57 @@ async function loadDeviceBySn(serialNumber: string): Promise<ZkDeviceContext | n
   };
 }
 
+function normalizeSerial(serialNumber: string) {
+  return serialNumber.trim().toUpperCase();
+}
+
+const lastPingBroadcastAt = new Map<string, number>();
+const deviceBySnCache = new Map<string, { at: number; device: ZkDeviceContext | null }>();
+const skipCommandPollUntil = new Map<string, number>();
+const DEVICE_CACHE_MS = 20_000;
+const EMPTY_COMMAND_POLL_MS = 15_000;
+const todayAttlogQueued = new Map<string, string>();
+
+async function loadDeviceBySn(serialNumber: string): Promise<ZkDeviceContext | null> {
+  const sn = normalizeSerial(serialNumber);
+  if (!sn) return null;
+  const cached = deviceBySnCache.get(sn);
+  if (cached && Date.now() - cached.at < DEVICE_CACHE_MS) return cached.device;
+
+  const include = { branch: { select: { name: true, timezone: true, location: true } } } as const;
+  const device =
+    (await prisma.attendanceDevice.findUnique({
+      where: { serialNumber: sn },
+      include,
+    })) ??
+    (await prisma.attendanceDevice.findFirst({
+      where: { serialNumber: { equals: sn, mode: "insensitive" } },
+      include,
+    }));
+  const ctx = device ? toDeviceContext(device) : null;
+  deviceBySnCache.set(sn, { at: Date.now(), device: ctx });
+  return ctx;
+}
+
+export async function rememberDeviceSeenIp(serialNumber: string, peerIp?: string | null) {
+  const ip = parsePeerIpv4(peerIp);
+  if (!ip) return;
+  const device = await loadDeviceBySn(serialNumber);
+  if (!device?.isActive) return;
+  await rememberDevicePeerIp(device.id, ip);
+}
+
+async function loadDeviceById(id: string): Promise<ZkDeviceContext | null> {
+  const device = await prisma.attendanceDevice.findUnique({
+    where: { id },
+    include: { branch: { select: { name: true, timezone: true, location: true } } },
+  });
+  if (!device) return null;
+  return toDeviceContext(device);
+}
+
 async function touchDevice(device: ZkDeviceContext, extra?: { attStamp?: string; opStamp?: string }) {
   const now = new Date();
-  const previous = await prisma.attendanceDevice.findUnique({
-    where: { id: device.id },
-    select: { lastSeenAt: true },
-  });
   await prisma.attendanceDevice.update({
     where: { id: device.id },
     data: {
@@ -75,9 +131,10 @@ async function touchDevice(device: ZkDeviceContext, extra?: { attStamp?: string;
     },
   });
 
-  const last = previous?.lastSeenAt?.getTime() ?? 0;
-  if (Date.now() - last >= PING_THROTTLE_MS) {
-    broadcastEvent("device_ping", {
+  const last = lastPingBroadcastAt.get(device.id) ?? 0;
+  if (now.getTime() - last >= PING_THROTTLE_MS) {
+    lastPingBroadcastAt.set(device.id, now.getTime());
+    broadcastAppEvent("device_ping", {
       deviceId: device.id,
       deviceName: deviceDisplayName(device),
       location: device.location,
@@ -90,34 +147,59 @@ async function touchDevice(device: ZkDeviceContext, extra?: { attStamp?: string;
   }
 }
 
-export async function handshakeOptions(serialNumber: string) {
-  const device = await loadDeviceBySn(serialNumber);
+export async function heartbeatBySerial(serialNumber: string, _peerIp?: string | null) {
+  const sn = normalizeSerial(serialNumber);
+  if (!sn) return;
+  const device = await loadDeviceBySn(sn);
+  if (!device?.isActive) return;
+  await touchDevice(device);
+}
+
+export async function handshakeOptions(serialNumber: string, _peerIp?: string | null) {
+  const sn = normalizeSerial(serialNumber);
+  const device = await loadDeviceBySn(sn);
   if (device?.isActive) {
     await touchDevice(device);
+    const attStamp = sanitizeZkStamp(device.attStamp);
+    const opStamp = sanitizeZkStamp(device.opStamp);
+    if (attStamp !== (device.attStamp || "0") || opStamp !== (device.opStamp || "0")) {
+      await prisma.attendanceDevice.update({
+        where: { id: device.id },
+        data: { attStamp, opStamp },
+      });
+      deviceBySnCache.delete(sn);
+    }
+    void queueTodayAttLogQuery(device.id, device.timezone).catch(() => undefined);
     return buildHandshakeOptions({
-      serialNumber,
-      attStamp: device.attStamp,
-      opStamp: device.opStamp,
+      serialNumber: device.serialNumber,
+      attStamp,
+      opStamp,
       timeZone: device.timezone,
     });
   }
   return buildHandshakeOptions({
-    serialNumber,
+    serialNumber: sn || serialNumber,
     timeZone: DEFAULT_BRANCH_TIMEZONE,
   });
 }
 
-export async function pendingDeviceCommands(serialNumber: string): Promise<string> {
+export async function pendingDeviceCommands(serialNumber: string, _peerIp?: string | null): Promise<string> {
   const device = await loadDeviceBySn(serialNumber);
   if (!device?.isActive) return "OK";
-  await touchDevice(device);
+  void touchDevice(device).catch(() => undefined);
+
+  const skipUntil = skipCommandPollUntil.get(device.id) ?? 0;
+  if (skipUntil > Date.now()) return "OK";
 
   const pending = await prisma.attendanceDeviceCommand.findMany({
     where: { deviceId: device.id, status: "PENDING" },
     orderBy: { cmdId: "asc" },
     take: 8,
   });
-  if (pending.length === 0) return "OK";
+  if (pending.length === 0) {
+    skipCommandPollUntil.set(device.id, Date.now() + EMPTY_COMMAND_POLL_MS);
+    return "OK";
+  }
 
   await prisma.attendanceDeviceCommand.updateMany({
     where: { id: { in: pending.map((c) => c.id) } },
@@ -125,6 +207,51 @@ export async function pendingDeviceCommands(serialNumber: string): Promise<strin
   });
 
   return pending.map((c) => `C:${c.cmdId}:${c.command}`).join("\n");
+}
+
+async function enqueueDeviceCommand(deviceId: string, command: string) {
+  skipCommandPollUntil.delete(deviceId);
+  const alreadyQueued = await prisma.attendanceDeviceCommand.findFirst({
+    where: { deviceId, command, status: { in: ["PENDING", "SENT"] } },
+    select: { id: true },
+  });
+  if (alreadyQueued) return;
+  const last = await prisma.attendanceDeviceCommand.findFirst({
+    where: { deviceId },
+    orderBy: { cmdId: "desc" },
+    select: { cmdId: true },
+  });
+  await prisma.attendanceDeviceCommand.create({
+    data: {
+      deviceId,
+      cmdId: (last?.cmdId ?? 0) + 1,
+      command,
+      status: "PENDING",
+    },
+  });
+}
+
+export async function queueTodayAttLogQuery(deviceId: string, timeZone: string) {
+  const day = calendarDateInZone(new Date(), timeZone);
+  if (todayAttlogQueued.get(deviceId) === day) return;
+  const start = `${day} 00:00:00`;
+  const end = `${day} 23:59:59`;
+  await enqueueDeviceCommand(
+    deviceId,
+    `DATA QUERY ATTLOG StartTime=${start}\tEndTime=${end}`
+  );
+  await enqueueDeviceCommand(deviceId, "CHECK");
+  todayAttlogQueued.set(deviceId, day);
+}
+
+export async function queueRealtimePushCommands(deviceId: string, admsUrl: string) {
+  skipCommandPollUntil.delete(deviceId);
+  await enqueueDeviceCommand(
+    deviceId,
+    `DATA UPDATE OPTIONS IclockSvrFun=1,IclockSvrUrl=${admsUrl},Realtime=1,TransInterval=1,Delay=10,ErrorDelay=30,TransTimes=00:00;14:05,SupportPing=1,PushPingTime=60`
+  );
+  const device = await loadDeviceById(deviceId);
+  await queueTodayAttLogQuery(deviceId, device?.timezone || DEFAULT_BRANCH_TIMEZONE);
 }
 
 export async function ackDeviceCommands(serialNumber: string, body: string) {
@@ -144,10 +271,10 @@ export async function recordDeviceInfo(serialNumber: string, body: string) {
   const device = await loadDeviceBySn(serialNumber);
   if (!device?.isActive) return;
   const info = parseDeviceInfo(body);
+  await touchDevice(device);
   await prisma.attendanceDevice.update({
     where: { id: device.id },
     data: {
-      lastSeenAt: new Date(),
       deviceInfo: body.slice(0, 4000),
       ...(info.model ? { model: info.model } : {}),
       ...(info.firmware ? { firmware: info.firmware } : {}),
@@ -261,12 +388,6 @@ async function applyPunchRow(
         error: null,
       },
     });
-    if (stamp) {
-      await prisma.attendanceDevice.update({
-        where: { id: device.id },
-        data: { attStamp: stamp },
-      });
-    }
     return { ok: true, duplicate: result.duplicate };
   } catch (e) {
     const message = e instanceof Error ? e.message : "PUNCH_FAILED";
@@ -285,17 +406,23 @@ async function applyPunchRow(
   }
 }
 
-export async function ingestAttLog(serialNumber: string, body: string, stamp?: string) {
+export async function ingestAttLog(
+  serialNumber: string,
+  body: string,
+  stamp?: string,
+  peerIp?: string | null
+) {
   const device = await loadDeviceBySn(serialNumber);
   const rows = parseAttLogBody(body);
 
+  const sn = serialNumber.trim().toUpperCase();
   if (!device?.isActive) {
     for (const row of rows) {
       const punchedAt = parseDeviceLocalTime(row.timestamp, DEFAULT_BRANCH_TIMEZONE);
       await prisma.attendancePunchLog
         .create({
           data: {
-            serialNumber,
+            serialNumber: sn,
             pin: row.pin,
             punchedAt,
             statusCode: row.statusCode,
@@ -307,15 +434,41 @@ export async function ingestAttLog(serialNumber: string, body: string, stamp?: s
         })
         .catch(() => undefined);
     }
+    if (rows.length > 0) {
+      broadcastAppEvent("attendance_updated", {
+        serialNumber: sn,
+        punches: rows.length,
+        processed: 0,
+        action: "attlog_unregistered",
+      });
+    }
     return { processed: 0, unregistered: true };
   }
 
-  await touchDevice(device, stamp ? { attStamp: stamp } : undefined);
+  await touchDevice(device);
 
   let processed = 0;
   for (const row of rows) {
     const result = await applyPunchRow(device, row, { stamp });
     if (result.ok) processed += 1;
+  }
+
+  const safeStamp = sanitizeZkStamp(stamp);
+  if (stamp && /^\d+$/.test(stamp.trim()) && (rows.length > 0 || !body.trim())) {
+    await prisma.attendanceDevice.update({
+      where: { id: device.id },
+      data: { attStamp: safeStamp },
+    });
+    deviceBySnCache.delete(sn);
+  }
+
+  if (rows.length > 0) {
+    broadcastAppEvent("attendance_updated", {
+      serialNumber: sn,
+      punches: rows.length,
+      processed,
+      action: "attlog",
+    });
   }
   return { processed, unregistered: false };
 }
@@ -324,6 +477,60 @@ export async function ingestOperLog(serialNumber: string, stamp?: string) {
   const device = await loadDeviceBySn(serialNumber);
   if (!device?.isActive) return;
   await touchDevice(device, stamp ? { opStamp: stamp } : undefined);
+}
+
+export async function ingestPullAttendance(
+  deviceId: string,
+  punches: Array<{
+    pin: string;
+    punchedAt: Date;
+    statusCode?: number;
+    verifyType?: number;
+    rawLine?: string;
+  }>
+) {
+  const device = await loadDeviceById(deviceId);
+  if (!device?.isActive) {
+    return { processed: 0, unmatched: 0, skipped: punches.length };
+  }
+
+  await touchDevice(device);
+
+  let processed = 0;
+  let unmatched = 0;
+  let skipped = 0;
+
+  for (const punch of punches) {
+    const punchedAt = punch.punchedAt;
+    const wall = wallClockInZone(punchedAt, device.timezone);
+    const statusCode = punch.statusCode ?? 0;
+    const result = await applyPunchRow(
+      device,
+      {
+        pin: punch.pin,
+        timestamp: wall,
+        statusCode,
+        verifyType: punch.verifyType ?? 1,
+        workCode: 0,
+        rawLine: punch.rawLine ?? `pull:${punch.pin}:${wall}`,
+      },
+      { punchedAt }
+    );
+    if (result.ok) processed += 1;
+    else if (result.error === "EMPLOYEE_NOT_FOUND") unmatched += 1;
+    else skipped += 1;
+  }
+
+  if (punches.length > 0) {
+    broadcastAppEvent("attendance_updated", {
+      deviceId,
+      processed,
+      unmatched,
+      action: "device_pull",
+    });
+  }
+
+  return { processed, unmatched, skipped };
 }
 
 export async function replayUnprocessedPunches(serialNumber: string) {

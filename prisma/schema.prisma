@@ -332,6 +332,8 @@ model AttendanceDevice {
   model        String?
   firmware     String?
   timezone     String?
+  ipAddress    String?
+  commPort     Int       @default(4370)
   apiKey       String    @unique
   isActive     Boolean   @default(true)
   lastSeenAt   DateTime?

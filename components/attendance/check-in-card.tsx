@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, Clock, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui";
 import { AttendanceMethodBadge } from "@/components/attendance/attendance-method-badge";
-import { useAttendanceLive } from "@/hooks/use-attendance-live";
 import { notify, readApiError } from "@/lib/toast";
-import { cn } from "@/lib/utils";
 
 type TodayRecord = {
   checkIn: Date | string | null;
@@ -26,10 +24,15 @@ function formatTime(value: Date | string | null) {
   });
 }
 
-export function CheckInCard({ todayRecord }: { todayRecord: TodayRecord }) {
+export function CheckInCard({
+  todayRecord,
+  onChanged,
+}: {
+  todayRecord: TodayRecord;
+  onChanged?: () => void;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState<"in" | "out" | null>(null);
-  useAttendanceLive();
 
   async function checkIn() {
     setLoading("in");
@@ -38,6 +41,7 @@ export function CheckInCard({ todayRecord }: { todayRecord: TodayRecord }) {
       notify.error(await readApiError(res, "Failed to check in"));
     } else {
       notify.success("Checked in successfully");
+      onChanged?.();
       router.refresh();
     }
     setLoading(null);
@@ -50,6 +54,7 @@ export function CheckInCard({ todayRecord }: { todayRecord: TodayRecord }) {
       notify.error(await readApiError(res, "Failed to check out"));
     } else {
       notify.success("Checked out successfully");
+      onChanged?.();
       router.refresh();
     }
     setLoading(null);
