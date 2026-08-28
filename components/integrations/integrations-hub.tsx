@@ -109,6 +109,8 @@ export function IntegrationsHub() {
   const [loading, setLoading] = useState(true);
   const [busySlug, setBusySlug] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
+  const [googleRedirectUri, setGoogleRedirectUri] = useState<string | null>(null);
+  const [zohoRedirectUri, setZohoRedirectUri] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/integrations", { cache: "no-store" });
@@ -119,9 +121,13 @@ export function IntegrationsHub() {
     const data = (await res.json()) as {
       items: IntegrationItem[];
       logs: SyncLog[];
+      googleRedirectUri?: string;
+      zohoRedirectUri?: string;
     };
     setItems(data.items);
     setLogs(data.logs);
+    setGoogleRedirectUri(data.googleRedirectUri ?? null);
+    setZohoRedirectUri(data.zohoRedirectUri ?? null);
   }, []);
 
   useEffect(() => {
@@ -241,6 +247,33 @@ export function IntegrationsHub() {
         />
       </Card>
 
+      {(googleRedirectUri || zohoRedirectUri) && (
+        <Card className="p-4 bg-gray-50 border-dashed">
+          <p className="text-sm font-medium text-gray-900">OAuth redirect URIs</p>
+          <p className="text-xs text-gray-500 mt-1">
+            Add these exact URLs under Authorized redirect URIs in Google Cloud Console and Zoho API
+            Console. Smart HR uses <code className="text-[11px]">/api/google/callback</code> (not
+            NextAuth&apos;s <code className="text-[11px]">/api/auth/callback/google</code>). Include
+            the full path on production, e.g.{" "}
+            <code className="text-[11px]">https://your-app.vercel.app/api/google/callback</code>.
+          </p>
+          <dl className="mt-3 space-y-2 text-xs">
+            {googleRedirectUri && (
+              <div>
+                <dt className="font-medium text-gray-700">Google</dt>
+                <dd className="font-mono text-gray-600 break-all">{googleRedirectUri}</dd>
+              </div>
+            )}
+            {zohoRedirectUri && (
+              <div>
+                <dt className="font-medium text-gray-700">Zoho</dt>
+                <dd className="font-mono text-gray-600 break-all">{zohoRedirectUri}</dd>
+              </div>
+            )}
+          </dl>
+        </Card>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
         {items.map((item) => {
           const Icon = VENDOR_ICONS[item.provider] ?? Link2;
@@ -286,7 +319,7 @@ export function IntegrationsHub() {
                 {item.lastError && (
                   <p className="text-xs text-amber-700">
                     Last sync failed. Use Sync now to retry
-                    {item.lastError.length < 180 ? ` — ${item.lastError}` : "."}
+                    {item.lastError.length < 320 ? ` — ${item.lastError}` : "."}
                   </p>
                 )}
 

@@ -102,12 +102,15 @@ export async function getAuthorizedClient() {
   return getGoogleAuthorizedClient(null);
 }
 
-export function getGoogleAuthUrl() {
-  return getWorkspaceAuthUrl("");
+export function getGoogleAuthUrl(ctx?: import("@/lib/integrations/oauth-env").OAuthRedirectContext) {
+  return getWorkspaceAuthUrl("", ctx);
 }
 
-export async function exchangeGoogleCode(code: string) {
-  const integration = await exchangeWorkspaceCode(code, null);
+export async function exchangeGoogleCode(
+  code: string,
+  ctx?: import("@/lib/integrations/oauth-env").OAuthRedirectContext
+) {
+  const integration = await exchangeWorkspaceCode(code, null, ctx);
   return integration.accountEmail;
 }
 

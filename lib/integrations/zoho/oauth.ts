@@ -1,6 +1,6 @@
 import type { IntegrationRecord, IntegrationProvider } from "@/lib/integrations/types";
 import { getCatalogItem } from "@/lib/integrations/catalog";
-import { getZohoRedirectUri } from "@/lib/integrations/oauth-env";
+import { getZohoRedirectUri, type OAuthRedirectContext } from "@/lib/integrations/oauth-env";
 import { upsertIntegration, getIntegration, parseMetadata } from "@/lib/integrations/store";
 import { zohoOriginForPath, inferZohoLocation } from "@/lib/integrations/zoho/hosts";
 
@@ -36,11 +36,64 @@ function accountsUrlFrom(value?: string | null) {
   return trimmed || zohoAccountsUrl();
 }
 
+function formatZohoErrorCode(code: unknown, detail: string) {
+  if (code === 7213) {
+    return "OAuth token is invalid — disconnect Zoho People and connect again";
+  }
+  if (code === 7074) {
+    return "Zoho People API is not available on your current Zoho plan — upgrade Zoho People to sync employees, or import staff via People → Import from device";
+  }
+  return code != null ? `[${code}] ${detail}` : detail;
+}
+
+function nestedZohoErrorMessage(errors: unknown): string | null {
+  if (!errors || typeof errors !== "object") return null;
+  const errObj = errors as Record<string, unknown>;
+  const code = errObj.code;
+  const detail = errObj.message;
+  if (typeof detail === "string" && detail.trim()) {
+    return formatZohoErrorCode(code, detail);
+  }
+  if (detail && typeof detail === "object") {
+    const parts = Object.entries(detail as Record<string, unknown>).map(
+      ([key, value]) => `${key}: ${String(value)}`
+    );
+    if (parts.length) {
+      const text = parts.join("; ");
+      return formatZohoErrorCode(code, text);
+    }
+  }
+  return null;
+}
+
+function zohoPayloadFailure(payload: unknown, fallback = "Zoho request failed"): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const root = payload as Record<string, unknown>;
+  const error = root.error;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message: unknown }).message || fallback);
+  }
+  const response = root.response as Record<string, unknown> | undefined;
+  if (!response) return null;
+  const status = response.status;
+  if (status === 0 || status === "0" || status == null) return null;
+
+  const nested = nestedZohoErrorMessage(response.errors);
+  if (nested) return nested;
+
+  const message = String(response.message || fallback);
+  if (/no records/i.test(message)) return null;
+  return message;
+}
+
 export function summarizeZohoErrorBody(text: string, status?: number) {
   const trimmed = text.trim();
   if (!trimmed) return status ? `HTTP ${status}` : "Zoho request failed";
   try {
     const json = JSON.parse(trimmed) as Record<string, unknown>;
+    const failure = zohoPayloadFailure(json);
+    if (failure) return failure.slice(0, 400);
     const response = json.response as Record<string, unknown> | undefined;
     const error = json.error;
     const message =
@@ -62,32 +115,27 @@ export function summarizeZohoErrorBody(text: string, status?: number) {
 }
 
 function peopleApiFailure(payload: unknown): string | null {
-  if (!payload || typeof payload !== "object") return null;
-  const root = payload as Record<string, unknown>;
-  const error = root.error;
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "message" in error) {
-    return String((error as { message: unknown }).message || "Zoho People error");
-  }
-  const response = root.response as Record<string, unknown> | undefined;
-  if (!response) return null;
-  const status = response.status;
-  if (status === 0 || status === "0" || status == null) return null;
-  const message = String(response.message || "Zoho People request failed");
-  if (/no records/i.test(message)) return null;
-  return message;
+  return zohoPayloadFailure(payload, "Zoho People request failed");
+}
+
+function isZohoPeopleApiPath(path: string, provider: IntegrationProvider) {
+  return (
+    path.startsWith("/people/") ||
+    (provider === "ZOHO_PEOPLE" && path.startsWith("/api/forms"))
+  );
 }
 
 export function getZohoAuthUrl(
   provider: IntegrationProvider,
   state: string,
-  _appUrl?: string
+  _appUrl?: string,
+  ctx?: OAuthRedirectContext
 ) {
   if (!isZohoConfigured()) return null;
   const item = getCatalogItem(provider);
   if (!item) return null;
 
-  const redirectUri = getZohoRedirectUri(provider);
+  const redirectUri = getZohoRedirectUri(provider, ctx);
   const params = new URLSearchParams({
     client_id: process.env.ZOHO_CLIENT_ID!,
     response_type: "code",
@@ -105,11 +153,12 @@ export async function exchangeZohoCode(
   provider: IntegrationProvider,
   code: string,
   companyId?: string | null,
-  extras?: { location?: string | null; accountsServer?: string | null }
+  extras?: { location?: string | null; accountsServer?: string | null },
+  ctx?: OAuthRedirectContext
 ) {
   if (!isZohoConfigured()) throw new Error("Zoho OAuth is not configured");
 
-  const redirectUri = getZohoRedirectUri(provider);
+  const redirectUri = getZohoRedirectUri(provider, ctx);
   const accounts = accountsUrlFrom(extras?.accountsServer);
   const tokenUrl = `${accounts}/oauth/v2/token`;
 
@@ -261,7 +310,7 @@ export async function zohoApiFetch(
     throw new Error(`Zoho API ${path}: ${summarizeZohoErrorBody(text, res.status)}`);
   }
 
-  if (path.startsWith("/people/")) {
+  if (isZohoPeopleApiPath(path, current.provider)) {
     const failure = peopleApiFailure(payload);
     if (failure) throw new Error(`Zoho People ${path}: ${failure}`);
   }

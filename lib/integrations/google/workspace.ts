@@ -1,7 +1,7 @@
 import { google } from "googleapis";
 import type { IntegrationProvider } from "@/lib/integrations/types";
 import { getCatalogItem } from "@/lib/integrations/catalog";
-import { getGoogleRedirectUri } from "@/lib/integrations/oauth-env";
+import { getGoogleRedirectUri, type OAuthRedirectContext } from "@/lib/integrations/oauth-env";
 import {
   getIntegration,
   upsertIntegration,
@@ -17,17 +17,17 @@ export function isGoogleWorkspaceConfigured() {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
-export function createGoogleOAuthClient(_appUrl?: string) {
+export function createGoogleOAuthClient(ctx?: OAuthRedirectContext) {
   if (!isGoogleWorkspaceConfigured()) return null;
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    getGoogleRedirectUri()
+    getGoogleRedirectUri(ctx)
   );
 }
 
-export function getGoogleAuthUrl(state: string, _appUrl?: string) {
-  const client = createGoogleOAuthClient();
+export function getGoogleAuthUrl(state: string, ctx?: OAuthRedirectContext) {
+  const client = createGoogleOAuthClient(ctx);
   if (!client) return null;
   const scopes = getCatalogItem(PROVIDER)?.scopes ?? [];
   return client.generateAuthUrl({
@@ -35,16 +35,16 @@ export function getGoogleAuthUrl(state: string, _appUrl?: string) {
     prompt: "consent",
     scope: scopes,
     state,
-    redirect_uri: getGoogleRedirectUri(),
+    redirect_uri: getGoogleRedirectUri(ctx),
   });
 }
 
 export async function exchangeGoogleCode(
   code: string,
   companyId?: string | null,
-  _appUrl?: string
+  ctx?: OAuthRedirectContext
 ) {
-  const client = createGoogleOAuthClient();
+  const client = createGoogleOAuthClient(ctx);
   if (!client) throw new Error("Google OAuth is not configured");
 
   const { tokens } = await client.getToken(code);

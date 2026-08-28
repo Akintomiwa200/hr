@@ -9,6 +9,12 @@ export type ZohoPeopleEmployee = {
   status: string;
 };
 
+export type ZohoPeopleForm = {
+  formLinkName: string;
+  displayName: string;
+  viewName?: string;
+};
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -85,9 +91,82 @@ export function mapZohoPeopleDepartmentName(row: Record<string, unknown>) {
   return field(row, "Department", "DepartmentName", "Department_Name", "Name", "DepartmentName.Name");
 }
 
+export async function fetchZohoPeopleForms(
+  fetchJson: (path: string) => Promise<unknown>
+): Promise<ZohoPeopleForm[]> {
+  const data = await fetchJson("/people/api/forms");
+  const root = asRecord(data);
+  const response = asRecord(root?.response) ?? root;
+  const result = response?.result;
+  if (!Array.isArray(result)) return [];
+
+  const mapped: ZohoPeopleForm[] = [];
+  for (const item of result) {
+    const rec = asRecord(item);
+    if (!rec) continue;
+    const formLinkName = field(rec, "formLinkName", "formlinkname");
+    if (!formLinkName) continue;
+    const viewDetails = asRecord(rec.viewDetails);
+    const viewName = viewDetails ? field(viewDetails, "view_Name", "viewName") : "";
+    mapped.push({
+      formLinkName,
+      displayName: field(rec, "displayName", "displayname") || formLinkName,
+      ...(viewName ? { viewName } : {}),
+    });
+  }
+  return mapped;
+}
+
+export function resolveZohoPeopleFormCandidates(
+  forms: ZohoPeopleForm[],
+  ...defaults: string[]
+): string[] {
+  const candidates = new Set<string>();
+
+  for (const name of defaults) {
+    const lower = name.toLowerCase();
+    const byLink = forms.find((form) => form.formLinkName.toLowerCase() === lower);
+    if (byLink) {
+      candidates.add(byLink.formLinkName);
+      if (byLink.viewName) candidates.add(byLink.viewName);
+      continue;
+    }
+    const byDisplay = forms.find((form) => form.displayName.toLowerCase() === lower);
+    if (byDisplay) {
+      candidates.add(byDisplay.formLinkName);
+      if (byDisplay.viewName) candidates.add(byDisplay.viewName);
+    }
+  }
+
+  if (candidates.size === 0) {
+    const hint = defaults.find((name) => /employee|department/i.test(name));
+    if (hint) {
+      const match = forms.find(
+        (form) =>
+          new RegExp(hint.replace(/^P_/, ""), "i").test(form.displayName) ||
+          new RegExp(hint.replace(/^P_/, ""), "i").test(form.formLinkName)
+      );
+      if (match) {
+        candidates.add(match.formLinkName);
+        if (match.viewName) candidates.add(match.viewName);
+      }
+    }
+  }
+
+  for (const name of defaults) {
+    if (name !== "P_Employee" && name !== "P_Department") candidates.add(name);
+  }
+  return [...candidates];
+}
+
 function isRetryableFormError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
+  if (/\[7011\]|form name.*invalid|invalid form|form.*not found|does not exist|check the form name/i.test(message)) {
+    return true;
+  }
   const lower = message.toLowerCase();
+  if (lower.includes("error occurred") && lower.includes("getrecords")) return true;
+  if (lower.includes("error occurred") && lower.includes("/records")) return true;
   return (
     lower.includes("form") &&
     (lower.includes("invalid") ||
@@ -95,6 +174,35 @@ function isRetryableFormError(error: unknown) {
       lower.includes("does not exist") ||
       lower.includes("check the form name"))
   );
+}
+
+function recordPaths(form: string, sIndex: number) {
+  const encoded = encodeURIComponent(form);
+  const paths = [
+    `/people/api/forms/${encoded}/getRecords?sIndex=${sIndex}&limit=200`,
+    `/api/forms/${encoded}/getRecords?sIndex=${sIndex}&limit=200`,
+  ];
+  if (/view$/i.test(form)) {
+    paths.unshift(`/api/forms/${encoded}/records?rec_limit=200&sIndex=${sIndex}`);
+  }
+  return paths;
+}
+
+async function fetchFormPage(
+  fetchJson: (path: string) => Promise<unknown>,
+  form: string,
+  sIndex: number
+) {
+  let lastError: unknown = null;
+  for (const path of recordPaths(form, sIndex)) {
+    try {
+      return await fetchJson(path);
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableFormError(error)) throw error;
+    }
+  }
+  throw lastError ?? new Error(`Zoho People form ${form}: request failed`);
 }
 
 export async function fetchZohoPeopleFormRecords(
@@ -108,9 +216,7 @@ export async function fetchZohoPeopleFormRecords(
       const rows: Record<string, unknown>[] = [];
       let sIndex = 1;
       for (let page = 0; page < 10; page++) {
-        const data = await fetchJson(
-          `/people/api/forms/${encodeURIComponent(form)}/getRecords?sIndex=${sIndex}&limit=200`
-        );
+        const data = await fetchFormPage(fetchJson, form, sIndex);
         const batch = flattenZohoPeopleRecords(data);
         if (batch.length === 0) break;
         rows.push(...batch);

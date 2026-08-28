@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { IntegrationProvider } from "@/lib/integrations/types";
 import { requireRoles, unauthorized } from "@/lib/api-auth";
 import { INTEGRATION_CATALOG } from "@/lib/integrations/catalog";
@@ -15,9 +15,11 @@ function isProviderConfigured(provider: IntegrationProvider) {
   return isZohoConfigured();
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const { session, error } = await requireRoles(INTEGRATION_ADMIN_ROLES);
   if (error || !session) return error ?? unauthorized();
+
+  const ctx = { request };
 
   const companyId = session.companyId ?? null;
   const integrations = await listIntegrations(companyId);
@@ -57,8 +59,8 @@ export async function GET() {
   });
 
   return NextResponse.json({
-    googleRedirectUri: getGoogleRedirectUri(),
-    zohoRedirectUri: getZohoRedirectUri(),
+    googleRedirectUri: getGoogleRedirectUri(ctx),
+    zohoRedirectUri: getZohoRedirectUri(undefined, ctx),
     items,
     logs: recentLogs.map((log) => ({
       id: log.id,

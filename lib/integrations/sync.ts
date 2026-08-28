@@ -13,8 +13,10 @@ import { zohoApiFetch } from "@/lib/integrations/zoho/oauth";
 import {
   fetchZohoPeopleCount,
   fetchZohoPeopleFormRecords,
+  fetchZohoPeopleForms,
   mapZohoPeopleDepartmentName,
   mapZohoPeopleEmployee,
+  resolveZohoPeopleFormCandidates,
 } from "@/lib/integrations/zoho/people";
 import { broadcastEvent } from "@/lib/events";
 
@@ -37,9 +39,13 @@ async function upsertDepartment(companyId: string | null, name: string) {
 async function syncZohoPeople(integration: IntegrationRecord): Promise<SyncResult> {
   const fetchJson = (path: string) => zohoApiFetch(integration, path);
 
+  const forms = await fetchZohoPeopleForms(fetchJson).catch(() => []);
+  const employeeForms = resolveZohoPeopleFormCandidates(forms, "employee");
+  const departmentForms = resolveZohoPeopleFormCandidates(forms, "department");
+
   const [employeeRows, departmentRows] = await Promise.all([
-    fetchZohoPeopleFormRecords(fetchJson, ["employee", "P_Employee"]),
-    fetchZohoPeopleFormRecords(fetchJson, ["department", "P_Department"]).catch(
+    fetchZohoPeopleFormRecords(fetchJson, employeeForms),
+    fetchZohoPeopleFormRecords(fetchJson, departmentForms).catch(
       () => [] as Record<string, unknown>[]
     ),
   ]);

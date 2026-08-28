@@ -23,10 +23,11 @@ export async function GET(
     provider,
   });
 
+  const ctx = { request };
   const url =
     provider === "GOOGLE_WORKSPACE"
-      ? getGoogleAuthUrl(state)
-      : getZohoAuthUrl(provider, state);
+      ? getGoogleAuthUrl(state, ctx)
+      : getZohoAuthUrl(provider, state, undefined, ctx);
 
   if (!url) redirect(`/settings/integrations?error=not-configured&provider=${slug}`);
   redirect(url);

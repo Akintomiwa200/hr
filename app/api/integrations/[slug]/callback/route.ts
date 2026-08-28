@@ -33,13 +33,14 @@ export async function GET(
       : slug;
 
   try {
+    const ctx = { request };
     if (provider === "GOOGLE_WORKSPACE") {
-      await exchangeGoogleCode(code!, companyId);
+      await exchangeGoogleCode(code!, companyId, ctx);
     } else {
       await exchangeZohoCode(provider, code!, companyId, {
         location: request.nextUrl.searchParams.get("location"),
         accountsServer: request.nextUrl.searchParams.get("accounts-server"),
-      });
+      }, ctx);
     }
 
     await runIntegrationSync(provider, companyId).catch(() => undefined);
