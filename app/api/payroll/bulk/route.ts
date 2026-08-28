@@ -30,7 +30,10 @@ export async function POST(request: NextRequest) {
     periodEnd: new Date(periodEnd),
     label,
     status,
-    createdByName: session.name ?? session.email ?? "Payroll",
+    createdByName:
+      [session.firstName, session.lastName].filter(Boolean).join(" ") ||
+      session.email ||
+      "Payroll",
     skipExisting: skipExisting !== false,
     employeeIds: Array.isArray(employeeIds) ? employeeIds : undefined,
   });

@@ -14,7 +14,7 @@ export const prisma = new Proxy({} as PrismaClient, {
 });
 
 function hasDelegate(client: PrismaClient, key: string, method: "findMany" | "count" | "create") {
-  const delegate = (client as Record<string, { findMany?: unknown; count?: unknown; create?: unknown } | undefined>)[key];
+  const delegate = (client as unknown as Record<string, { findMany?: unknown; count?: unknown; create?: unknown } | undefined>)[key];
   return typeof delegate?.[method] === "function";
 }
 

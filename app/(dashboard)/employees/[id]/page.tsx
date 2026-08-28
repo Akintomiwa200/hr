@@ -12,8 +12,7 @@ export default async function EmployeeDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await getSession();
-  requirePeoplePage(session);
+  const session = requirePeoplePage(await getSession());
 
   const { id } = await params;
 

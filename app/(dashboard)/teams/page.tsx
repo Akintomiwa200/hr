@@ -10,8 +10,7 @@ import { TeamsModule } from "@/components/teams/teams-module";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function TeamsPage() {
-  const session = await getSession();
-  requirePeoplePage(session);
+  const session = requirePeoplePage(await getSession());
 
   const workspace = getTeamsWorkspace(session.role);
   const scope = getCompanyScope(session);

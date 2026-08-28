@@ -51,7 +51,7 @@ export function summarizeZohoErrorBody(text: string, status?: number) {
         typeof error === "object" &&
         "message" in error &&
         String((error as { message: unknown }).message));
-    if (message) return message.slice(0, 400);
+    if (typeof message === "string" && message) return message.slice(0, 400);
   } catch {
     // HTML or plain text from the wrong host
   }

@@ -15,8 +15,7 @@ import { getPeopleWorkspace } from "@/lib/role-workspace";
 import { EmployeesModule } from "@/components/employees/employees-module";
 
 export default async function EmployeesPage() {
-  const session = await getSession();
-  requirePeoplePage(session);
+  const session = requirePeoplePage(await getSession());
 
   const workspace = getPeopleWorkspace(session.role);
   const scope = getCompanyScope(session);

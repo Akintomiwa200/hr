@@ -58,8 +58,22 @@ function serializeDevice(d: {
   };
 }
 
-async function withPunchesAndEndpoints<T extends { id: string; serialNumber?: string | null }>(
-  devices: T[]
+async function withPunchesAndEndpoints(
+  devices: Array<{
+    id: string;
+    name: string;
+    location: string | null;
+    isActive: boolean;
+    lastSeenAt: Date | null;
+    createdAt: Date;
+    vendor?: string | null;
+    serialNumber?: string | null;
+    model?: string | null;
+    firmware?: string | null;
+    timezone?: string | null;
+    branchId?: string | null;
+    branch?: { id: string; name: string; location: string; timezone: string } | null;
+  }>
 ) {
   const endpoints = await loadDeviceEndpoints(devices.map((d) => d.id)).catch(
     () => new Map<string, { ipAddress: string | null; commPort: number }>()

@@ -28,6 +28,11 @@ import { isDeviceOnline } from "@/lib/attendance-device-spec";
 import type { WorkspaceMode } from "@/lib/role-workspace";
 import { AttendanceSettingsPanel } from "@/components/attendance/attendance-settings-panel";
 import type { AttendanceSettingsData } from "@/lib/attendance-settings";
+import type {
+  AttendanceOverview,
+  AttendanceOverviewRow,
+  AttendancePunchRow,
+} from "@/lib/attendance-overview";
 
 const STATUS_FILTERS = [
   { id: "ALL", label: "All" },

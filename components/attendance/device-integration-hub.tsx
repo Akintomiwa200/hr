@@ -549,7 +549,7 @@ export function DeviceIntegrationHub() {
     return (
       <div className="text-center py-20 text-gray-500">
         Could not load device integration.{" "}
-        <button type="button" onClick={loadDocs} className="text-brand-600 font-medium">
+        <button type="button" onClick={() => void loadDocs()} className="text-brand-600 font-medium">
           Retry
         </button>
       </div>

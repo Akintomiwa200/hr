@@ -4,7 +4,7 @@ import { getCompanyScope, employeeCompanyWhere, branchCompanyWhere, deviceCompan
 import { teamScopedEmployeeWhere } from "@/lib/employee-access";
 import { canManageDevices } from "@/lib/roles";
 import { getAttendanceWorkspace } from "@/lib/role-workspace";
-import { punchActionFromStatus } from "@/lib/zkteco/protocol";
+import { punchActionFromStatus, type ZkPunchAction } from "@/lib/zkteco/protocol";
 import { loadDeviceEndpoints, withDeviceEndpoint } from "@/lib/zkteco/device-endpoint-store";
 import { isDeviceOnline } from "@/lib/attendance-device-spec";
 import { DEFAULT_ZK_PORT } from "@/lib/zkteco/device-ip";
@@ -48,7 +48,7 @@ export type AttendancePunchRow = {
   punchedAt: string;
   createdAt: string;
   statusCode: number;
-  action: "check_in" | "check_out" | "toggle";
+  action: ZkPunchAction;
   verifyLabel: string;
   processed: boolean;
   duplicate: boolean;

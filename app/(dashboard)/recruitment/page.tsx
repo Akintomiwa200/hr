@@ -12,8 +12,7 @@ import { getCompanyScope, departmentCompanyWhere } from "@/lib/company-scope";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function RecruitmentPage() {
-  const session = await getSession();
-  requireRecruitmentPage(session);
+  const session = requireRecruitmentPage(await getSession());
 
   const scope = getCompanyScope(session);
   const companyFilter = scope.companyId
