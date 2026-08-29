@@ -29,6 +29,7 @@ import {
   CheckSquare,
   ListTodo,
   UserMinus,
+  Trash2,
   BarChart3,
   PenLine,
 } from "lucide-react";
@@ -196,6 +197,15 @@ export const dashboardNavSections: NavSection[] = [
         icon: CheckSquare,
         roles: CHECKLIST_TEMPLATE_ROLES,
         match: (pathname) => pathname.startsWith("/checklist/settings"),
+      },
+      {
+        id: "offboarded-staff",
+        href: "/offboarded-staff",
+        label: "Delete & Separations",
+        pageTitle: "Delete & Separations",
+        icon: Trash2,
+        roles: PEOPLE_ADMIN_ROLES,
+        match: (pathname) => pathname === "/offboarded-staff",
       },
     ],
   },

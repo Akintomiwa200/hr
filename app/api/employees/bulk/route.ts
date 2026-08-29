@@ -29,6 +29,10 @@ export async function PATCH(request: NextRequest) {
       where: { id: { in: scopedIds } },
       data: { status: "INACTIVE" },
     });
+    await prisma.employee.updateMany({
+      where: { id: { in: scopedIds }, endDate: null },
+      data: { endDate: new Date() },
+    });
   } else if (action === "activate") {
     await prisma.employee.updateMany({
       where: { id: { in: scopedIds } },

@@ -35,7 +35,7 @@ function loadEnvFile(fileName) {
 loadEnvFile(".env");
 loadEnvFile(".env.local");
 
-function runPrisma(label, args) {
+function runPrisma(label, args, { fatal = true } = {}) {
   console.log(`[db-sync] ${label}…`);
   const result = spawnSync(process.execPath, [prismaCli, ...args], {
     cwd: root,
@@ -47,14 +47,12 @@ function runPrisma(label, args) {
     },
     shell: false,
   });
-  if (result.error) {
-    console.error(`[db-sync] ${label} failed.`, result.error.message);
-    process.exit(1);
-  }
-  if (result.status !== 0) {
-    console.error(`[db-sync] ${label} failed.`);
+  if (result.error || result.status !== 0) {
+    if (!fatal) return false;
+    console.error(`[db-sync] ${label} failed.`, result.error?.message ?? "");
     process.exit(result.status ?? 1);
   }
+  return true;
 }
 
 function hasMigrations() {
@@ -80,5 +78,13 @@ if (!process.env.DIRECT_URL && process.env.DATABASE_URL.includes("neon.tech")) {
   );
 }
 
-runPrisma("Applying migrations", ["migrate", "deploy"]);
-console.log("[db-sync] Database is in sync.");
+const migrated = runPrisma("Applying migrations", ["migrate", "deploy"], { fatal: false });
+if (migrated) {
+  console.log("[db-sync] Database is in sync.");
+} else {
+  console.warn(
+    "[db-sync] Could not reach / sync the database. Continuing so the app can start — " +
+      "database-backed pages will error until the database is reachable.",
+  );
+  process.exit(0);
+}

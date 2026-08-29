@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  Archive,
   Clock,
   Filter,
   Fingerprint,
@@ -698,6 +699,15 @@ export function AttendanceModule({
         </div>
         {canManageSettings && attendanceSettings && (
           <AttendanceSettingsPanel settings={attendanceSettings} />
+        )}
+        {canManageSettings && (
+          <Link
+            href="/attendance/archive"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+          >
+            <Archive className="w-4 h-4" />
+            Archive
+          </Link>
         )}
       </div>
       )}

@@ -1,5 +1,7 @@
+import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { getAutoRegisterSettings } from "@/lib/attendance-settings";
 import {
   recordCheckIn,
   recordCheckOut,
@@ -128,6 +130,70 @@ async function loadDeviceById(id: string): Promise<ZkDeviceContext | null> {
   return toDeviceContext(device);
 }
 
+/**
+ * Auto-register a terminal the first time it pushes a heartbeat/changes to
+ * `/iclock`. ZKTeco PUSH mode has the device dial OUT to us (no server→terminal
+ * reachability needed), so a brand-new machine only needs internet + the correct
+ * Smart HR URL to connect on its own. Opt-in via a platform-wide settings row.
+ * Returns an active device context, or null if auto-register is off / no branch.
+ */
+async function ensureDeviceAutoRegistered(
+  serialNumber: string
+): Promise<ZkDeviceContext | null> {
+  const known = await loadDeviceBySn(serialNumber);
+  if (known?.isActive) return known;
+
+  const sn = normalizeSerial(serialNumber);
+  if (!sn) return null;
+
+  const auto = await getAutoRegisterSettings();
+  if (!auto.enabled || !auto.branchId) return null;
+
+  const branch = await prisma.branch.findUnique({
+    where: { id: auto.branchId },
+    select: {
+      id: true,
+      name: true,
+      timezone: true,
+      location: true,
+      companyId: true,
+    },
+  });
+  if (!branch) return null;
+
+  try {
+    await prisma.attendanceDevice.create({
+      data: {
+        name: branch.name ? `${branch.name} · Auto (${sn.slice(-4)})` : `Auto (${sn.slice(-4)})`,
+        location: branch.location,
+        vendor: "ZKTECO",
+        serialNumber: sn,
+        branchId: branch.id,
+        companyId: branch.companyId,
+        timezone: branch.timezone,
+        apiKey: `dev_${randomBytes(24).toString("hex")}`,
+        lastSeenAt: new Date(),
+        isActive: true,
+      },
+    });
+  } catch {
+    return null;
+  }
+
+  deviceBySnCache.delete(sn);
+  const fresh = await loadDeviceBySn(sn);
+  if (fresh) {
+    broadcastAppEvent("attendance_updated", {
+      deviceId: fresh.id,
+      deviceName: fresh.name,
+      action: "device_created",
+      autoRegistered: true,
+      serialNumber: sn,
+    });
+  }
+  return fresh;
+}
+
 async function touchDevice(device: ZkDeviceContext, extra?: { attStamp?: string; opStamp?: string }) {
   const now = new Date();
   await prisma.attendanceDevice.update({
@@ -158,7 +224,10 @@ async function touchDevice(device: ZkDeviceContext, extra?: { attStamp?: string;
 export async function heartbeatBySerial(serialNumber: string, _peerIp?: string | null) {
   const sn = normalizeSerial(serialNumber);
   if (!sn) return;
-  const device = await loadDeviceBySn(sn);
+  let device = await loadDeviceBySn(sn);
+  if (!device?.isActive) {
+    device = await ensureDeviceAutoRegistered(sn);
+  }
   if (!device?.isActive) return;
   const attStamp = sanitizeZkStamp(device.attStamp);
   const opStamp = sanitizeZkStamp(device.opStamp);
@@ -460,10 +529,13 @@ export async function ingestAttLog(
   stamp?: string,
   peerIp?: string | null
 ) {
-  const device = await loadDeviceBySn(serialNumber);
+  const sn = serialNumber.trim().toUpperCase();
+  let device = await loadDeviceBySn(serialNumber);
+  if (!device?.isActive) {
+    device = await ensureDeviceAutoRegistered(sn);
+  }
   const rows = parseAttLogBody(body);
 
-  const sn = serialNumber.trim().toUpperCase();
   if (!device?.isActive) {
     for (const row of rows) {
       const punchedAt = parseDeviceLocalTime(row.timestamp, DEFAULT_BRANCH_TIMEZONE);

@@ -151,6 +151,8 @@ model Company {
   payrollSettings   PayrollSettings[]
   attendanceSettings AttendanceSettings[]
   payrollRuns       PayrollRun[]
+  attendanceArchives AttendanceArchive[]
+  offboardingSettings OffboardingSettings[]
   performanceSettings PerformanceSettings[]
   kpiDefinitions    KpiDefinition[]
   appraisalCycles   AppraisalCycle[]
@@ -353,9 +355,47 @@ model AttendanceSettings {
   breakTrackingEnabled Boolean  @default(false)
   maxBreakMinutes      Int      @default(60)
   timezone             String   @default("Africa/Lagos")
+  autoRegisterDevices  Boolean  @default(false)
+  autoRegisterBranchId String?
   updatedAt            DateTime @updatedAt
 
   company Company? @relation(fields: [companyId], references: [id])
+}
+
+/**
+ * Company-wide offboarding retention: how many days to keep a deactivated
+ * (offboarded) staff record before it is permanently deleted from the database.
+ */
+model OffboardingSettings {
+  id          String  @id @default(cuid())
+  companyId   String? @unique
+  retentionDays Int   @default(30)
+  updatedAt   DateTime @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id])
+}
+
+/**
+ * Pointer to an attendance month archived to Cloudinary to free primary-storage space.
+ * The JSON payload lives in Cloudinary; only lightweight metadata stays in the DB.
+ */
+model AttendanceArchive {
+  id          String   @id @default(cuid())
+  companyId   String?
+  month       String
+  publicId    String
+  fileUrl     String
+  recordCount Int      @default(0)
+  bytes       Int      @default(0)
+  createdBy   String?
+  restored    Boolean  @default(false)
+  restoredAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, month])
+  @@index([companyId, createdAt])
 }
 
 model AttendanceDevice {

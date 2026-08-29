@@ -6,7 +6,8 @@ import { SettingsModule } from "@/components/settings/settings-module";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { APP_CURRENCIES } from "@/lib/currency";
 import { getAppCurrencyCode } from "@/lib/currency-server";
-import { isSuperAdmin } from "@/lib/roles";
+import { isSuperAdmin, canManageEmployees } from "@/lib/roles";
+import { RetentionSettingsCard } from "@/components/offboarding/retention-settings-card";
 
 export default async function SettingsPage() {
   const session = await getSession();
@@ -55,6 +56,11 @@ export default async function SettingsPage() {
             : null
         }
       />
+      {canManageEmployees(session.role) && (
+        <div className="mt-6">
+          <RetentionSettingsCard />
+        </div>
+      )}
     </div>
   );
 }

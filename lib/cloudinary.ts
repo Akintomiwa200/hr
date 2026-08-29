@@ -38,19 +38,24 @@ function sign(params: Record<string, string | number>, apiSecret: string) {
   return crypto.createHash("sha1").update(`${toSign}${apiSecret}`).digest("hex");
 }
 
-export async function uploadChecklistFileToCloudinary(input: {
+type CloudinaryUploadInput = {
   buffer: Buffer;
   filename: string;
   mimeType?: string | null;
   publicId: string;
-}) {
+  resourceType?: "auto" | "image" | "raw";
+};
+
+export async function uploadToCloudinary(input: CloudinaryUploadInput) {
   const config = getCloudinaryConfig();
   if (!config) {
     throw new Error("CLOUDINARY_NOT_CONFIGURED");
   }
 
+  const resourceType = input.resourceType ?? "auto";
   const timestamp = Math.floor(Date.now() / 1000);
-  const params = { public_id: input.publicId, timestamp };
+  const params: Record<string, string | number> = { public_id: input.publicId, timestamp };
+  if (resourceType !== "auto") params.resource_type = resourceType;
   const signature = sign(params, config.apiSecret);
 
   const form = new FormData();
@@ -63,11 +68,12 @@ export async function uploadChecklistFileToCloudinary(input: {
   form.append("timestamp", String(timestamp));
   form.append("signature", signature);
   form.append("public_id", input.publicId);
+  if (resourceType !== "auto") form.append("resource_type", resourceType);
 
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${config.cloudName}/auto/upload`, {
-    method: "POST",
-    body: form,
-  });
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${config.cloudName}/${resourceType}/upload`,
+    { method: "POST", body: form }
+  );
   const data = (await res.json()) as {
     secure_url?: string;
     url?: string;
@@ -86,7 +92,57 @@ export async function uploadChecklistFileToCloudinary(input: {
   };
 }
 
-export async function deleteCloudinaryFile(publicId: string) {
+export async function uploadChecklistFileToCloudinary(input: {
+  buffer: Buffer;
+  filename: string;
+  mimeType?: string | null;
+  publicId: string;
+}) {
+  return uploadToCloudinary({ ...input, resourceType: "auto" });
+}
+
+export async function uploadJsonToCloudinary(input: {
+  data: unknown;
+  publicId: string;
+}) {
+  const buffer = Buffer.from(JSON.stringify(input.data), "utf8");
+  return uploadToCloudinary({
+    buffer,
+    filename: "data.json",
+    mimeType: "application/json",
+    publicId: input.publicId,
+    resourceType: "raw",
+  });
+}
+
+export async function uploadAttendancePhotoToCloudinary(input: {
+  buffer: Buffer;
+  filename: string;
+  mimeType?: string | null;
+  companyId: string;
+  employeeId: string;
+  kind: "check-in" | "check-out";
+}) {
+  const publicId = [
+    "smarthr",
+    "attendance",
+    input.companyId,
+    input.employeeId,
+    `${input.kind}-${Date.now()}`,
+  ].join("/");
+  return uploadToCloudinary({
+    buffer: input.buffer,
+    filename: input.filename,
+    mimeType: input.mimeType,
+    publicId,
+    resourceType: "image",
+  });
+}
+
+export async function deleteCloudinaryFile(
+  publicId: string,
+  resourceType: "image" | "raw" = "image"
+) {
   const config = getCloudinaryConfig();
   if (!config) return;
   const timestamp = Math.floor(Date.now() / 1000);
@@ -96,8 +152,8 @@ export async function deleteCloudinaryFile(publicId: string) {
   form.append("timestamp", String(timestamp));
   form.append("signature", signature);
   form.append("public_id", publicId);
-  await fetch(`https://api.cloudinary.com/v1_1/${config.cloudName}/image/destroy`, {
-    method: "POST",
-    body: form,
-  }).catch(() => undefined);
+  await fetch(
+    `https://api.cloudinary.com/v1_1/${config.cloudName}/${resourceType}/destroy`,
+    { method: "POST", body: form }
+  ).catch(() => undefined);
 }

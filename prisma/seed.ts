@@ -3,9 +3,11 @@
  * Creates platform Super Admin only. Companies/people are created in the app.
  */
 import { PrismaClient, Role } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   const passwordHash = await bcrypt.hash("password", 10);

@@ -7,6 +7,8 @@ export type AttendanceSettingsData = {
   breakTrackingEnabled: boolean;
   maxBreakMinutes: number;
   timezone: string;
+  autoRegisterDevices: boolean;
+  autoRegisterBranchId: string | null;
 };
 
 export const defaultAttendanceSettings: AttendanceSettingsData = {
@@ -16,6 +18,8 @@ export const defaultAttendanceSettings: AttendanceSettingsData = {
   breakTrackingEnabled: false,
   maxBreakMinutes: 60,
   timezone: "Africa/Lagos",
+  autoRegisterDevices: false,
+  autoRegisterBranchId: null,
 };
 
 export async function getAttendanceSettings(
@@ -37,7 +41,49 @@ export async function getAttendanceSettings(
     breakTrackingEnabled: row.breakTrackingEnabled,
     maxBreakMinutes: row.maxBreakMinutes,
     timezone: row.timezone,
+    autoRegisterDevices: row.autoRegisterDevices,
+    autoRegisterBranchId: row.autoRegisterBranchId,
   };
+}
+
+/**
+ * Auto-register configuration for ZKTeco terminals. `/iclock` pushes are
+ * unauthenticated (the device dials OUT to us), so we read the platform-wide
+ * (companyId = null) settings row. When enabled, an unknown terminal that pushes
+ * a heartbeat is auto-created in the configured branch and connects on its own.
+ */
+export async function getAutoRegisterSettings(): Promise<{
+  enabled: boolean;
+  branchId: string | null;
+}> {
+  const row = await prisma.attendanceSettings.findFirst({
+    where: { companyId: null },
+    select: { autoRegisterDevices: true, autoRegisterBranchId: true },
+  });
+  return {
+    enabled: Boolean(row?.autoRegisterDevices),
+    branchId: row?.autoRegisterBranchId ?? null,
+  };
+}
+
+export async function setAutoRegisterSettings(data: {
+  enabled: boolean;
+  branchId: string | null;
+}) {
+  const input = {
+    autoRegisterDevices: Boolean(data.enabled),
+    autoRegisterBranchId: data.branchId || null,
+  };
+  const existing = await prisma.attendanceSettings.findFirst({
+    where: { companyId: null },
+    select: { id: true },
+  });
+  if (existing) {
+    return prisma.attendanceSettings.update({ where: { id: existing.id }, data: input });
+  }
+  return prisma.attendanceSettings.create({
+    data: { companyId: null, ...input },
+  });
 }
 
 export async function updateAttendanceSettings(

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -98,8 +99,11 @@ export function EmployeesModule({
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [menuRect, setMenuRect] = useState<{ top: number; left: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const [viewEmployee, setViewEmployee] = useState<EmployeeRow | null>(null);
   const [editEmployee, setEditEmployee] = useState<EmployeeRow | null>(null);
@@ -157,14 +161,18 @@ export function EmployeesModule({
     });
   }, [employees, search, employmentFilter, roleFilter, activeFilter]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+
   const allFilteredSelected =
-    filtered.length > 0 && filtered.every((e) => selected.has(e.id));
+    pageItems.length > 0 && pageItems.every((e) => selected.has(e.id));
 
   function toggleAll() {
     if (allFilteredSelected) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(filtered.map((e) => e.id)));
+      setSelected(new Set(pageItems.map((e) => e.id)));
     }
   }
 
@@ -175,6 +183,10 @@ export function EmployeesModule({
       else next.add(id);
       return next;
     });
+  }
+
+  function goToPage(next: number) {
+    setPage(Math.min(Math.max(1, next), totalPages));
   }
 
   function openCreate() {
@@ -454,13 +466,19 @@ export function EmployeesModule({
           <div className="flex flex-wrap items-center gap-2">
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               placeholder="Search Employee"
               className="px-3 py-2 text-[12px] bg-gray-50 border border-gray-200 rounded-lg w-40 focus:outline-none focus:ring-2 focus:ring-violet-500"
             />
             <select
               value={employmentFilter}
-              onChange={(e) => setEmploymentFilter(e.target.value)}
+              onChange={(e) => {
+                setEmploymentFilter(e.target.value);
+                setPage(1);
+              }}
               className="px-3 py-2 text-[12px] bg-gray-50 border border-gray-200 rounded-lg text-gray-600"
             >
               <option value="ALL">All Employment</option>
@@ -469,7 +487,10 @@ export function EmployeesModule({
             </select>
             <select
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
+              onChange={(e) => {
+                setRoleFilter(e.target.value);
+                setPage(1);
+              }}
               className="px-3 py-2 text-[12px] bg-gray-50 border border-gray-200 rounded-lg text-gray-600"
             >
               <option value="ALL">All Role</option>
@@ -481,7 +502,10 @@ export function EmployeesModule({
             </select>
             <select
               value={activeFilter}
-              onChange={(e) => setActiveFilter(e.target.value)}
+              onChange={(e) => {
+                setActiveFilter(e.target.value);
+                setPage(1);
+              }}
               className="px-3 py-2 text-[12px] bg-gray-50 border border-gray-200 rounded-lg text-gray-600"
             >
               <option value="ALL">All Status</option>
@@ -534,16 +558,14 @@ export function EmployeesModule({
                 )}
                 <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Employee ID</th>
                 <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Employee name</th>
-                <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Email</th>
                 <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Job title</th>
-                <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Role</th>
                 <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Department</th>
                 <th className="px-3 py-3 text-[11px] font-semibold text-gray-500">Employment</th>
                 <th className="px-5 py-3 text-[11px] font-semibold text-gray-500">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map((emp) => {
+              {pageItems.map((emp) => {
                 const variant = employmentVariant(resolveEmploymentType(emp));
                 return (
                   <tr key={emp.id} className="hover:bg-gray-50/60 transition-colors">
@@ -572,12 +594,8 @@ export function EmployeesModule({
                         </span>
                       </button>
                     </td>
-                    <td className="px-3 py-3.5 text-gray-500 text-[12px]">{emp.email}</td>
                     <td className="px-3 py-3.5 text-gray-700 text-[12px] whitespace-nowrap">
                       {emp.jobTitle.replace(/\s*\(Freelance\)/i, "")}
-                    </td>
-                    <td className="px-3 py-3.5 text-gray-600 text-[12px] capitalize">
-                      {(emp.user?.role ?? "EMPLOYEE").toLowerCase()}
                     </td>
                     <td className="px-3 py-3.5">
                       <span className="inline-block px-2.5 py-1 text-[11px] text-gray-600 bg-gray-100 rounded-md">
@@ -614,59 +632,22 @@ export function EmployeesModule({
                           Profile
                         </Link>
                         {canManage && (
-                          <div className="relative">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setMenuOpen(menuOpen === emp.id ? null : emp.id)
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              if (menuOpen === emp.id) {
+                                setMenuOpen(null);
+                                return;
                               }
-                              className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                            {menuOpen === emp.id && (
-                              <>
-                                <button
-                                  type="button"
-                                  className="fixed inset-0 z-10"
-                                  onClick={() => setMenuOpen(null)}
-                                />
-                                <div className="absolute right-0 top-full mt-1 z-20 w-44 bg-white border border-gray-100 rounded-xl shadow-lg py-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => openEdit(emp)}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
-                                  >
-                                    <Pencil className="w-4 h-4" /> Edit
-                                  </button>
-                                  <Link
-                                    href={`/employees/${emp.id}/attendance`}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
-                                    onClick={() => setMenuOpen(null)}
-                                  >
-                                    Attendance
-                                  </Link>
-                                  <Link
-                                    href={`/employees/${emp.id}/leave`}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
-                                    onClick={() => setMenuOpen(null)}
-                                  >
-                                    Leave
-                                  </Link>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setDeleteEmployee(emp);
-                                      setMenuOpen(null);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-red-600 hover:bg-red-50"
-                                  >
-                                    <UserX className="w-4 h-4" /> Deactivate
-                                  </button>
-                                </div>
-                              </>
-                            )}
-                          </div>
+                              const r = e.currentTarget.getBoundingClientRect();
+                              setMenuRect({ top: r.bottom + 4, left: Math.max(8, r.right - 176) });
+                              setMenuOpen(emp.id);
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg"
+                            aria-label="More actions"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
                         )}
                       </div>
                     </td>
@@ -679,6 +660,62 @@ export function EmployeesModule({
             <p className="px-5 py-8 text-center text-sm text-gray-500">
               No employees match your filters.
             </p>
+          )}
+
+          {filtered.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-gray-100">
+              <div className="flex items-center gap-3 text-[12px] text-gray-500">
+                <span>
+                  Showing{" "}
+                  <span className="font-medium text-gray-700">
+                    {filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1}
+                  </span>
+                  –
+                  <span className="font-medium text-gray-700">
+                    {Math.min(safePage * pageSize, filtered.length)}
+                  </span>{" "}
+                  of <span className="font-medium text-gray-700">{filtered.length}</span>
+                </span>
+                <label className="flex items-center gap-1.5">
+                  <span>Rows</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="px-2 py-1 text-[12px] bg-gray-50 border border-gray-200 rounded-lg text-gray-600 focus:outline-none"
+                  >
+                    {[20, 25, 50, 100].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => goToPage(safePage - 1)}
+                  disabled={safePage <= 1}
+                  className="px-3 py-1.5 text-[12px] font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-1.5 text-[12px] text-gray-600">
+                  Page <span className="font-medium text-gray-900">{safePage}</span> of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => goToPage(safePage + 1)}
+                  disabled={safePage >= totalPages}
+                  className="px-3 py-1.5 text-[12px] font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -926,6 +963,64 @@ export function EmployeesModule({
           </div>
         </div>
       </Dialog>
+
+      {menuOpen &&
+        menuRect &&
+        typeof document !== "undefined" &&
+        (() => {
+          const menuEmp = filtered.find((e) => e.id === menuOpen);
+          if (!menuEmp) return null;
+          return createPortal(
+            <>
+              <button
+                type="button"
+                className="fixed inset-0 z-[90]"
+                onClick={() => setMenuOpen(null)}
+                aria-label="Close menu"
+              />
+              <div
+                className="fixed z-[100] w-44 bg-white border border-gray-100 rounded-xl shadow-lg py-1"
+                style={{ top: menuRect.top, left: menuRect.left }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(null);
+                    openEdit(menuEmp);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+                >
+                  <Pencil className="w-4 h-4" /> Edit
+                </button>
+                <Link
+                  href={`/employees/${menuEmp.id}/attendance`}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+                  onClick={() => setMenuOpen(null)}
+                >
+                  Attendance
+                </Link>
+                <Link
+                  href={`/employees/${menuEmp.id}/leave`}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+                  onClick={() => setMenuOpen(null)}
+                >
+                  Leave
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteEmployee(menuEmp);
+                    setMenuOpen(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-red-600 hover:bg-red-50"
+                >
+                  <UserX className="w-4 h-4" /> Deactivate
+                </button>
+              </div>
+            </>,
+            document.body
+          );
+        })()}
     </>
   );
 }

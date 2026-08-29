@@ -19,7 +19,7 @@ import { useDeviceLive } from "@/hooks/use-attendance-live";
 import { usePollingFetch } from "@/hooks/use-polling-fetch";
 import { notify, readApiError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { isDeviceOnline, type AttendanceDeviceSpec } from "@/lib/attendance-device-spec";
+import { isDeviceOnline, isDeviceLive, type AttendanceDeviceSpec } from "@/lib/attendance-device-spec";
 import { BRANCH_TIMEZONES } from "@/lib/zkteco/timezones";
 import { DEFAULT_ZK_PORT } from "@/lib/zkteco/device-ip";
 
@@ -163,8 +163,53 @@ export function DeviceIntegrationHub() {
   const [connectNote, setConnectNote] = useState<string | null>(null);
   const connectAbortRef = useRef<AbortController | null>(null);
 
-  const loadDocsAbortRef = useRef<AbortController | null>(null);
+  const [autoRegister, setAutoRegister] = useState<{
+    enabled: boolean;
+    branchId: string | null;
+    branches: { id: string; name: string; location: string }[];
+  } | null>(null);
+  const autoRegisterBusy = useRef(false);
 
+  const loadAutoRegister = useCallback(async () => {
+    try {
+      const res = await fetch("/api/attendance/devices/auto-register", {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setAutoRegister(data);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const saveAutoRegister = async (enabled: boolean, branchId: string | null) => {
+    if (autoRegisterBusy.current) return;
+    autoRegisterBusy.current = true;
+    try {
+      const res = await fetch("/api/attendance/devices/auto-register", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled, branchId }),
+      });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Could not update auto-register"));
+        return;
+      }
+      const data = (await res.json()) as { enabled: boolean; branchId: string | null };
+      setAutoRegister((prev) =>
+        prev ? { ...prev, enabled: data.enabled, branchId: data.branchId } : prev
+      );
+      notify.success(data.enabled ? "Auto-register on" : "Auto-register off");
+      void loadDocs(true);
+    } catch {
+      notify.error("Could not update auto-register");
+    } finally {
+      autoRegisterBusy.current = false;
+    }
+  };
+
+  const loadDocsAbortRef = useRef<AbortController | null>(null);
   const loadDocs = useCallback(async (silent = false, signal?: AbortSignal) => {
     if (!silent) setLoading(true);
     try {
@@ -198,13 +243,14 @@ export function DeviceIntegrationHub() {
         if (!prev) return prev;
         return (data.devices ?? []).find((d) => d.id === prev.id) ?? prev;
       });
+      void loadAutoRegister();
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       notify.error("Failed to load ZKTeco console");
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, []);
+  }, [loadAutoRegister]);
 
   const refreshStatus = useCallback(async (signal: AbortSignal) => {
     try {
@@ -364,7 +410,13 @@ export function DeviceIntegrationHub() {
     setSheetBranchId(device.branchId ?? "");
     setSheetIp(device.ipAddress ?? "");
     setSheetPort(String(device.commPort || DEFAULT_ZK_PORT));
-    setConnectNote(null);
+    setConnectNote(
+      isDeviceLive(device.lastSeenAt)
+        ? "Auto-connect: this terminal is already pushing to Smart HR right now. Confirm applies instantly — no wait."
+        : device.online
+          ? "This terminal is already connected. Confirm will apply the details instantly."
+          : "Enter the hardware IP, then Confirm to connect."
+    );
   };
 
   const connectRealtime = async () => {
@@ -374,11 +426,14 @@ export function DeviceIntegrationHub() {
       return;
     }
     setSyncingId(connectDevice.id);
-    setConnectNote(`Checking ${sheetIp.trim()}:${Number(sheetPort) || DEFAULT_ZK_PORT}…`);
+    setConnectNote(
+      isDeviceLive(connectDevice.lastSeenAt)
+        ? "Auto-connecting…"
+        : `Checking ${sheetIp.trim()}:${Number(sheetPort) || DEFAULT_ZK_PORT}…`
+    );
     connectAbortRef.current?.abort();
     const controller = new AbortController();
     connectAbortRef.current = controller;
-    const timer = window.setTimeout(() => controller.abort(), 18_000);
     try {
       const res = await fetch(`/api/attendance/devices/${connectDevice.id}/connect`, {
         method: "POST",
@@ -395,7 +450,7 @@ export function DeviceIntegrationHub() {
       if (connectAbortRef.current !== controller) return;
       if (!res.ok) {
         notify.error(await readApiError(res, "Could not save the terminal"));
-        setConnectNote("Confirm failed. Nothing new was applied — try again.");
+        setConnectNote("Could not save — check the details and try again.");
         return;
       }
       const data = (await res.json()) as {
@@ -414,27 +469,23 @@ export function DeviceIntegrationHub() {
       if (data.ipAddress) setSheetIp(data.ipAddress);
       if (data.commPort) setSheetPort(String(data.commPort));
       void loadDocs(true);
-      const outcome =
-        data.message ||
-        (data.reachedDevice
-          ? "Reached the terminal. Real-time PUSH is on."
-          : "Device IP saved. Could not reach port 4370 from this PC.");
+      const outcome = data.message || "Terminal saved. It auto-connects when it reaches Smart HR.";
       setConnectNote(outcome);
-      if (data.reachedDevice || data.realtime === "live") {
+      if (data.realtime === "live") {
         notify.success("Connected", outcome);
       } else {
         notify.success("Saved", outcome);
       }
+      void refreshStatus(new AbortController().signal);
     } catch (err) {
       if (connectAbortRef.current !== controller) return;
-      const timedOut = err instanceof Error && err.name === "AbortError";
-      const outcome = timedOut
-        ? "Confirm timed out after 18 seconds. If Last seen updates, the save still went through."
-        : "Could not reach Smart HR to confirm. Check the page is still online and try again.";
+      const outcome =
+        err instanceof Error && err.name === "AbortError"
+          ? "Still saving — this usually means the server is busy. No error was applied."
+          : "Could not reach Smart HR to save. Check the page is still online and try again.";
       setConnectNote(outcome);
-      notify.error(timedOut ? "Confirm timed out" : "Confirm failed", outcome);
+      notify.error("Could not confirm", outcome);
     } finally {
-      window.clearTimeout(timer);
       if (connectAbortRef.current === controller) {
         connectAbortRef.current = null;
         setSyncingId(null);
@@ -758,6 +809,61 @@ export function DeviceIntegrationHub() {
       </div>
 
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <h3 className="text-sm font-semibold text-gray-900 mb-1">Auto-connect new terminals</h3>
+        <p className="text-xs text-gray-500 mb-3">
+          When on, any ZKTeco terminal that reaches Smart HR with a serial number you have not added
+          registers itself automatically in the branch below and connects in real time — no button
+          needed. Point the terminal at Smart HR and it just appears.
+        </p>
+        {!autoRegister ? (
+          <p className="text-xs text-gray-400">Loading…</p>
+        ) : (
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4"
+                checked={autoRegister.enabled}
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+                  if (!enabled) {
+                    void saveAutoRegister(false, autoRegister.branchId);
+                    return;
+                  }
+                  if (autoRegister.branchId) {
+                    void saveAutoRegister(true, autoRegister.branchId);
+                  } else {
+                    setAutoRegister((prev) => (prev ? { ...prev, enabled: true } : prev));
+                    notify.info("Pick a branch below — new terminals will land there.");
+                  }
+                }}
+              />
+              <span className="text-sm text-gray-700">Enable auto-register (PUSH auto-connect)</span>
+            </label>
+            <select
+              className={inputClass}
+              value={autoRegister.branchId ?? ""}
+              onChange={(e) => {
+                const branchId = e.target.value;
+                const next = { ...autoRegister, branchId };
+                setAutoRegister(next);
+                if (branchId) {
+                  void saveAutoRegister(next.enabled, branchId);
+                }
+              }}
+            >
+              <option value="">Select branch for new terminals</option>
+              {autoRegister.branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name} — {branch.location}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-gray-900 mb-1">
           Live terminals ({docs.devices.length})
         </h3>
@@ -889,9 +995,27 @@ export function DeviceIntegrationHub() {
             Transfer time <span className="font-medium text-gray-900">00:00;14:05</span>
           </div>
           {connectDevice?.lastSeenAt && (
-            <p className="text-xs text-emerald-700">
-              Last seen {new Date(connectDevice.lastSeenAt).toLocaleString()}
-            </p>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-700">
+              {isDeviceLive(connectDevice.lastSeenAt) ? (
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full font-medium bg-emerald-50 text-emerald-700">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live now
+                </span>
+              ) : connectDevice.online ? (
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full font-medium bg-emerald-50 text-emerald-700">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  Connected
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full font-medium bg-gray-100 text-gray-500">
+                  <span className="w-2 h-2 rounded-full bg-gray-400" />
+                  Offline
+                </span>
+              )}
+              <span>
+                Last seen {new Date(connectDevice.lastSeenAt).toLocaleString()}
+              </span>
+            </div>
           )}
           {connectNote && (
             <p

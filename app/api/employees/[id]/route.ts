@@ -216,7 +216,10 @@ export async function DELETE(
 
   await prisma.employee.update({
     where: { id },
-    data: { status: "INACTIVE" },
+    data: {
+      status: "INACTIVE",
+      ...(existing.endDate ? {} : { endDate: new Date() }),
+    },
   });
 
   notifyEmployeeChange(id, "deleted");

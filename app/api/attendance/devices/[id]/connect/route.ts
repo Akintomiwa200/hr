@@ -97,35 +97,40 @@ export async function POST(
     (typeof body.serialNumber === "string" ? body.serialNumber.trim().toUpperCase() : "");
 
   const alreadyLive = isDeviceOnline(existing.lastSeenAt);
-  const probe = await Promise.race([
-    probeDevicePort(endpoint.ip, endpoint.port, 5_000),
-    new Promise<"timeout">((resolve) => {
-      setTimeout(() => resolve("timeout"), 6_000);
-    }),
-  ]);
-  const reachedDevice = probe === "open";
 
-  if (reachedDevice) {
-    scheduleDevicePull(id, true);
-  }
-
-  broadcastAppEvent("attendance_updated", {
-    id,
-    action: reachedDevice ? "device_connected" : "device_saved",
-  });
+  // NON-BLOCKING: save settings and respond immediately so the UI never waits
+  // on a port probe. ZKTeco PUSH mode has the device dial OUT to /iclock, so
+  // reaching port 4370 from the server is optional — online status is driven
+  // entirely by the device's own heartbeat. The probe runs in the background
+  // only to opportunistically trigger a history pull when the server can reach
+  // the terminal directly (PULL mode).
+  void (async () => {
+    try {
+      const probe = await Promise.race([
+        probeDevicePort(endpoint.ip, endpoint.port, 5_000),
+        new Promise<"timeout">((resolve) => {
+          setTimeout(() => resolve("timeout"), 6_000);
+        }),
+      ]);
+      const reachedDevice = probe === "open";
+      if (reachedDevice) {
+        scheduleDevicePull(id, true);
+      }
+      broadcastAppEvent("attendance_updated", {
+        id,
+        action: reachedDevice ? "device_connected" : "device_saved",
+      });
+    } catch {
+      // Ignore background probe errors; heartbeat keeps the device live.
+    }
+  })();
 
   const hardware = `${endpoint.ip}:${endpoint.port}`;
   let message: string;
-  if (reachedDevice) {
-    message = `Reached ${hardware}. Real-time PUSH is on for SN ${serial || "this terminal"}. Recent thumbprints are downloading now — check Live or History in a few seconds.`;
-  } else if (probe === "refused") {
-    message = `Saved ${hardware}, but the port refused the connection. Confirm COMM → Ethernet IP/port on the machine.`;
-  } else if (probe === "unreachable") {
-    message = `Saved ${hardware}, but this server cannot reach that network. Use the LAN IP while this PC is on the same office Wi‑Fi.`;
-  } else if (alreadyLive) {
-    message = `Saved ${hardware}. Could not probe port 4370 just now, but the terminal was already pushing. Real-time PUSH stays on.`;
+  if (alreadyLive) {
+    message = `Auto-connected. ${hardware} is pushing fingerprints to Smart HR in real time — PUSH is live and history stays up to date. No action needed; you're online.`;
   } else {
-    message = `Saved ${hardware}. No reply on port 4370 yet. Real-time PUSH is listening for SN ${serial || "this terminal"} — punches still appear when the machine can reach Smart HR.`;
+    message = `Settings saved for ${hardware}. The terminal auto-connects the moment it reaches ${admsUrl} — as soon as it has internet and is set to PUSH, it shows Live and punches start flowing automatically. No button needed.`;
   }
 
   return NextResponse.json({
@@ -137,9 +142,9 @@ export async function POST(
     listenHost: reachable.hostname,
     listenPort: reachable.port,
     serialNumber: serial || existing.serialNumber,
-    reachedDevice,
-    realtime: reachedDevice || alreadyLive ? "live" : "waiting",
-    probe,
+    reachedDevice: alreadyLive,
+    realtime: alreadyLive ? "live" : "waiting",
+    probe: alreadyLive ? "auto-live" : "pending",
     processed: 0,
     unmatched: 0,
     logsDownloaded: 0,

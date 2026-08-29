@@ -23,9 +23,18 @@ export default async function EmployeesPage() {
   const orgDepartment = departmentCompanyWhere(scope);
   const directoryScope = await peopleDirectoryEmployeeWhere(session);
 
+  // Offboarded staff (inactive with an end date) are managed on the
+  // Delete & Separations page and are excluded from the working directory.
+  const offboardedExclusion = {
+    NOT: {
+      status: "INACTIVE",
+      endDate: { not: null },
+    },
+  };
+
   const employeeWhere = directoryScope
-    ? { AND: [orgEmployee, directoryScope] }
-    : orgEmployee;
+    ? { AND: [orgEmployee, directoryScope, offboardedExclusion] }
+    : { AND: [orgEmployee, offboardedExclusion] };
 
   const [employees, departments, branches, managers] = await Promise.all([
     prisma.employee.findMany({
