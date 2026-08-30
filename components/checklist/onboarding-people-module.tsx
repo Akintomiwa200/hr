@@ -12,10 +12,16 @@ import {
 } from "@/components/employees/onboarding-notice";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { notify, readApiError } from "@/lib/toast";
-import { ORG_ROLES, roleLabel } from "@/lib/roles";
 import type { Role } from "@prisma/client";
 import { formatDate, fullName } from "@/lib/utils";
 import { todayInputValue } from "@/lib/dates";
+import { ORG_ROLES } from "@/lib/roles";
+
+export type RoleOption = {
+  baseRole: Role;
+  label: string;
+  roleId?: string | null;
+};
 
 type Department = { id: string; name: string };
 type Manager = { id: string; firstName: string; lastName: string };
@@ -44,18 +50,23 @@ export function OnboardingPeopleModule({
   canManage,
   departments,
   managers,
-  allowedRoles = ORG_ROLES,
+  jobTitles = [],
+  roleOptions = ORG_ROLES.map((role) => ({ baseRole: role, label: role, roleId: null })),
 }: {
   canManage: boolean;
   departments: Department[];
   managers: Manager[];
-  allowedRoles?: Role[];
+  jobTitles?: string[];
+  roleOptions?: RoleOption[];
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<OnboardingSuccess | null>(null);
   const [rows, setRows] = useState<ProgressRow[]>([]);
   const [listLoading, setListLoading] = useState(true);
+  const [roleValue, setRoleValue] = useState("EMPLOYEE");
+  const [customJobTitle, setCustomJobTitle] = useState(false);
+  const [jobTitleSelect, setJobTitleSelect] = useState("");
 
   const load = useCallback(async (silent = false) => {
     if (!silent && rows.length === 0) setListLoading(true);
@@ -120,6 +131,9 @@ export function OnboardingPeopleModule({
           : "Person added to the company"
       );
       form.reset();
+      setRoleValue("EMPLOYEE");
+      setCustomJobTitle(false);
+      setJobTitleSelect("");
       await load(true);
       router.refresh();
     } catch {
@@ -130,6 +144,7 @@ export function OnboardingPeopleModule({
   }
 
   const inProgress = rows.filter((r) => r.status !== "COMPLETED");
+  const selectedRole = roleOptions.find((o) => (o.roleId ?? o.baseRole) === roleValue);
 
   return (
     <div className="space-y-8">
@@ -172,12 +187,39 @@ export function OnboardingPeopleModule({
               </div>
               <div className="sm:col-span-2 xl:col-span-3">
                 <label className={labelClass}>Job title</label>
-                <input
-                  name="jobTitle"
-                  required
-                  className={inputClass}
-                  placeholder="Software Engineer"
-                />
+                {!customJobTitle && jobTitles.length > 0 ? (
+                  <select
+                    name="jobTitle"
+                    required
+                    className={inputClass}
+                    value={jobTitleSelect}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "__custom__") {
+                        setCustomJobTitle(true);
+                        setJobTitleSelect("");
+                      } else {
+                        setJobTitleSelect(v);
+                      }
+                    }}
+                  >
+                    <option value="">Select a job title…</option>
+                    {jobTitles.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                    <option value="__custom__">Other – type a title…</option>
+                  </select>
+                ) : (
+                  <input
+                    name="jobTitle"
+                    required
+                    className={inputClass}
+                    placeholder="Software Engineer"
+                    autoFocus={customJobTitle}
+                  />
+                )}
               </div>
               <div>
                 <label className={labelClass}>Department</label>
@@ -209,13 +251,19 @@ export function OnboardingPeopleModule({
               </div>
               <div>
                 <label className={labelClass}>Role</label>
-                <select name="role" className={inputClass} defaultValue="EMPLOYEE">
-                  {allowedRoles.map((role) => (
-                    <option key={role} value={role}>
-                      {roleLabel(role)}
+                <select
+                  name="role"
+                  className={inputClass}
+                  value={roleValue}
+                  onChange={(e) => setRoleValue(e.target.value)}
+                >
+                  {roleOptions.map((o) => (
+                    <option key={o.roleId ?? o.baseRole} value={o.roleId ?? o.baseRole}>
+                      {o.label}
                     </option>
                   ))}
                 </select>
+                <input type="hidden" name="roleId" value={selectedRole?.roleId ?? ""} />
               </div>
               <div>
                 <label className={labelClass}>Salary</label>

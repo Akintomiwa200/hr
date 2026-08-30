@@ -90,7 +90,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const resolvedRole = normalizeRole(String(role || "EMPLOYEE"));
+  const resolvedRoleValue = normalizeRole(String(role || "EMPLOYEE"));
+  const rawRoleId = String(body.roleId || "").trim();
+  let resolvedRole: Role = resolvedRoleValue;
+  let resolvedRoleId: string | null = null;
+
+  if (rawRoleId) {
+    const definition = await prisma.roleDefinition.findUnique({
+      where: { id: rawRoleId },
+    });
+    if (!definition || !definition.isActive) {
+      return NextResponse.json({ error: "Invalid role selected" }, { status: 400 });
+    }
+    if (session.companyId && definition.companyId !== session.companyId) {
+      return NextResponse.json({ error: "Invalid role for this company" }, { status: 400 });
+    }
+    resolvedRole = definition.baseRole;
+    resolvedRoleId = definition.id;
+  }
+
   if (!canAssignRole(session.role, resolvedRole)) {
     return NextResponse.json(
       { error: "You cannot assign that system role" },
@@ -114,6 +132,7 @@ export async function POST(request: NextRequest) {
       managerId,
       employmentType,
       role: resolvedRole,
+      roleId: resolvedRoleId,
       salary,
       status,
       companyId: session.companyId,

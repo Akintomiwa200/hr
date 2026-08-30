@@ -362,6 +362,31 @@ export function SettingsModule({
           </Card>
         )}
 
+        {hasRole(role as Role, ["SUPER_ADMIN", "COMPANY_ADMIN", "HR"]) && (
+          <Card className="p-6 bg-sky-50/40 border-sky-100 lg:col-span-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-sky-600 flex items-center justify-center shrink-0">
+                  <Shield className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Roles & permissions</h3>
+                  <p className="text-xs text-gray-500 leading-relaxed max-w-xl">
+                    View built-in roles and create custom roles that map to a base system role — shown in the
+                    People role dropdown.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/settings/roles"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-xl hover:bg-sky-700 shrink-0"
+              >
+                Manage roles
+              </Link>
+            </div>
+          </Card>
+        )}
+
         {canManageDevices(role as Role) && (
           <Card className="p-6 bg-brand-50/50 border-brand-100 lg:col-span-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

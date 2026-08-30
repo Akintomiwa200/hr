@@ -18,6 +18,7 @@ export type CreateEmployeeInput = {
   managerId?: string | null;
   employmentType?: string;
   role?: Role | string;
+  roleId?: string | null;
   salary?: number | string;
   status?: string;
   companyId?: string | null;
@@ -146,7 +147,18 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
   const normalizedEmail = input.email.trim().toLowerCase();
   const employmentType =
     input.employmentType === "FREELANCE" ? "FREELANCE" : "FULL_TIME";
-  const role = normalizeRoleInput(input.role);
+  let role = normalizeRoleInput(input.role);
+  let roleDefinitionId: string | null = input.roleId?.trim() || null;
+  if (roleDefinitionId) {
+    const definition = await prisma.roleDefinition.findUnique({
+      where: { id: roleDefinitionId },
+    });
+    if (!definition || !definition.isActive) {
+      roleDefinitionId = null;
+    } else {
+      role = definition.baseRole;
+    }
+  }
 
   const existing = await prisma.user.findUnique({
     where: { email: normalizedEmail },
@@ -186,6 +198,7 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
           employmentType,
           departmentId: input.departmentId,
           branchId: input.branchId?.trim() || null,
+          roleId: roleDefinitionId,
           biometricPin,
           managerId,
           hireDate: parseLocalDate(input.hireDate) ?? new Date(),

@@ -28,6 +28,7 @@ import {
   ListTodo,
   UserMinus,
   PenLine,
+  ShieldCheck,
 } from "lucide-react";
 import {
   ALL_STAFF,
@@ -38,6 +39,7 @@ import {
   ONBOARDING_ROLES,
   ORG_CHART_ROLES,
   PAYROLL_VIEW_ROLES,
+  PEOPLE_ADMIN_ROLES,
   PEOPLE_VIEW_ROLES,
   PERFORMANCE_VIEW_ROLES,
   RECRUITMENT_ROLES,
@@ -296,6 +298,16 @@ export const appFeatures: AppFeature[] = [
     section: "Administration",
     icon: CreditCard,
     roles: [...SUBSCRIPTION_ADMIN_ROLES, "HR"],
+    helpSlug: "settings",
+  },
+  {
+    id: "roles",
+    label: "Roles",
+    description: "View built-in roles and create custom roles",
+    href: "/settings/roles",
+    section: "Administration",
+    icon: ShieldCheck,
+    roles: [...PEOPLE_ADMIN_ROLES, "SUPER_ADMIN"],
     helpSlug: "settings",
   },
   {
