@@ -62,6 +62,14 @@ function StatusPill({ label, variant }: { label: string; variant: "fulltime" | "
   );
 }
 
+type ImportPreviewRow = {
+  pin: string;
+  name: string;
+  email: string;
+  employeeCode: string;
+  fromFile: boolean;
+};
+
 export function EmployeesModule({
   employees: initialEmployees,
   departments,
@@ -102,6 +110,9 @@ export function EmployeesModule({
   const [menuRect, setMenuRect] = useState<{ top: number; left: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importRows, setImportRows] = useState<ImportPreviewRow[]>([]);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -229,13 +240,39 @@ export function EmployeesModule({
       const body = new FormData();
       body.append("file", file);
       if (branches[0]?.id) body.append("branchId", branches[0].id);
+      body.append("dryRun", "true");
+      const res = await fetch("/api/employees/import", { method: "POST", body });
+      const data = (await res.json()) as {
+        error?: string;
+        rows?: ImportPreviewRow[];
+      };
+      if (!res.ok) {
+        notify.error(data.error || "Import failed");
+        return;
+      }
+      setPendingImportFile(file);
+      setImportRows(data.rows ?? []);
+      setImportOpen(true);
+    } catch {
+      notify.error("Import failed");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function confirmImport() {
+    if (!pendingImportFile) return;
+    setImporting(true);
+    try {
+      const body = new FormData();
+      body.append("file", pendingImportFile);
+      if (branches[0]?.id) body.append("branchId", branches[0].id);
       const res = await fetch("/api/employees/import", { method: "POST", body });
       const data = (await res.json()) as {
         error?: string;
         created?: number;
         updated?: number;
         skipped?: number;
-        preview?: { count: number };
       };
       if (!res.ok) {
         notify.error(data.error || "Import failed");
@@ -245,6 +282,9 @@ export function EmployeesModule({
         "Device staff imported",
         `${data.created ?? 0} added · ${data.updated ?? 0} updated · ${data.skipped ?? 0} skipped`
       );
+      setImportOpen(false);
+      setPendingImportFile(null);
+      setImportRows([]);
       await refreshList();
       router.refresh();
     } catch {
@@ -959,6 +999,107 @@ export function EmployeesModule({
               className="px-4 py-2 text-[13px] text-gray-500"
             >
               Cancel
+            </button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Import review — employee codes */}
+      <Dialog
+        open={importOpen}
+        onClose={() => {
+          if (importing) return;
+          setImportOpen(false);
+          setPendingImportFile(null);
+          setImportRows([]);
+        }}
+        title="Import review — employee codes"
+        description="Review the codes that will be assigned before importing. Codes in your file are used as-is; missing ones are generated."
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-3 text-[12px]">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />From file:{" "}
+              {importRows.filter((r) => r.fromFile).length}
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />Generated:{" "}
+              {importRows.filter((r) => !r.fromFile).length}
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50 text-gray-600 font-medium">
+              Total: {importRows.length}
+            </span>
+          </div>
+
+          <div className="border border-gray-100 rounded-xl overflow-hidden max-h-[45vh] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-[#fafbfc] text-left border-b border-gray-100">
+                <tr>
+                  <th className="px-4 py-2.5 text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                    Name
+                  </th>
+                  <th className="px-4 py-2.5 text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                    PIN
+                  </th>
+                  <th className="px-4 py-2.5 text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                    Employee code
+                  </th>
+                  <th className="px-4 py-2.5 text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                    Source
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {importRows.map((row, idx) => (
+                  <tr
+                    key={`${row.pin}-${idx}`}
+                    className="border-b border-gray-50 last:border-0"
+                  >
+                    <td className="px-4 py-2.5 text-[13px] text-gray-800">
+                      {row.name || row.pin}
+                    </td>
+                    <td className="px-4 py-2.5 text-[13px] text-gray-500">{row.pin}</td>
+                    <td className="px-4 py-2.5">
+                      <code className="px-2 py-0.5 rounded bg-[#f5f3ff] text-violet-700 text-[12px] font-mono">
+                        {row.employeeCode}
+                      </code>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        className={`text-[11px] font-medium ${
+                          row.fromFile ? "text-emerald-600" : "text-violet-600"
+                        }`}
+                      >
+                        {row.fromFile ? "From file" : "Generated"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setImportOpen(false);
+                setPendingImportFile(null);
+                setImportRows([]);
+              }}
+              disabled={importing}
+              className="px-4 py-2 text-[13px] text-gray-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void confirmImport()}
+              disabled={importing}
+              className="px-4 py-2 text-[13px] font-medium bg-[#7B61FF] text-white rounded-xl hover:bg-violet-600 disabled:opacity-60"
+            >
+              {importing ? "Importing…" : `Import ${importRows.length} employees`}
             </button>
           </div>
         </div>

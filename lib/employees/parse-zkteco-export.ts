@@ -51,6 +51,13 @@ function rowFromHeaders(headers: string[], values: string[]): DeviceEmployeeRow 
     cell(map.get("full name"));
   const { firstName, lastName } = splitName(fullName || pin);
 
+  const code = cell(
+    map.get("employee code") ||
+      map.get("emp code") ||
+      map.get("empcode") ||
+      map.get("employment code")
+  );
+
   return {
     pin,
     firstName,
@@ -60,6 +67,7 @@ function rowFromHeaders(headers: string[], values: string[]): DeviceEmployeeRow 
       cell(map.get("position code") || map.get("position") || map.get("job title")) ||
       "Staff",
     departmentName: cell(map.get("department") || map.get("dept")) || null,
+    employeeCode: code && code.toUpperCase() !== pin.toUpperCase() ? code : null,
   };
 }
 
@@ -152,6 +160,8 @@ export function parseZktecoEmployeeExport(rows: RawRow[]): DeviceEmployeeRow[] {
     }
     if (!firstName) firstName = pin;
 
+    const code = pick(row, "Employee Code", "EMP Code", "EmpCode", "Employment Code");
+
     parsed.push({
       pin,
       firstName,
@@ -159,6 +169,7 @@ export function parseZktecoEmployeeExport(rows: RawRow[]): DeviceEmployeeRow[] {
       email: pick(row, "Email", "E-mail", "Mail") || null,
       jobTitle: pick(row, "Job Title", "JobTitle", "Position", "Title") || "Staff",
       departmentName: pick(row, "Department", "Dept", "Division") || null,
+      employeeCode: code && code.toUpperCase() !== pin.toUpperCase() ? code : null,
     });
   }
 
@@ -176,9 +187,11 @@ function dedupeByPin(rows: DeviceEmployeeRow[]) {
 export function summarizeImportRows(rows: DeviceEmployeeRow[]) {
   return {
     count: rows.length,
+    fromCodeCount: rows.filter((r) => r.employeeCode?.trim()).length,
     sample: rows.slice(0, 5).map((r) => ({
       pin: r.pin,
       name: `${r.firstName} ${r.lastName}`.trim(),
+      employeeCode: r.employeeCode?.trim() || null,
     })),
   };
 }

@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { getSession, canManageEmployees } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { importDeviceEmployees } from "@/lib/employees/import-from-device";
+import { nextEmployeeCode } from "@/lib/employees/next-employee-code";
 import {
   parseZktecoEmployeeSheet,
   summarizeImportRows,
@@ -42,8 +43,41 @@ export async function POST(request: NextRequest) {
   }
 
   const preview = summarizeImportRows(rows);
+
   if (dryRun) {
-    return NextResponse.json({ ok: true, dryRun: true, preview });
+    const existing = await prisma.employee.findMany({
+      where: { user: { companyId: session.companyId } },
+      select: { employeeCode: true },
+    });
+    const usedCodes = new Set(existing.map((e) => e.employeeCode?.trim()).filter(Boolean));
+    const previewRows: Array<{
+      pin: string;
+      name: string;
+      email: string;
+      employeeCode: string;
+      fromFile: boolean;
+    }> = [];
+    for (const row of rows) {
+      const fromFileCode = row.employeeCode?.trim();
+      let employeeCode = fromFileCode;
+      let fromFile = Boolean(fromFileCode);
+      if (!employeeCode || usedCodes.has(employeeCode)) {
+        const generated = await nextEmployeeCode();
+        usedCodes.add(generated);
+        employeeCode = generated;
+        fromFile = false;
+      } else {
+        usedCodes.add(employeeCode);
+      }
+      previewRows.push({
+        pin: row.pin,
+        name: `${row.firstName} ${row.lastName}`.trim(),
+        email: row.email?.trim() || "",
+        employeeCode,
+        fromFile,
+      });
+    }
+    return NextResponse.json({ ok: true, dryRun: true, preview, rows: previewRows });
   }
 
   const department = await prisma.department.findFirst({

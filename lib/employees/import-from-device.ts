@@ -14,6 +14,7 @@ export type DeviceEmployeeRow = {
   email?: string | null;
   jobTitle?: string | null;
   departmentName?: string | null;
+  employeeCode?: string | null;
 };
 
 export type ImportDeviceEmployeesOptions = {
@@ -77,6 +78,19 @@ export async function importDeviceEmployees(
     }
   }
 
+  const usedCodes = new Set(existing.map((e) => e.employeeCode?.trim()).filter(Boolean));
+
+  async function resolveEmployeeCode(row: DeviceEmployeeRow): Promise<string> {
+    const fromFile = row.employeeCode?.trim();
+    if (fromFile && !usedCodes.has(fromFile)) {
+      usedCodes.add(fromFile);
+      return fromFile;
+    }
+    const generated = await nextEmployeeCode();
+    usedCodes.add(generated);
+    return generated;
+  }
+
   for (const row of options.rows) {
     const pin = row.pin.trim();
     if (!pin) {
@@ -125,7 +139,7 @@ export async function importDeviceEmployees(
         continue;
       }
 
-      const employeeCode = await nextEmployeeCode();
+      const employeeCode = await resolveEmployeeCode(row);
       const user = await withPrismaRetry(() =>
         prisma.user.create({
           data: {
