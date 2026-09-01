@@ -6,13 +6,12 @@ import {
   ArrowLeft,
   Building2,
   Fingerprint,
-  Loader2,
   MapPin,
   Plus,
   RefreshCw,
   Trash2,
 } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button, Skeleton } from "@/components/ui";
 import { Sheet } from "@/components/ui/sheet";
 import { LiveTerminalCard } from "@/components/attendance/live-terminal-card";
 import { useDeviceLive } from "@/hooks/use-attendance-live";
@@ -51,7 +50,6 @@ type DeviceRow = {
 };
 
 type DocsResponse = {
-  appUrl: string;
   spec: AttendanceDeviceSpec;
   status: {
     message: string;
@@ -69,49 +67,6 @@ const inputClass =
 
 function isOnline(lastSeenAt: string | null) {
   return isDeviceOnline(lastSeenAt);
-}
-
-function isLoopbackHost(hostname: string) {
-  const host = hostname.toLowerCase();
-  return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
-}
-
-function cloudServerForThisPlace(
-  specCloud: AttendanceDeviceSpec["zkteco"]["cloudServer"] | undefined,
-  appUrl: string
-) {
-  const path = specCloud?.path ?? "/iclock";
-  if (typeof window !== "undefined") {
-    const { hostname, port, protocol, origin } = window.location;
-    if (hostname && !isLoopbackHost(hostname)) {
-      return {
-        host: hostname,
-        portHint: port || (protocol === "https:" ? "443" : "80"),
-        path,
-        protocol: protocol.replace(":", ""),
-        origin,
-      };
-    }
-  }
-  if (specCloud?.host) return specCloud;
-  try {
-    const url = new URL(appUrl.includes("://") ? appUrl : `http://${appUrl}`);
-    return {
-      host: url.hostname,
-      portHint: url.port || (url.protocol === "https:" ? "443" : "80"),
-      path,
-      protocol: url.protocol.replace(":", ""),
-      origin: url.origin,
-    };
-  } catch {
-    return {
-      host: specCloud?.host || "localhost",
-      portHint: specCloud?.portHint || "3000",
-      path,
-      protocol: specCloud?.protocol || "http",
-      origin: specCloud?.origin || appUrl || "http://localhost:3000",
-    };
-  }
 }
 
 type DeviceStatusRow = {
@@ -153,6 +108,8 @@ export function DeviceIntegrationHub() {
   const [deviceBranchId, setDeviceBranchId] = useState("");
   const [deviceModel, setDeviceModel] = useState("");
   const [connectDevice, setConnectDevice] = useState<DeviceRow | null>(null);
+  const [branchSheetOpen, setBranchSheetOpen] = useState(false);
+  const [deviceSheetOpen, setDeviceSheetOpen] = useState(false);
   const [sheetName, setSheetName] = useState("");
   const [sheetSn, setSheetSn] = useState("");
   const [sheetBranchId, setSheetBranchId] = useState("");
@@ -162,52 +119,6 @@ export function DeviceIntegrationHub() {
   const [pullingId, setPullingId] = useState<string | null>(null);
   const [connectNote, setConnectNote] = useState<string | null>(null);
   const connectAbortRef = useRef<AbortController | null>(null);
-
-  const [autoRegister, setAutoRegister] = useState<{
-    enabled: boolean;
-    branchId: string | null;
-    branches: { id: string; name: string; location: string }[];
-  } | null>(null);
-  const autoRegisterBusy = useRef(false);
-
-  const loadAutoRegister = useCallback(async () => {
-    try {
-      const res = await fetch("/api/attendance/devices/auto-register", {
-        cache: "no-store",
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      setAutoRegister(data);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const saveAutoRegister = async (enabled: boolean, branchId: string | null) => {
-    if (autoRegisterBusy.current) return;
-    autoRegisterBusy.current = true;
-    try {
-      const res = await fetch("/api/attendance/devices/auto-register", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled, branchId }),
-      });
-      if (!res.ok) {
-        notify.error(await readApiError(res, "Could not update auto-register"));
-        return;
-      }
-      const data = (await res.json()) as { enabled: boolean; branchId: string | null };
-      setAutoRegister((prev) =>
-        prev ? { ...prev, enabled: data.enabled, branchId: data.branchId } : prev
-      );
-      notify.success(data.enabled ? "Auto-register on" : "Auto-register off");
-      void loadDocs(true);
-    } catch {
-      notify.error("Could not update auto-register");
-    } finally {
-      autoRegisterBusy.current = false;
-    }
-  };
 
   const loadDocsAbortRef = useRef<AbortController | null>(null);
   const loadDocs = useCallback(async (silent = false, signal?: AbortSignal) => {
@@ -226,7 +137,6 @@ export function DeviceIntegrationHub() {
         return;
       }
       setDocs({
-        appUrl: data.appUrl ?? "",
         spec: data.spec,
         status: data.status ?? {
           message: "Waiting for ZKTeco terminals",
@@ -243,14 +153,13 @@ export function DeviceIntegrationHub() {
         if (!prev) return prev;
         return (data.devices ?? []).find((d) => d.id === prev.id) ?? prev;
       });
-      void loadAutoRegister();
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       notify.error("Failed to load ZKTeco console");
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [loadAutoRegister]);
+  }, []);
 
   const refreshStatus = useCallback(async (signal: AbortSignal) => {
     try {
@@ -333,6 +242,7 @@ export function DeviceIntegrationHub() {
     setBranchLocation("");
     setDeviceBranchId(data.branch.id);
     await loadDocs();
+    setBranchSheetOpen(false);
   };
 
   const removeBranch = async (branch: BranchRow) => {
@@ -376,6 +286,7 @@ export function DeviceIntegrationHub() {
     setDeviceIp("");
     setDevicePort(String(DEFAULT_ZK_PORT));
     await loadDocs();
+    setDeviceSheetOpen(false);
   };
 
   const toggleDevice = async (device: DeviceRow) => {
@@ -494,7 +405,7 @@ export function DeviceIntegrationHub() {
   };
 
   const syncDeviceLogs = async (device: DeviceRow) => {
-    if (!device.ipAddress && !device.id) {
+    if (!device.ipAddress) {
       notify.error("Enter Device IP on Connect first");
       return;
     }
@@ -532,9 +443,13 @@ export function DeviceIntegrationHub() {
 
   const renderTerminalRow = (device: DeviceRow) => {
     const live = docs?.devices.find((d) => d.id === device.id) ?? device;
+    const admsUrl = docs
+      ? `${docs.spec.zkteco.cloudServer.origin}${docs.spec.zkteco.cloudServer.path || "/iclock"}`
+      : undefined;
     return (
       <LiveTerminalCard
         key={device.id}
+        admsUrl={admsUrl}
         device={{
           id: live.id,
           name: live.name,
@@ -589,9 +504,32 @@ export function DeviceIntegrationHub() {
 
   if (loading && !docs) {
     return (
-      <div className="flex items-center justify-center py-20 text-gray-500">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-        Loading ZKTeco console…
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-3">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-9 w-20 rounded-xl" />
+        </div>
+        <div className="rounded-2xl border border-gray-100 bg-white p-6">
+          <div className="flex gap-3">
+            <Skeleton className="h-11 w-11 rounded-xl" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-5 w-52" />
+              <Skeleton className="h-4 w-72" />
+            </div>
+          </div>
+          <div className="mt-4 space-y-3">
+            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-10 w-full rounded-lg" />
+          </div>
+        </div>
+        <div className="rounded-2xl border border-gray-100 bg-white p-5">
+          <Skeleton className="h-4 w-36 mb-3" />
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            <Skeleton className="h-28 w-full rounded-2xl" />
+            <Skeleton className="h-28 w-full rounded-2xl" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -607,8 +545,7 @@ export function DeviceIntegrationHub() {
     );
   }
 
-  const { spec, appUrl, status } = docs;
-  const cloud = cloudServerForThisPlace(spec.zkteco?.cloudServer, appUrl);
+  const { status } = docs;
   const grouped = (docs.branches ?? []).map((branch) => ({
     branch,
     devices: docs.devices.filter((d) => d.branchId === branch.id),
@@ -663,50 +600,29 @@ export function DeviceIntegrationHub() {
               <span className="text-gray-400">· Live punches via ADMS + SSE</span>
             </div>
           </div>
-          <div className="text-right text-xs text-gray-500">
-            <p>PUSH · Real-time</p>
-            <p className="mt-1">{cloud.origin || appUrl}</p>
-          </div>
+          <div className="rounded-xl bg-white/80 px-3 py-2 text-xs font-medium text-brand-700">PUSH · Real-time</div>
         </div>
+        {docs.devices.length === 0 && <div className="mt-5 grid gap-2 sm:grid-cols-3 text-xs">
+          {[
+            ["1", "Add a branch", "Sets the local timezone and office location."],
+            ["2", "Register terminal", "Save its serial number and hardware IP."],
+            ["3", "Confirm live status", "A heartbeat turns the terminal Live automatically."],
+          ].map(([step, title, copy]) => (
+            <div key={step} className="flex gap-2 rounded-xl border border-brand-100 bg-white/80 p-3">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[10px] font-bold text-white">{step}</span>
+              <div><p className="font-semibold text-gray-800">{title}</p><p className="mt-0.5 text-gray-500">{copy}</p></div>
+            </div>
+          ))}
+        </div>}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Company branches</h3>
+          <div className="flex items-center gap-2 mb-1"><span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-50 text-xs font-bold text-brand-700">1</span><h3 className="text-sm font-semibold text-gray-900">Company branches</h3></div>
           <p className="text-xs text-gray-500 mb-3">
             Each office location gets its own timezone so late/present is calculated locally.
           </p>
-          <div className="space-y-3">
-            <input
-              className={inputClass}
-              placeholder="Branch name (e.g. Lagos HQ)"
-              value={branchName}
-              onChange={(e) => setBranchName(e.target.value)}
-            />
-            <input
-              className={inputClass}
-              placeholder="Location (city / address)"
-              value={branchLocation}
-              onChange={(e) => setBranchLocation(e.target.value)}
-            />
-            <select
-              className={inputClass}
-              value={branchTimezone}
-              onChange={(e) => setBranchTimezone(e.target.value)}
-            >
-              {BRANCH_TIMEZONES.map((tz) => (
-                <option key={tz.value} value={tz.value}>
-                  {tz.label}
-                </option>
-              ))}
-            </select>
-            <Button onClick={createBranch} loading={creatingBranch}>
-              <Plus className="w-4 h-4" />
-              Add branch
-            </Button>
-          </div>
-
-          <div className="mt-4 space-y-2">
+          <div className="space-y-2">
             {docs.branches.length === 0 ? (
               <p className="text-sm text-gray-500">No branches yet. Add each office location first.</p>
             ) : (
@@ -743,124 +659,34 @@ export function DeviceIntegrationHub() {
               ))
             )}
           </div>
+          <Button className="mt-4 w-full" onClick={() => setBranchSheetOpen(true)}>
+            <Plus className="w-4 h-4" />
+            Add branch
+          </Button>
         </div>
 
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Register ZKTeco terminal</h3>
+          <div className="flex items-center gap-2 mb-1"><span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-50 text-xs font-bold text-brand-700">2</span><h3 className="text-sm font-semibold text-gray-900">Register ZKTeco terminal</h3></div>
           <p className="text-xs text-gray-500 mb-3">
             Serial number is on the back of the device. Device IP is the hardware address, e.g.
             102.88.54.109.
           </p>
-          <div className="space-y-3">
-            <input
-              className={inputClass}
-              placeholder="Terminal name (e.g. Reception SpeedFace)"
-              value={deviceName}
-              onChange={(e) => setDeviceName(e.target.value)}
-            />
-            <input
-              className={inputClass}
-              placeholder="Serial number (SN)"
-              value={deviceSn}
-              onChange={(e) => setDeviceSn(e.target.value)}
-            />
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <input
-                className={cn(inputClass, "sm:col-span-2")}
-                placeholder="Device IP (e.g. 102.88.54.109)"
-                value={deviceIp}
-                onChange={(e) => setDeviceIp(e.target.value)}
-                inputMode="decimal"
-                autoComplete="off"
-              />
-              <input
-                className={inputClass}
-                placeholder="Port"
-                value={devicePort}
-                onChange={(e) => setDevicePort(e.target.value)}
-                inputMode="numeric"
-                autoComplete="off"
-              />
-            </div>
-            <select
-              className={inputClass}
-              value={deviceBranchId}
-              onChange={(e) => setDeviceBranchId(e.target.value)}
-            >
-              <option value="">Select branch</option>
-              {docs.branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name} — {branch.location}
-                </option>
-              ))}
-            </select>
-            <input
-              className={inputClass}
-              placeholder="Model (optional, e.g. MB360)"
-              value={deviceModel}
-              onChange={(e) => setDeviceModel(e.target.value)}
-            />
-            <Button onClick={createDevice} loading={creatingDevice} disabled={docs.branches.length === 0}>
-              <Plus className="w-4 h-4" />
-              Add terminal
-            </Button>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/50 px-3 py-3">
+            <p className="text-xs text-gray-500">
+              {docs.branches.length === 0
+                ? "Add a branch first so each terminal has the right location and timezone."
+                : `${docs.branches.length} branch${docs.branches.length === 1 ? "" : "es"} available for this terminal.`}
+            </p>
           </div>
+          <Button
+            className="mt-4 w-full"
+            onClick={() => setDeviceSheetOpen(true)}
+            disabled={docs.branches.length === 0}
+          >
+            <Plus className="w-4 h-4" />
+            Register terminal
+          </Button>
         </div>
-      </div>
-
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-900 mb-1">Auto-connect new terminals</h3>
-        <p className="text-xs text-gray-500 mb-3">
-          When on, any ZKTeco terminal that reaches Smart HR with a serial number you have not added
-          registers itself automatically in the branch below and connects in real time — no button
-          needed. Point the terminal at Smart HR and it just appears.
-        </p>
-        {!autoRegister ? (
-          <p className="text-xs text-gray-400">Loading…</p>
-        ) : (
-          <div className="space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                className="w-4 h-4"
-                checked={autoRegister.enabled}
-                onChange={(e) => {
-                  const enabled = e.target.checked;
-                  if (!enabled) {
-                    void saveAutoRegister(false, autoRegister.branchId);
-                    return;
-                  }
-                  if (autoRegister.branchId) {
-                    void saveAutoRegister(true, autoRegister.branchId);
-                  } else {
-                    setAutoRegister((prev) => (prev ? { ...prev, enabled: true } : prev));
-                    notify.info("Pick a branch below — new terminals will land there.");
-                  }
-                }}
-              />
-              <span className="text-sm text-gray-700">Enable auto-register (PUSH auto-connect)</span>
-            </label>
-            <select
-              className={inputClass}
-              value={autoRegister.branchId ?? ""}
-              onChange={(e) => {
-                const branchId = e.target.value;
-                const next = { ...autoRegister, branchId };
-                setAutoRegister(next);
-                if (branchId) {
-                  void saveAutoRegister(next.enabled, branchId);
-                }
-              }}
-            >
-              <option value="">Select branch for new terminals</option>
-              {autoRegister.branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name} — {branch.location}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
 
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
@@ -903,6 +729,163 @@ export function DeviceIntegrationHub() {
           </div>
         )}
       </div>
+
+      <Sheet
+        open={branchSheetOpen}
+        onClose={() => {
+          if (creatingBranch) return;
+          setBranchSheetOpen(false);
+        }}
+        title="Add company branch"
+        description="Each office gets its own timezone so late/present is calculated locally."
+        width="md"
+      >
+        <div className="p-6 space-y-4">
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Branch name</span>
+            <input
+              className={inputClass}
+              placeholder="e.g. Lagos HQ"
+              value={branchName}
+              onChange={(e) => setBranchName(e.target.value)}
+              disabled={creatingBranch}
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Location</span>
+            <input
+              className={inputClass}
+              placeholder="City / address"
+              value={branchLocation}
+              onChange={(e) => setBranchLocation(e.target.value)}
+              disabled={creatingBranch}
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Timezone</span>
+            <select
+              className={inputClass}
+              value={branchTimezone}
+              onChange={(e) => setBranchTimezone(e.target.value)}
+              disabled={creatingBranch}
+            >
+              {BRANCH_TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+          <Button variant="secondary" onClick={() => setBranchSheetOpen(false)} disabled={creatingBranch}>
+            Cancel
+          </Button>
+          <Button onClick={() => void createBranch()} loading={creatingBranch}>
+            <Plus className="w-4 h-4" />
+            Add branch
+          </Button>
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={deviceSheetOpen}
+        onClose={() => {
+          if (creatingDevice) return;
+          setDeviceSheetOpen(false);
+        }}
+        title="Register ZKTeco terminal"
+        description="Serial number is on the back of the device. Transfer mode is real-time PUSH."
+        width="lg"
+      >
+        <div className="p-6 space-y-4">
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Terminal name</span>
+            <input
+              className={inputClass}
+              placeholder="e.g. Reception SpeedFace"
+              value={deviceName}
+              onChange={(e) => setDeviceName(e.target.value)}
+              disabled={creatingDevice}
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Serial number (SN)</span>
+            <input
+              className={inputClass}
+              placeholder="On the back of the device"
+              value={deviceSn}
+              onChange={(e) => setDeviceSn(e.target.value)}
+              disabled={creatingDevice}
+            />
+          </label>
+          <div className="grid grid-cols-3 gap-3">
+            <label className="block space-y-1.5 col-span-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Device IP</span>
+              <input
+                className={inputClass}
+                placeholder="102.88.54.109"
+                value={deviceIp}
+                onChange={(e) => setDeviceIp(e.target.value)}
+                inputMode="decimal"
+                autoComplete="off"
+                disabled={creatingDevice}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Port</span>
+              <input
+                className={inputClass}
+                placeholder={String(DEFAULT_ZK_PORT)}
+                value={devicePort}
+                onChange={(e) => setDevicePort(e.target.value)}
+                inputMode="numeric"
+                autoComplete="off"
+                disabled={creatingDevice}
+              />
+            </label>
+          </div>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Area / branch</span>
+            <select
+              className={inputClass}
+              value={deviceBranchId}
+              onChange={(e) => setDeviceBranchId(e.target.value)}
+              disabled={creatingDevice}
+            >
+              <option value="">Select branch</option>
+              {docs.branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name} — {branch.location}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Model (optional)</span>
+            <input
+              className={inputClass}
+              placeholder="e.g. MB360"
+              value={deviceModel}
+              onChange={(e) => setDeviceModel(e.target.value)}
+              disabled={creatingDevice}
+            />
+          </label>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+          <Button variant="secondary" onClick={() => setDeviceSheetOpen(false)} disabled={creatingDevice}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void createDevice()}
+            loading={creatingDevice}
+            disabled={docs.branches.length === 0}
+          >
+            <Plus className="w-4 h-4" />
+            Register terminal
+          </Button>
+        </div>
+      </Sheet>
 
       <Sheet
         open={Boolean(connectDevice)}

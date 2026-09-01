@@ -32,21 +32,21 @@ export function ReportsBarChart({
               {isActive && (
                 <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-20 bg-gray-900 text-white text-[10px] rounded-lg px-2.5 py-2 whitespace-nowrap shadow-lg pointer-events-none">
                   <p className="font-medium">{item.label}</p>
-                  <p className="text-teal-300 mt-0.5">
+                  <p className="text-brand-200 mt-0.5">
                     {item.value}
                     {valueSuffix}
                   </p>
                 </div>
               )}
               <div
-                className={`w-full max-w-[28px] mx-auto rounded-t-md bg-teal-500 transition-opacity ${
-                  isHighlight ? "ring-2 ring-teal-400/50" : ""
+              className={`w-full max-w-[28px] mx-auto rounded-t-md bg-brand-600 transition-opacity ${
+                  isHighlight ? "ring-2 ring-brand-300/60" : ""
                 } ${hovered && !isActive ? "opacity-60" : "opacity-100"}`}
                 style={{ height: `${Math.max(h, item.value > 0 ? 6 : 2)}px` }}
               />
               <span
                 className={`text-[10px] text-center leading-tight ${
-                  isHighlight || isActive ? "text-teal-600 font-semibold" : "text-gray-400"
+                  isHighlight || isActive ? "text-brand-700 font-semibold" : "text-gray-400"
                 }`}
               >
                 {item.month ?? item.label.split(" ")[0]}

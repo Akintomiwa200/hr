@@ -54,8 +54,9 @@ export async function uploadToCloudinary(input: CloudinaryUploadInput) {
 
   const resourceType = input.resourceType ?? "auto";
   const timestamp = Math.floor(Date.now() / 1000);
+  // Cloudinary signs all upload parameters EXCEPT file, cloud_name, api_key,
+  // resource_type and signature — resource_type is implied by the upload endpoint.
   const params: Record<string, string | number> = { public_id: input.publicId, timestamp };
-  if (resourceType !== "auto") params.resource_type = resourceType;
   const signature = sign(params, config.apiSecret);
 
   const form = new FormData();

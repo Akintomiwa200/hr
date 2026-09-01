@@ -25,6 +25,7 @@ export type CreateEmployeeInput = {
   biometricPin?: string | null;
   branchId?: string | null;
   hireDate?: string | Date | null;
+  employeeCode?: string | null;
 };
 
 export type CreateEmployeeResult = {
@@ -174,7 +175,7 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
     role,
   });
 
-  const employeeCode = await nextEmployeeCode();
+  const employeeCode = (input.employeeCode?.trim() || (await nextEmployeeCode()));
   const passwordHash = await bcrypt.hash(DEFAULT_EMPLOYEE_PASSWORD, 10);
   const biometricPin =
     (typeof input.biometricPin === "string" && input.biometricPin.trim()) ||

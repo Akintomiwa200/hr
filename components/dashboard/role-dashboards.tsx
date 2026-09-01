@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import {
+  CalendarClock,
   ChevronRight,
   TrendingDown,
   TrendingUp,
+  UserSearch,
 } from "lucide-react";
 import { employmentLabel, employmentVariant, resolveEmploymentType } from "@/lib/employment";
 import { fullName } from "@/lib/utils";
@@ -248,6 +250,41 @@ export function HrDashboard({
               color: d.color,
             }))}
           />
+        </WidgetCard>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        <WidgetCard title="Open Jobs">
+          <p className="text-[32px] font-bold text-violet-600 leading-none">{data.openJobs}</p>
+          <p className="text-[12px] text-gray-500 mt-2">Positions currently hiring</p>
+          <Link
+            href="/recruitment"
+            className="inline-flex items-center gap-0.5 text-[11px] text-[#7B61FF] font-medium mt-4 hover:underline"
+          >
+            Manage jobs <ChevronRight className="w-3 h-3" />
+          </Link>
+        </WidgetCard>
+
+        <WidgetCard title="Active Candidates">
+          <p className="text-[32px] font-bold text-violet-600 leading-none">{data.activeCandidates}</p>
+          <p className="text-[12px] text-gray-500 mt-2">In screening through offer</p>
+          <Link
+            href="/recruitment/candidates"
+            className="inline-flex items-center gap-0.5 text-[11px] text-[#7B61FF] font-medium mt-4 hover:underline"
+          >
+            View candidates <UserSearch className="w-3 h-3" />
+          </Link>
+        </WidgetCard>
+
+        <WidgetCard title="Upcoming Interviews">
+          <p className="text-[32px] font-bold text-violet-600 leading-none">{data.upcomingInterviews}</p>
+          <p className="text-[12px] text-gray-500 mt-2">Scheduled from today onward</p>
+          <Link
+            href="/recruitment/interviews"
+            className="inline-flex items-center gap-0.5 text-[11px] text-[#7B61FF] font-medium mt-4 hover:underline"
+          >
+            Open schedule <CalendarClock className="w-3 h-3" />
+          </Link>
         </WidgetCard>
       </div>
 
@@ -595,6 +632,7 @@ export function CompanyAdminDashboard({
     { href: "/settings", label: "Company settings", hint: "Org configuration" },
     { href: "/documents", label: "Documents & policies", hint: "Company content" },
     { href: "/reports", label: "Org reports", hint: "Headcount & analytics" },
+    { href: "/recruitment", label: "Recruitment", hint: "Jobs, candidates & interviews" },
     { href: "/settings/integrations", label: "Integrations", hint: "Connected apps" },
   ];
 

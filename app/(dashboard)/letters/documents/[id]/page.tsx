@@ -19,6 +19,7 @@ export default async function LetterDocumentPage({
     include: {
       employee: { select: { firstName: true, lastName: true } },
       template: { select: { fieldsJson: true } },
+      company: { select: { name: true, logo: true, updatedAt: true } },
     },
   });
   if (!doc) notFound();
@@ -28,6 +29,12 @@ export default async function LetterDocumentPage({
     <LetterDocumentModule
       canManage={canManageLetters(session)}
       isRecipient={Boolean(session.employeeId && doc.employeeId === session.employeeId)}
+      companyName={doc.company?.name ?? "Company"}
+      companyLogo={
+        doc.company?.logo
+          ? `${doc.company.logo}${doc.company.logo.includes("?") ? "&" : "?"}v=${doc.company.updatedAt.getTime()}`
+          : null
+      }
       document={{
         id: doc.id,
         kind: doc.kind,

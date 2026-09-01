@@ -25,8 +25,9 @@ export function ReportsDataTable({
   }
 
   return (
-    <div className="overflow-x-auto -mx-6 px-6">
-      <table className="w-full text-sm">
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[680px] text-sm">
         <thead>
           <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400">
             {columns.map((col) => (
@@ -56,6 +57,7 @@ export function ReportsDataTable({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -76,8 +78,8 @@ export function ReportsSubNav({
             key={tab.href}
             href={tab.href}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
-              active
-                ? "border-teal-600 text-teal-700"
+            active
+                ? "border-brand-600 text-brand-700"
                 : "border-transparent text-gray-500 hover:text-gray-800"
             }`}
           >
@@ -91,16 +93,16 @@ export function ReportsSubNav({
 
 export function ReportsBreadcrumb({ items }: { items: { label: string; href?: string }[] }) {
   return (
-    <p className="text-sm text-gray-400 mb-2">
+    <p className="inline-flex items-center rounded-full bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 mb-3">
       {items.map((item, i) => (
         <span key={item.label}>
           {i > 0 && " › "}
           {item.href ? (
-            <Link href={item.href} className="hover:text-teal-600">
+            <Link href={item.href} className="hover:text-brand-600">
               {item.label}
             </Link>
           ) : (
-            <span className="text-gray-500">{item.label}</span>
+            <span className="text-brand-900">{item.label}</span>
           )}
         </span>
       ))}

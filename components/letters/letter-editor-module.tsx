@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus, Save, Send, Trash2 } from "lucide-react";
 import { Badge, Button, Card, statusBadge } from "@/components/ui";
-import { Dialog } from "@/components/ui/dialog";
+import { Sheet } from "@/components/ui/sheet";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { scheduleRouterRefresh } from "@/hooks/use-soft-refresh";
 import { notify, readApiError } from "@/lib/toast";
@@ -19,6 +19,7 @@ import {
   type FormFieldType,
 } from "@/lib/letters/fields";
 import { buildMergeValues, renderLetterBody } from "@/lib/letters/render";
+import { defaultIssueExtras } from "@/lib/letters/issue-defaults";
 
 const inputClass =
   "w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500";
@@ -37,18 +38,25 @@ export type EditorTemplate = {
 export type EmployeeOption = {
   id: string;
   name: string;
+  employeeCode: string;
   jobTitle: string;
   department: string;
+  address: string | null;
+  salary: number;
 };
+
+type EmployeeOverride = { jobTitle: string; address: string; salary: string };
 
 export function LetterEditorModule({
   template: initial,
   employees,
   companyName,
+  companyLogo,
 }: {
   template: EditorTemplate;
   employees: EmployeeOption[];
   companyName: string;
+  companyLogo: string | null;
 }) {
   const router = useRouter();
   useAppEvents({
@@ -69,6 +77,7 @@ export function LetterEditorModule({
   const [issueOpen, setIssueOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [extras, setExtras] = useState<Record<string, string>>({});
+  const [employeeOverrides, setEmployeeOverrides] = useState<Record<string, EmployeeOverride>>({});
   const [employeeQuery, setEmployeeQuery] = useState("");
 
   const categories = form.kind === "FORM" ? FORM_CATEGORIES : LETTER_CATEGORIES;
@@ -127,6 +136,11 @@ export function LetterEditorModule({
       notify.error("Select at least one person");
       return;
     }
+    const missing = fields.find((field) => field.required && !extras[field.id]?.trim());
+    if (missing) {
+      notify.error(`Complete ${missing.label} before issuing`);
+      return;
+    }
     setLoading(true);
     try {
       const saveRes = await fetch(`/api/letters/templates/${initial.id}`, {
@@ -145,6 +159,7 @@ export function LetterEditorModule({
           templateId: initial.id,
           employeeIds: selectedIds,
           extras,
+          employeeOverrides,
         }),
       });
       if (!res.ok) {
@@ -184,6 +199,8 @@ export function LetterEditorModule({
             onClick={() => {
               setIssueOpen(true);
               setSelectedIds([]);
+              setExtras(defaultIssueExtras(form.category));
+              setEmployeeOverrides({});
             }}
           >
             <Send className="w-4 h-4" />
@@ -330,6 +347,12 @@ export function LetterEditorModule({
             <Badge variant="info">Sample employee</Badge>
           </div>
           <div className="rounded-xl border border-gray-100 bg-white p-6 min-h-[360px]">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 pb-4 mb-5">
+              <p className="text-sm font-semibold text-gray-900">{companyName}</p>
+              {companyLogo ? (
+                <img src={companyLogo} alt={`${companyName} logo`} className="h-10 max-w-28 object-contain object-right" />
+              ) : null}
+            </div>
             <p className="text-lg font-semibold text-gray-900 mb-4">{form.title || "Untitled"}</p>
             <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700 leading-relaxed">
               {preview || "Start typing to preview."}
@@ -352,17 +375,19 @@ export function LetterEditorModule({
         </Card>
       </div>
 
-      <Dialog
+      <Sheet
         open={issueOpen}
         onClose={() => setIssueOpen(false)}
         title={form.kind === "FORM" ? "Assign form" : "Issue letter"}
-        description="Saves the template, then sends it to the people you select."
-        size="lg"
+        description="Employee information is filled from the HR record. Complete only the letter-specific terms below."
+        width="lg"
       >
         <div className="px-6 pb-6 space-y-4">
           {fields.map((field) => (
             <div key={field.id}>
-              <label className="text-xs font-medium text-gray-500">{field.label}</label>
+              <label className="text-xs font-medium text-gray-500">
+                {field.label}{field.required ? " *" : ""}
+              </label>
               {field.type === "textarea" ? (
                 <textarea
                   className={`${inputClass} mt-1`}
@@ -370,6 +395,26 @@ export function LetterEditorModule({
                   value={extras[field.id] ?? ""}
                   onChange={(e) => setExtras((v) => ({ ...v, [field.id]: e.target.value }))}
                 />
+              ) : field.type === "select" ? (
+                <select
+                  className={`${inputClass} mt-1`}
+                  value={extras[field.id] ?? ""}
+                  onChange={(e) => setExtras((v) => ({ ...v, [field.id]: e.target.value }))}
+                >
+                  <option value="">Select…</option>
+                  {(field.options ?? []).map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              ) : field.type === "checkbox" ? (
+                <label className="flex items-center gap-2 mt-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={extras[field.id] === "true"}
+                    onChange={(e) => setExtras((v) => ({ ...v, [field.id]: e.target.checked ? "true" : "" }))}
+                  />
+                  Yes
+                </label>
               ) : (
                 <input
                   className={`${inputClass} mt-1`}
@@ -402,12 +447,65 @@ export function LetterEditorModule({
                   />
                   <span className="text-sm">
                     {emp.name}
-                    <span className="text-xs text-gray-500 block">{emp.jobTitle}</span>
+                    <span className="text-xs text-gray-500 block">
+                      {emp.employeeCode} · {emp.jobTitle} · {emp.department}
+                    </span>
+                    <span className="text-xs text-gray-400 block">
+                      {emp.address || "Address missing"} · Salary: {emp.salary > 0 ? emp.salary.toLocaleString() : "missing"}
+                    </span>
                   </span>
                 </label>
               );
             })}
           </div>
+          {form.kind === "LETTER" && selectedIds.length > 0 && (
+            <div className="space-y-4 border-t border-gray-100 pt-5">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase">Recipient details</p>
+                <p className="text-xs text-gray-500 mt-1">Add or correct these details here. They will be saved to the employee profile and used in this letter.</p>
+              </div>
+              {selectedIds.map((id) => {
+                const employee = employees.find((emp) => emp.id === id);
+                if (!employee) return null;
+                const override = employeeOverrides[id];
+                return (
+                  <div key={id} className="rounded-xl border border-gray-200 p-4 space-y-3">
+                    <p className="text-sm font-semibold text-gray-900">{employee.name}</p>
+                    <input
+                      className={inputClass}
+                      placeholder="Job title / role"
+                      value={override?.jobTitle ?? employee.jobTitle}
+                      onChange={(e) => setEmployeeOverrides((current) => ({
+                        ...current,
+                        [id]: { jobTitle: e.target.value, address: current[id]?.address ?? employee.address ?? "", salary: current[id]?.salary ?? String(employee.salary || "") },
+                      }))}
+                    />
+                    <textarea
+                      className={inputClass}
+                      rows={2}
+                      placeholder="Residential address"
+                      value={override?.address ?? employee.address ?? ""}
+                      onChange={(e) => setEmployeeOverrides((current) => ({
+                        ...current,
+                        [id]: { jobTitle: current[id]?.jobTitle ?? employee.jobTitle, address: e.target.value, salary: current[id]?.salary ?? String(employee.salary || "") },
+                      }))}
+                    />
+                    <input
+                      className={inputClass}
+                      type="number"
+                      min="0"
+                      placeholder="Monthly salary"
+                      value={override?.salary ?? (employee.salary > 0 ? String(employee.salary) : "")}
+                      onChange={(e) => setEmployeeOverrides((current) => ({
+                        ...current,
+                        [id]: { jobTitle: current[id]?.jobTitle ?? employee.jobTitle, address: current[id]?.address ?? employee.address ?? "", salary: e.target.value },
+                      }))}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setIssueOpen(false)}>
               Cancel
@@ -417,7 +515,7 @@ export function LetterEditorModule({
             </Button>
           </div>
         </div>
-      </Dialog>
+      </Sheet>
     </div>
   );
 }

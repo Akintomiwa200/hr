@@ -27,6 +27,7 @@ import {
   type PortalKind,
 } from "@/lib/letters/fields";
 import { STARTER_TEMPLATES } from "@/lib/letters/starters";
+import { defaultIssueExtras } from "@/lib/letters/issue-defaults";
 
 export type TemplateRow = {
   id: string;
@@ -55,9 +56,14 @@ export type DocumentRow = {
 export type EmployeeOption = {
   id: string;
   name: string;
+  employeeCode: string;
   jobTitle: string;
   department: string;
+  address: string | null;
+  salary: number;
 };
+
+type EmployeeOverride = { jobTitle: string; address: string; salary: string };
 
 const inputClass =
   "w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500";
@@ -90,6 +96,7 @@ export function LettersModule({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [employeeQuery, setEmployeeQuery] = useState("");
   const [issueExtras, setIssueExtras] = useState<Record<string, string>>({});
+  const [employeeOverrides, setEmployeeOverrides] = useState<Record<string, EmployeeOverride>>({});
   const [deleteFor, setDeleteFor] = useState<TemplateRow | null>(null);
 
   const templates = useMemo(() => {
@@ -177,6 +184,15 @@ export function LettersModule({
       notify.error("Select at least one person");
       return;
     }
+    if (issueFor.kind === "LETTER") {
+      const missing = parseFieldsJson(issueFor.fieldsJson).find(
+        (field) => field.required && !issueExtras[field.id]?.trim()
+      );
+      if (missing) {
+        notify.error(`Complete ${missing.label} before issuing`);
+        return;
+      }
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/letters/issue", {
@@ -186,6 +202,7 @@ export function LettersModule({
           templateId: issueFor.id,
           employeeIds: selectedIds,
           extras: issueExtras,
+          employeeOverrides,
         }),
       });
       if (!res.ok) {
@@ -369,7 +386,8 @@ export function LettersModule({
                       setIssueFor(tpl);
                       setSelectedIds([]);
                       setEmployeeQuery("");
-                      setIssueExtras({});
+                      setIssueExtras(defaultIssueExtras(tpl.category));
+                      setEmployeeOverrides({});
                     }}
                   >
                     <Send className="w-3.5 h-3.5" />
@@ -457,17 +475,23 @@ export function LettersModule({
         </div>
       </Sheet>
 
-      <Dialog
+      <Sheet
         open={Boolean(issueFor)}
         onClose={() => setIssueFor(null)}
         title={issueFor?.kind === "FORM" ? "Assign form" : "Issue letter"}
-        description={issueFor ? `Send “${issueFor.title}” to selected people in real time.` : undefined}
-        size="lg"
+        description={
+          issueFor
+            ? `Send “${issueFor.title}” in real time. Name, role, address, salary, and other employee details are filled from the HR record.`
+            : undefined
+        }
+        width="lg"
       >
-        <div className="px-6 pb-6 space-y-4">
+        <div className="p-6 space-y-5">
           {parseFieldsJson(issueFor?.fieldsJson).map((field) => (
             <div key={field.id}>
-              <label className="text-xs font-medium text-gray-500">{field.label}</label>
+              <label className="text-xs font-medium text-gray-500">
+                {field.label}{field.required ? " *" : ""}
+              </label>
               {field.type === "textarea" ? (
                 <textarea
                   className={`${inputClass} mt-1`}
@@ -475,22 +499,48 @@ export function LettersModule({
                   value={issueExtras[field.id] ?? ""}
                   onChange={(e) => setIssueExtras((v) => ({ ...v, [field.id]: e.target.value }))}
                 />
+              ) : field.type === "select" ? (
+                <select
+                  className={`${inputClass} mt-1`}
+                  value={issueExtras[field.id] ?? ""}
+                  onChange={(e) => setIssueExtras((v) => ({ ...v, [field.id]: e.target.value }))}
+                >
+                  <option value="">Select…</option>
+                  {(field.options ?? []).map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              ) : field.type === "checkbox" ? (
+                <label className="flex items-center gap-2 mt-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={issueExtras[field.id] === "true"}
+                    onChange={(e) => setIssueExtras((v) => ({ ...v, [field.id]: e.target.checked ? "true" : "" }))}
+                  />
+                  Yes
+                </label>
               ) : (
                 <input
                   className={`${inputClass} mt-1`}
-                  type={field.type === "date" ? "date" : "text"}
+                  type={field.type === "date" ? "date" : field.type === "number" ? "number" : "text"}
                   value={issueExtras[field.id] ?? ""}
                   onChange={(e) => setIssueExtras((v) => ({ ...v, [field.id]: e.target.value }))}
                 />
               )}
             </div>
           ))}
-          <input
-            className={inputClass}
-            placeholder="Search employees"
-            value={employeeQuery}
-            onChange={(e) => setEmployeeQuery(e.target.value)}
-          />
+          <div className="border-t border-gray-100 pt-5 space-y-3">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase">Recipients</p>
+              <p className="text-xs text-gray-500 mt-1">Choose employees. Their personal and job details merge automatically into the letter.</p>
+            </div>
+            <input
+              className={inputClass}
+              placeholder="Search by name or role"
+              value={employeeQuery}
+              onChange={(e) => setEmployeeQuery(e.target.value)}
+            />
+          </div>
           <div className="max-h-64 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-50">
             {filteredEmployees.map((emp) => {
               const checked = selectedIds.includes(emp.id);
@@ -508,13 +558,64 @@ export function LettersModule({
                   <span>
                     <span className="text-sm font-medium text-gray-900">{emp.name}</span>
                     <span className="text-xs text-gray-500 block">
-                      {emp.jobTitle} · {emp.department}
+                      {emp.employeeCode} · {emp.jobTitle} · {emp.department}
+                    </span>
+                    <span className="text-xs text-gray-400 block">
+                      {emp.address || "Address missing"} · Salary: {emp.salary > 0 ? emp.salary.toLocaleString() : "missing"}
                     </span>
                   </span>
                 </label>
               );
             })}
           </div>
+          {issueFor?.kind === "LETTER" && selectedIds.length > 0 && (
+            <div className="space-y-4 border-t border-gray-100 pt-5">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase">Recipient details</p>
+                <p className="text-xs text-gray-500 mt-1">These values are saved to each employee profile and merge into the letter immediately.</p>
+              </div>
+              {selectedIds.map((id) => {
+                const employee = employees.find((emp) => emp.id === id);
+                if (!employee) return null;
+                const override = employeeOverrides[id];
+                return (
+                  <div key={id} className="rounded-xl border border-gray-200 p-4 space-y-3">
+                    <p className="text-sm font-semibold text-gray-900">{employee.name}</p>
+                    <input
+                      className={inputClass}
+                      placeholder="Job title / role"
+                      value={override?.jobTitle ?? employee.jobTitle}
+                      onChange={(e) => setEmployeeOverrides((current) => ({
+                        ...current,
+                        [id]: { jobTitle: e.target.value, address: current[id]?.address ?? employee.address ?? "", salary: current[id]?.salary ?? String(employee.salary || "") },
+                      }))}
+                    />
+                    <textarea
+                      className={inputClass}
+                      rows={2}
+                      placeholder="Residential address"
+                      value={override?.address ?? employee.address ?? ""}
+                      onChange={(e) => setEmployeeOverrides((current) => ({
+                        ...current,
+                        [id]: { jobTitle: current[id]?.jobTitle ?? employee.jobTitle, address: e.target.value, salary: current[id]?.salary ?? String(employee.salary || "") },
+                      }))}
+                    />
+                    <input
+                      className={inputClass}
+                      type="number"
+                      min="0"
+                      placeholder="Monthly salary"
+                      value={override?.salary ?? (employee.salary > 0 ? String(employee.salary) : "")}
+                      onChange={(e) => setEmployeeOverrides((current) => ({
+                        ...current,
+                        [id]: { jobTitle: current[id]?.jobTitle ?? employee.jobTitle, address: current[id]?.address ?? employee.address ?? "", salary: e.target.value },
+                      }))}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setIssueFor(null)}>
               Cancel
@@ -525,7 +626,7 @@ export function LettersModule({
             </Button>
           </div>
         </div>
-      </Dialog>
+      </Sheet>
 
       <Dialog
         open={Boolean(deleteFor)}

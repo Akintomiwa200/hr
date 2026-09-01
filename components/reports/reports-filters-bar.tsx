@@ -30,10 +30,10 @@ export function ReportsFiltersBar({
   };
 
   const selectClass =
-    "text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white min-w-[120px]";
+    "text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white min-w-[120px] focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400";
 
   return (
-    <div className="flex flex-wrap items-center gap-2 mb-6">
+    <div className="flex flex-wrap items-center gap-2 mb-6 rounded-2xl border border-brand-100 bg-brand-50/50 p-3">
       {showDateRange && (
         <>
           <input

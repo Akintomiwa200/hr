@@ -8,14 +8,14 @@ export function ReportsPageHeader({
   breadcrumb: { label: string; href?: string }[];
 }) {
   return (
-    <div className="mb-6">
+    <div className="mb-6 rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50 to-white px-6 py-5">
       <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
       <p className="text-sm text-gray-400 mt-1">
         {breadcrumb.map((item, i) => (
           <span key={item.label}>
             {i > 0 && " › "}
             {item.href ? (
-              <Link href={item.href} className="hover:text-teal-600">
+              <Link href={item.href} className="hover:text-brand-600">
                 {item.label}
               </Link>
             ) : (
@@ -38,8 +38,8 @@ export function ReportDetailCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-gray-100">
+    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-brand-100 bg-brand-50/40">
         <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
         {actions}
       </div>

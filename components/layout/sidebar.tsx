@@ -13,7 +13,7 @@ import {
   settingsNavItem,
   type NavItem,
 } from "@/lib/dashboard-nav";
-import { roleWorkspaceLabel, canManageOrgContent, hasRole } from "@/lib/roles";
+import { roleWorkspaceLabel, roleLabel, canManageOrgContent, hasRole } from "@/lib/roles";
 import { useEffect, useState } from "react";
 import { useAutoHideScrollbar } from "@/hooks/use-auto-hide-scrollbar";
 import { useNavSummary } from "@/components/layout/nav-provider";
@@ -152,6 +152,8 @@ export function Sidebar({
   mobileOpen = false,
   onCloseMobile,
   employeeId,
+  companyName,
+  companyLogo,
 }: {
   role: Role;
   userName: string;
@@ -160,6 +162,8 @@ export function Sidebar({
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
   employeeId?: string | null;
+  companyName?: string;
+  companyLogo?: string | null;
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -192,12 +196,22 @@ export function Sidebar({
           className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}
           onClick={onCloseMobile}
         >
-          <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
-            <BrandIcon className="w-5 h-5 text-white" strokeWidth={2.5} />
+          <div className="w-10 h-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
+            {companyLogo ? (
+              <img
+                src={companyLogo}
+                alt={companyName ?? "Company"}
+                className="w-full h-full object-contain p-1"
+              />
+            ) : (
+              <BrandIcon className="w-5 h-5 text-violet-600" strokeWidth={2.5} />
+            )}
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-[15px] font-bold text-gray-900 leading-tight">Smart HR</p>
+              <p className="text-[15px] font-bold text-gray-900 leading-tight truncate">
+                {companyName || "Smart HR"}
+              </p>
               <p className="text-[11px] text-gray-400 mt-0.5">{roleWorkspaceLabel(role)}</p>
             </div>
           )}
@@ -255,7 +269,7 @@ export function Sidebar({
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-semibold text-gray-900 truncate">{userName}</p>
                   <p className="text-[11px] text-gray-400 truncate">
-                    {roleWorkspaceLabel(role)} · {userEmail}
+                    {companyName || "Smart HR"} · {roleLabel(role)}
                   </p>
                 </div>
                 <ChevronsUpDown

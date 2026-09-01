@@ -27,7 +27,7 @@ export default async function OnboardingReportPage({
   return (
     <div>
       <ReportsBreadcrumb items={[{ label: "List Report", href: "/reports" }, { label: "New hires" }]} />
-      <PageHeader title="New hires report" description="New hire trends and checklist progress" />
+      <PageHeader title="New hires report" description="Employees grouped by their actual join date, with onboarding progress" />
       <ReportsFiltersBar departments={departments} showDateRange exportSlug="onboarding" />
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
         <ReportsBarChart data={chart} />

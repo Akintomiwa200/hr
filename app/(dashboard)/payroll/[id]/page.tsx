@@ -20,12 +20,20 @@ export default async function PayslipPage({
   if (!session) redirect("/login");
 
   const { id } = await params;
-  const record = await prisma.payrollRecord.findUnique({
-    where: { id },
-    include: {
-      employee: { include: { department: true } },
-    },
-  });
+  const [record, company] = await Promise.all([
+    prisma.payrollRecord.findUnique({
+      where: { id },
+      include: {
+        employee: { include: { department: true } },
+      },
+    }),
+    session.companyId
+      ? prisma.company.findUnique({
+          where: { id: session.companyId },
+          select: { name: true, logo: true },
+        })
+      : Promise.resolve(null),
+  ]);
   if (!record) notFound();
 
   const allowed = await canViewPayrollRecord(session, record);
@@ -45,10 +53,21 @@ export default async function PayslipPage({
         />
       </div>
       <PayslipDetailModule
+        key={JSON.stringify([
+          record.breakdown,
+          record.notes,
+          record.status,
+          record.grossPay,
+          record.deductions,
+          record.netPay,
+          record.paidAt,
+        ])}
         record={record}
         breakdown={breakdown}
         canManage={canManage}
         viewer={viewer}
+        companyName={company?.name ?? "Company"}
+        companyLogo={company?.logo}
       />
     </div>
   );

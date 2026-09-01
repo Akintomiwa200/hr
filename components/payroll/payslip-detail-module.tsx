@@ -9,17 +9,20 @@ import {
   Download,
   ExternalLink,
   Info,
+  Mail,
   Minus,
   Pencil,
   Plus,
   Printer,
   RefreshCw,
   Save,
+  Send,
   Shield,
   Trash2,
   UserRound,
 } from "lucide-react";
 import { Button, statusBadge } from "@/components/ui";
+import { Sheet } from "@/components/ui/sheet";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
 import { useCurrency, useFormatCurrency } from "@/components/providers/currency-provider";
@@ -54,6 +57,7 @@ type PayslipRecord = {
     lastName: string;
     employeeCode: string;
     jobTitle: string;
+    email?: string | null;
     department: { name: string };
   };
 };
@@ -228,12 +232,14 @@ export function PayslipDetailModule({
   canManage,
   viewer,
   companyName = "Smart HR",
+  companyLogo,
 }: {
   record: PayslipRecord;
   breakdown: PayrollLineItem[];
   canManage: boolean;
   viewer: PayslipViewerContext;
   companyName?: string;
+  companyLogo?: string | null;
 }) {
   const router = useRouter();
   useAppEvents({
@@ -247,10 +253,25 @@ export function PayslipDetailModule({
   const [notes, setNotes] = useState(record.notes ?? "");
   const [status, setStatus] = useState(record.status);
   const [loading, setLoading] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState(record.employee.email ?? "");
+  const [emailCc, setEmailCc] = useState("");
+  const [emailBcc, setEmailBcc] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailResult, setEmailResult] = useState<
+    | { sent: true; messageId?: string; previewUrl?: string }
+    | { sent: false; error: string }
+    | null
+  >(null);
 
   const { earnings, deductions, grossPay, totalDeductions, netPay } = payslipTotals(items);
   const invoiceNo = payslipNumber(record.id);
   const issueDate = record.paidAt ?? record.createdAt ?? new Date();
+  const periodLabel = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(record.periodStart));
 
   const updateItem = (id: string, patch: Partial<PayrollLineItem>) => {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -300,6 +321,43 @@ export function PayslipDetailModule({
       notify.error("Failed to save payslip");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openEmailModal = () => {
+    setEmailResult(null);
+    setEmailTo(record.employee.email ?? "");
+    setEmailCc("");
+    setEmailBcc("");
+    setEmailMessage("");
+    setEmailOpen(true);
+  };
+
+  const sendEmail = async () => {
+    setEmailSending(true);
+    setEmailResult(null);
+    try {
+      const res = await fetch(`/api/payroll/${record.id}/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: emailTo,
+          cc: emailCc,
+          bcc: emailBcc,
+          message: emailMessage,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEmailResult({ sent: false, error: data.error ?? "Failed to send email" });
+        return;
+      }
+      setEmailResult({ sent: true, messageId: data.messageId, previewUrl: data.previewUrl });
+      notify.success("Payslip emailed successfully");
+    } catch {
+      setEmailResult({ sent: false, error: "Failed to send email" });
+} finally {
+      setEmailSending(false);
     }
   };
 
@@ -358,6 +416,10 @@ export function PayslipDetailModule({
               {viewer.downloadLabel}
             </Button>
           </a>
+          <Button variant="secondary" onClick={openEmailModal}>
+            <Mail className="w-4 h-4" />
+            Email payslip
+          </Button>
           {canManage && !editing && (
             <>
               <Button variant="secondary" loading={loading} onClick={recalculate}>
@@ -410,7 +472,16 @@ export function PayslipDetailModule({
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6 mb-8">
             <div>
-              <p className="text-2xl font-extrabold text-brand-600 tracking-tight">{companyName}</p>
+              <div className="flex items-center gap-3">
+                {companyLogo && (
+                  <img
+                    src={companyLogo}
+                    alt={companyName || "Company"}
+                    className="w-12 h-12 rounded-xl object-contain bg-white p-1 ring-1 ring-gray-100"
+                  />
+                )}
+                <p className="text-2xl font-extrabold text-brand-600 tracking-tight">{companyName}</p>
+              </div>
               <p className="text-sm text-gray-500 mt-1">{viewer.receiptKind}</p>
               <p className="text-xs text-gray-400 mt-1">{viewer.documentSubtitle}</p>
             </div>
@@ -421,6 +492,14 @@ export function PayslipDetailModule({
               <p className="text-xl font-extrabold text-gray-900 mt-1 font-mono">{invoiceNo}</p>
               <div className="mt-3">{statusBadge(status)}</div>
             </div>
+          </div>
+
+          {/* Pay period month & year */}
+          <div className="mb-8 rounded-xl border border-brand-100 bg-brand-50/60 text-center py-4 px-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand-600">
+              Salary Slip for
+            </p>
+            <p className="text-2xl font-extrabold text-gray-900 mt-1">{periodLabel}</p>
           </div>
 
           {/* Meta grid */}
@@ -448,8 +527,6 @@ export function PayslipDetailModule({
               <p className="font-bold text-gray-900">{companyName}</p>
               <p className="text-sm text-gray-500 mt-1 leading-relaxed">
                 Payroll &amp; Compensation
-                <br />
-                Smart HR Payroll System
               </p>
             </div>
             <div className="rounded-xl border border-gray-200 p-4">
@@ -583,6 +660,102 @@ export function PayslipDetailModule({
           </div>
         </div>
       </article>
+
+      {/* Email payslip side modal */}
+      <Sheet
+        open={emailOpen}
+        onClose={() => setEmailOpen(false)}
+        title="Email payslip"
+        description={`Send ${invoiceNo} to ${employeeName}`}
+        width="md"
+      >
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Recipient email
+            </label>
+            <input
+              type="email"
+              className={inputClass}
+              value={emailTo}
+              onChange={(e) => setEmailTo(e.target.value)}
+              placeholder="employee@company.com"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                CC <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="text"
+                className={inputClass}
+                value={emailCc}
+                onChange={(e) => setEmailCc(e.target.value)}
+                placeholder="cc@company.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                BCC <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="text"
+                className={inputClass}
+                value={emailBcc}
+                onChange={(e) => setEmailBcc(e.target.value)}
+                placeholder="bcc@company.com"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Message <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <textarea
+              className={inputClass}
+              rows={4}
+              value={emailMessage}
+              onChange={(e) => setEmailMessage(e.target.value)}
+              placeholder="Add a short note along with your payslip…"
+            />
+          </div>
+
+          {emailResult?.sent && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+              <p className="font-medium">Payslip sent successfully.</p>
+              {emailResult.previewUrl && (
+                <p className="mt-1">
+                  <a
+                    href={emailResult.previewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-violet-600 underline"
+                  >
+                    Open email preview
+                  </a>
+                </p>
+              )}
+            </div>
+          )}
+          {emailResult && !emailResult.sent && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              <p className="font-medium">Could not send the email.</p>
+              <p className="mt-1">{emailResult.error}</p>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setEmailOpen(false)}>
+              Close
+            </Button>
+            <Button loading={emailSending} onClick={sendEmail} disabled={!emailTo.trim()}>
+              <Send className="w-4 h-4" />
+              Send payslip
+            </Button>
+          </div>
+        </div>
+      </Sheet>
     </div>
   );
 }

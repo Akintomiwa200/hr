@@ -56,7 +56,10 @@ export default async function LettersPage() {
             id: true,
             firstName: true,
             lastName: true,
+            employeeCode: true,
             jobTitle: true,
+            address: true,
+            salary: true,
             department: { select: { name: true } },
           },
           orderBy: { firstName: "asc" },
@@ -102,8 +105,11 @@ export default async function LettersPage() {
         employees={employeesRaw.map((e) => ({
           id: e.id,
           name: `${e.firstName} ${e.lastName}`,
+          employeeCode: e.employeeCode,
           jobTitle: e.jobTitle,
           department: e.department.name,
+          address: e.address,
+          salary: e.salary,
         }))}
       />
     </div>

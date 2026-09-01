@@ -28,10 +28,10 @@ export default async function TimeOffBalancePage({
         items={[
           { label: "List Report", href: "/reports" },
           { label: "Time Off", href: "/reports/time-off/balance" },
-          { label: "Balance" },
+          { label: "Usage" },
         ]}
       />
-      <PageHeader title="Time Off Balance" description="Approved and pending leave usage from real requests" />
+      <PageHeader title="Time Off Usage" description="Approved leave used and pending requests from real leave records" />
       <ReportsFiltersBar departments={departments} showType={false} showStatus={false} exportSlug="time-off-balance" />
       <ReportsDataTable
         columns={[

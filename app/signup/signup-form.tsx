@@ -18,6 +18,7 @@ export function SignupForm({
   const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -42,7 +43,14 @@ export function SignupForm({
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, lastName, email, password, plan: planId }),
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          companyName,
+          email,
+          password,
+          plan: planId,
+        }),
       });
 
       if (!res.ok) {
@@ -96,6 +104,21 @@ export function SignupForm({
             className="w-full px-4 py-3 text-[14px] border border-gray-200 rounded-xl bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/30 focus:border-[#7B61FF] transition-shadow"
           />
         </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="companyName" className="block text-[13px] font-medium text-gray-700">
+          Company name
+        </label>
+        <input
+          id="companyName"
+          type="text"
+          value={companyName}
+          onChange={(e) => setCompanyName(e.target.value)}
+          placeholder="Acme Inc."
+          required
+          className="w-full px-4 py-3 text-[14px] border border-gray-200 rounded-xl bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/30 focus:border-[#7B61FF] transition-shadow"
+        />
       </div>
 
       <div className="space-y-1.5">

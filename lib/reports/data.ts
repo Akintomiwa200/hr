@@ -14,7 +14,7 @@ import { getDistinctGenders, getEmployeeGenderMap } from "@/lib/reports/gender-f
 export type ChartSegment = { label: string; value: number; color: string };
 export type BarPoint = { label: string; value: number; month?: string; year?: number };
 
-const CHART_COLORS = ["#14b8a6", "#8b5cf6", "#f59e0b", "#3b82f6", "#ec4899", "#64748b"];
+const CHART_COLORS = ["#6b51ef", "#8b5cf6", "#3b82f6", "#ec4899", "#f59e0b", "#64748b"];
 
 function ageFromDob(dob: Date | null | undefined): number | null {
   if (!dob) return null;
@@ -209,20 +209,18 @@ export async function getTurnoverReport(session: SessionUser, filters: ReportFil
     const monthStart = new Date(cursor);
     const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 23, 59, 59);
     const activeAtStart = employees.filter(
-      (e) => e.hireDate <= monthEnd && (e.status === "ACTIVE" || e.updatedAt >= monthStart)
+      (e) => e.hireDate <= monthStart && (!e.endDate || e.endDate >= monthStart)
     ).length;
     const departed = employees.filter(
       (e) =>
-        e.status === "INACTIVE" &&
-        e.updatedAt >= monthStart &&
-        e.updatedAt <= monthEnd
+        (e.endDate ? e.endDate >= monthStart && e.endDate <= monthEnd : e.status === "INACTIVE" && e.updatedAt >= monthStart && e.updatedAt <= monthEnd)
     ).length;
     const rate = activeAtStart > 0 ? Math.round((departed / activeAtStart) * 1000) / 10 : 0;
     months.push({ label, value: rate, month: cursor.toLocaleString("en-US", { month: "short" }), year: cursor.getFullYear() });
     cursor.setMonth(cursor.getMonth() + 1);
   }
 
-  const resigned = employees.filter((e) => e.status === "INACTIVE");
+  const resigned = employees.filter((e) => e.endDate || e.status === "INACTIVE");
   const rows = resigned.map((emp) => ({
     id: emp.id,
     name: fullName(emp.firstName, emp.lastName),
@@ -232,7 +230,7 @@ export async function getTurnoverReport(session: SessionUser, filters: ReportFil
     employmentType: employmentLabel(resolveEmploymentType(emp)),
     tenure: tenureLabel(emp.hireDate),
     hireDate: emp.hireDate.toISOString(),
-    resignDate: emp.updatedAt.toISOString(),
+    resignDate: (emp.endDate ?? emp.updatedAt).toISOString(),
   }));
   return { chart: months, rows };
 }
@@ -240,38 +238,37 @@ export async function getTurnoverReport(session: SessionUser, filters: ReportFil
 export async function getOnboardingReport(session: SessionUser, filters: ReportFilters) {
   const { from, to } = parseDateRange(filters);
   const scope = getCompanyScope(session);
-  const empWhere = await buildEmployeeReportWhere(session, filters);
-  const employeeIds = (await prisma.employee.findMany({ where: empWhere, select: { id: true } })).map(
-    (e) => e.id
+  const employees = (await loadEmployees(session, { ...filters, status: "ALL" })).filter(
+    (employee) => employee.hireDate >= from && employee.hireDate <= to
   );
 
   const instances = await prisma.checklistInstance.findMany({
     where: {
       type: "ONBOARDING",
-      startDate: { gte: from, lte: to },
-      employeeId: { in: employeeIds },
+      employeeId: { in: employees.map((employee) => employee.id) },
       ...(scope.companyId ? { companyId: scope.companyId } : {}),
     },
-    include: { employee: { include: { department: true } } },
+    select: { employeeId: true, status: true, startDate: true },
     orderBy: { startDate: "desc" },
   });
+  const onboardingStatus = new Map(instances.map((instance) => [instance.employeeId, instance.status]));
 
   const monthMap = new Map<string, number>();
-  for (const inst of instances) {
-    const key = inst.startDate.toLocaleString("en-US", { month: "short", year: "numeric" });
+  for (const employee of employees) {
+    const key = employee.hireDate.toLocaleString("en-US", { month: "short", year: "numeric" });
     monthMap.set(key, (monthMap.get(key) ?? 0) + 1);
   }
   const chart: BarPoint[] = [...monthMap.entries()].map(([label, value]) => ({ label, value }));
 
-  const rows = instances.map((inst) => ({
-    id: inst.id,
-    name: fullName(inst.employee.firstName, inst.employee.lastName),
-    employeeCode: inst.employee.employeeCode,
-    department: inst.employee.department.name,
-    jobTitle: inst.employee.jobTitle,
-    employmentType: employmentLabel(resolveEmploymentType(inst.employee)),
-    joinDate: inst.startDate.toISOString(),
-    status: inst.status,
+  const rows = employees.map((employee) => ({
+    id: employee.id,
+    name: fullName(employee.firstName, employee.lastName),
+    employeeCode: employee.employeeCode,
+    department: employee.department.name,
+    jobTitle: employee.jobTitle,
+    employmentType: employmentLabel(resolveEmploymentType(employee)),
+    joinDate: employee.hireDate.toISOString(),
+    status: onboardingStatus.get(employee.id) ?? "NOT_STARTED",
   }));
   return { chart, rows };
 }
@@ -279,41 +276,37 @@ export async function getOnboardingReport(session: SessionUser, filters: ReportF
 export async function getOffboardingReport(session: SessionUser, filters: ReportFilters) {
   const { from, to } = parseDateRange(filters);
   const scope = getCompanyScope(session);
-  const empWhere = await buildEmployeeReportWhere(session, { ...filters, status: "ALL" });
-  const employeeIds = (await prisma.employee.findMany({ where: empWhere, select: { id: true } })).map(
-    (e) => e.id
+  const employees = (await loadEmployees(session, { ...filters, status: "ALL" })).filter(
+    (employee) => employee.endDate && employee.endDate >= from && employee.endDate <= to
   );
 
   const instances = await prisma.checklistInstance.findMany({
     where: {
       type: "OFFBOARDING",
-      startDate: { gte: from, lte: to },
-      employeeId: { in: employeeIds },
+      employeeId: { in: employees.map((employee) => employee.id) },
       ...(scope.companyId ? { companyId: scope.companyId } : {}),
     },
-    include: { employee: { include: { department: true } } },
+    select: { employeeId: true, status: true, startDate: true },
     orderBy: { startDate: "desc" },
   });
+  const offboardingStatus = new Map(instances.map((instance) => [instance.employeeId, instance.status]));
 
   const monthMap = new Map<string, number>();
-  for (const inst of instances) {
-    const key = inst.startDate.toLocaleString("en-US", { month: "short", year: "numeric" });
+  for (const employee of employees) {
+    const key = employee.endDate!.toLocaleString("en-US", { month: "short", year: "numeric" });
     monthMap.set(key, (monthMap.get(key) ?? 0) + 1);
   }
   const chart: BarPoint[] = [...monthMap.entries()].map(([label, value]) => ({ label, value }));
 
-  const rows = instances.map((inst) => ({
-    id: inst.id,
-    name: fullName(inst.employee.firstName, inst.employee.lastName),
-    employeeCode: inst.employee.employeeCode,
-    department: inst.employee.department.name,
-    jobTitle: inst.employee.jobTitle,
-    resignationDate: inst.startDate.toISOString(),
-    lastWorkingDate:
-      inst.endDate?.toISOString() ??
-      (inst.employee as { endDate?: Date | null }).endDate?.toISOString() ??
-      "—",
-    status: inst.status,
+  const rows = employees.map((employee) => ({
+    id: employee.id,
+    name: fullName(employee.firstName, employee.lastName),
+    employeeCode: employee.employeeCode,
+    department: employee.department.name,
+    jobTitle: employee.jobTitle,
+    resignationDate: employee.updatedAt.toISOString(),
+    lastWorkingDate: employee.endDate!.toISOString(),
+    status: offboardingStatus.get(employee.id) ?? "COMPLETED",
   }));
   return { chart, rows };
 }

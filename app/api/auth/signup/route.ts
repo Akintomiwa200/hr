@@ -23,7 +23,7 @@ function resolveSignupPlan(plan?: string): SubscriptionPlanId {
 
 export async function POST(request: NextRequest) {
   try {
-    const { firstName, lastName, email, password, plan: planParam } = await request.json();
+    const { firstName, lastName, companyName: requestedCompanyName, email, password, plan: planParam } = await request.json();
 
     if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !password) {
       return NextResponse.json(
@@ -56,7 +56,10 @@ export async function POST(request: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const trial = defaultTrialCompanyData();
-    const companyName = `${firstName.trim()}'s Organization`;
+    const companyName =
+      requestedCompanyName && requestedCompanyName.trim()
+        ? requestedCompanyName.trim()
+        : `${firstName.trim()}'s Organization`;
 
     const user = await prisma.$transaction(async (tx) => {
       const company = await tx.company.create({

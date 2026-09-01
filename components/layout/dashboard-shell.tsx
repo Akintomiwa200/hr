@@ -29,6 +29,8 @@ export function DashboardShell({
   lastName,
   employeeId,
   avatarUrl,
+  companyName,
+  companyLogo,
   children,
 }: {
   role: Role;
@@ -38,6 +40,8 @@ export function DashboardShell({
   lastName: string;
   employeeId?: string | null;
   avatarUrl?: string | null;
+  companyName?: string;
+  companyLogo?: string | null;
   children: React.ReactNode;
 }) {
   const isMobile = useIsMobile();
@@ -98,6 +102,8 @@ export function DashboardShell({
         mobileOpen={mobileOpen}
         onCloseMobile={closeMobile}
         employeeId={employeeId}
+        companyName={companyName}
+        companyLogo={companyLogo}
       />
 
       <div

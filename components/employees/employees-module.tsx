@@ -13,6 +13,9 @@ import {
   Plus,
   Trash2,
   UserX,
+  ChevronDown,
+  FileSpreadsheet,
+  Cpu,
 } from "lucide-react";
 import { Avatar, statusBadge } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
@@ -70,6 +73,15 @@ type ImportPreviewRow = {
   fromFile: boolean;
 };
 
+type TemplatePreviewRow = {
+  name: string;
+  employeeCode: string;
+  role: string;
+  manager: string;
+  department: string;
+  branch: string;
+};
+
 export function EmployeesModule({
   employees: initialEmployees,
   departments,
@@ -113,6 +125,11 @@ export function EmployeesModule({
   const [importOpen, setImportOpen] = useState(false);
   const [importRows, setImportRows] = useState<ImportPreviewRow[]>([]);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [templateImporting, setTemplateImporting] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [templateRows, setTemplateRows] = useState<TemplatePreviewRow[]>([]);
+  const [pendingTemplateFile, setPendingTemplateFile] = useState<File | null>(null);
+  const [toolbarMenu, setToolbarMenu] = useState<"import" | "export" | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -291,6 +308,84 @@ export function EmployeesModule({
       notify.error("Import failed");
     } finally {
       setImporting(false);
+    }
+  }
+
+  function downloadTemplate() {
+    window.open("/api/employees/template", "_blank");
+  }
+
+  function downloadEmployeesCsv() {
+    window.open("/api/dashboard/export?type=employees", "_blank");
+  }
+
+  async function importTemplateFile(file: File) {
+    setTemplateImporting(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      body.append("dryRun", "true");
+      const res = await fetch("/api/employees/import-template", { method: "POST", body });
+      const data = (await res.json()) as {
+        error?: string;
+        count?: number;
+        rows?: TemplatePreviewRow[];
+      };
+      if (!res.ok) {
+        notify.error(data.error || "Import failed");
+        return;
+      }
+      setPendingTemplateFile(file);
+      setTemplateRows(
+        Array.isArray(data.rows)
+          ? data.rows.map((r) => ({
+              name: r.name || "",
+              employeeCode: r.employeeCode || "",
+              role: r.role || "",
+              manager: r.manager || "",
+              department: r.department || "",
+              branch: r.branch || "",
+            }))
+          : []
+      );
+      setTemplateOpen(true);
+    } catch {
+      notify.error("Import failed");
+    } finally {
+      setTemplateImporting(false);
+    }
+  }
+
+  async function confirmTemplateImport() {
+    if (!pendingTemplateFile) return;
+    setTemplateImporting(true);
+    try {
+      const body = new FormData();
+      body.append("file", pendingTemplateFile);
+      const res = await fetch("/api/employees/import-template", { method: "POST", body });
+      const data = (await res.json()) as {
+        error?: string;
+        created?: number;
+        updated?: number;
+        skipped?: number;
+      };
+      if (!res.ok) {
+        notify.error(data.error || "Import failed");
+        return;
+      }
+      notify.success(
+        "Employees imported",
+        `${data.created ?? 0} added · ${data.updated ?? 0} updated · ${data.skipped ?? 0} skipped`
+      );
+      setTemplateOpen(false);
+      setPendingTemplateFile(null);
+      setTemplateRows([]);
+      await refreshList();
+      router.refresh();
+    } catch {
+      notify.error("Import failed");
+    } finally {
+      setTemplateImporting(false);
     }
   }
 
@@ -554,29 +649,112 @@ export function EmployeesModule({
             </select>
             {canExport && (
             <>
-            <label className="inline-flex items-center gap-1.5 px-4 py-2 text-[12px] font-medium bg-white border border-gray-200 text-gray-700 rounded-lg hover:border-brand-200 cursor-pointer">
-              <Upload className="w-3.5 h-3.5" />
-              {importing ? "Importing…" : "Import from device"}
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                disabled={importing}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void importDeviceStaff(file);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => window.open("/api/dashboard/export?type=employees", "_blank")}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-[12px] font-medium bg-[#7B61FF] text-white rounded-lg hover:bg-violet-600"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setToolbarMenu(toolbarMenu === "import" ? null : "import")}
+                disabled={importing || templateImporting}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-[12px] font-medium bg-white border border-gray-200 text-gray-700 rounded-lg hover:border-violet-200 disabled:opacity-60"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Import
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              {toolbarMenu === "import" && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-[89]"
+                    onClick={() => setToolbarMenu(null)}
+                    aria-label="Close import menu"
+                  />
+                  <div className="absolute right-0 mt-2 z-90 w-56 bg-white border border-gray-100 rounded-xl shadow-lg py-1.5">
+                    <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                      Add employees from a file
+                    </p>
+                    <label className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-gray-700 cursor-pointer hover:bg-gray-50">
+                      <FileSpreadsheet className="w-4 h-4 text-violet-500" />
+                      <span>{templateImporting ? "Importing…" : "From template"}</span>
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls"
+                        className="hidden"
+                        disabled={templateImporting}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void importTemplateFile(file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <label className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-gray-700 cursor-pointer hover:bg-gray-50">
+                      <Cpu className="w-4 h-4 text-emerald-500" />
+                      <span>{importing ? "Importing…" : "From ZKTeco device"}</span>
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls"
+                        className="hidden"
+                        disabled={importing}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void importDeviceStaff(file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setToolbarMenu(toolbarMenu === "export" ? null : "export")}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-[12px] font-medium bg-[#7B61FF] text-white rounded-lg hover:bg-violet-600"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              {toolbarMenu === "export" && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-[89]"
+                    onClick={() => setToolbarMenu(null)}
+                    aria-label="Close export menu"
+                  />
+                  <div className="absolute right-0 mt-2 z-[90] w-56 bg-white border border-gray-100 rounded-xl shadow-lg py-1.5">
+                    <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                      Download
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setToolbarMenu(null);
+                        downloadTemplate();
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+                    >
+                      <FileSpreadsheet className="w-4 h-4 text-violet-500" />
+                      Import template (.xlsx)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setToolbarMenu(null);
+                        downloadEmployeesCsv();
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+                    >
+                      <Download className="w-4 h-4 text-brand-500" />
+                      Employees (CSV)
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             </>
             )}
           </div>
@@ -1100,6 +1278,99 @@ export function EmployeesModule({
               className="px-4 py-2 text-[13px] font-medium bg-[#7B61FF] text-white rounded-xl hover:bg-violet-600 disabled:opacity-60"
             >
               {importing ? "Importing…" : `Import ${importRows.length} employees`}
+            </button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Import review — template upload */}
+      <Dialog
+        open={templateOpen}
+        onClose={() => {
+          if (templateImporting) return;
+          setTemplateOpen(false);
+          setPendingTemplateFile(null);
+          setTemplateRows([]);
+        }}
+        title="Import review — template"
+        description="Review the employees parsed from your template before importing. Rows with an existing employee code are updated; the rest are created."
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-3 text-[12px]">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Total: {templateRows.length}
+            </span>
+          </div>
+
+          <div className="border border-gray-100 rounded-xl overflow-hidden max-h-[45vh] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-[#fafbfc] text-left border-b border-gray-100">
+                <tr>
+                  <th className="px-4 py-2.5 text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                    Name
+                  </th>
+                  <th className="px-4 py-2.5 text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                    Employee code
+                  </th>
+                  <th className="px-4 py-2.5 text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                    Department
+                  </th>
+                  <th className="px-4 py-2.5 text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                    Branch
+                  </th>
+                  <th className="px-4 py-2.5 text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                    Role
+                  </th>
+                  <th className="px-4 py-2.5 text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                    Manager
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {templateRows.map((row, idx) => (
+                  <tr
+                    key={`${row.name}-${idx}`}
+                    className="border-b border-gray-50 last:border-0"
+                  >
+                    <td className="px-4 py-2.5 text-[13px] text-gray-800">
+                      {row.name || "—"}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <code className="px-2 py-0.5 rounded bg-[#f5f3ff] text-violet-700 text-[12px] font-mono">
+                        {row.employeeCode || "—"}
+                      </code>
+                    </td>
+                    <td className="px-4 py-2.5 text-[13px] text-gray-500">{row.department || "—"}</td>
+                    <td className="px-4 py-2.5 text-[13px] text-gray-500">{row.branch || "—"}</td>
+                    <td className="px-4 py-2.5 text-[13px] text-gray-500">{row.role}</td>
+                    <td className="px-4 py-2.5 text-[13px] text-gray-500">{row.manager || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setTemplateOpen(false);
+                setPendingTemplateFile(null);
+                setTemplateRows([]);
+              }}
+              disabled={templateImporting}
+              className="px-4 py-2 text-[13px] text-gray-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void confirmTemplateImport()}
+              disabled={templateImporting}
+              className="px-4 py-2 text-[13px] font-medium bg-[#7B61FF] text-white rounded-xl hover:bg-violet-600 disabled:opacity-60"
+            >
+              {templateImporting ? "Importing…" : `Import ${templateRows.length} employees`}
             </button>
           </div>
         </div>

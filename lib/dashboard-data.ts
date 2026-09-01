@@ -112,6 +112,8 @@ export async function getHrDashboardData(
     pendingLeaves,
     todayAttendanceByStatus,
     openJobs,
+    activeCandidates,
+    upcomingInterviews,
     departmentCounts,
     payrollRecords,
     performanceReviews,
@@ -143,6 +145,19 @@ export async function getHrDashboardData(
       where: {
         status: "OPEN",
         department: orgDept,
+      },
+    }),
+    prisma.jobApplication.count({
+      where: {
+        status: { in: ["APPLIED", "SCREENING", "INTERVIEW", "OFFER"] },
+        job: { department: orgDept },
+      },
+    }),
+    prisma.interview.count({
+      where: {
+        status: "SCHEDULED",
+        scheduledAt: { gte: today },
+        application: { job: { department: orgDept } },
       },
     }),
     prisma.department.findMany({
@@ -313,6 +328,8 @@ export async function getHrDashboardData(
     pendingLeaves,
     todayAttendance: todayPresent + todayRemote + todayLate,
     openJobs,
+    activeCandidates,
+    upcomingInterviews,
     departmentCounts,
     attendanceRate,
     attendanceTrend,

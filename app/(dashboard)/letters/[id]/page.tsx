@@ -28,13 +28,16 @@ export default async function LetterEditorPage({
         id: true,
         firstName: true,
         lastName: true,
+        employeeCode: true,
         jobTitle: true,
+        address: true,
+        salary: true,
         department: { select: { name: true } },
       },
       orderBy: { firstName: "asc" },
     }),
     session.companyId
-      ? prisma.company.findUnique({ where: { id: session.companyId }, select: { name: true } })
+      ? prisma.company.findUnique({ where: { id: session.companyId }, select: { name: true, logo: true, updatedAt: true } })
       : Promise.resolve(null),
   ]);
 
@@ -43,6 +46,11 @@ export default async function LetterEditorPage({
   return (
     <LetterEditorModule
       companyName={company?.name ?? "Company"}
+      companyLogo={
+        company?.logo
+          ? `${company.logo}${company.logo.includes("?") ? "&" : "?"}v=${company.updatedAt.getTime()}`
+          : null
+      }
       template={{
         id: template.id,
         kind: template.kind,
@@ -56,8 +64,11 @@ export default async function LetterEditorPage({
       employees={employees.map((e) => ({
         id: e.id,
         name: `${e.firstName} ${e.lastName}`,
+        employeeCode: e.employeeCode,
         jobTitle: e.jobTitle,
         department: e.department.name,
+        address: e.address,
+        salary: e.salary,
       }))}
     />
   );

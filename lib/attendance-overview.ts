@@ -98,12 +98,6 @@ export type AttendanceOverview = {
   showPunches: boolean;
 };
 
-function startOfLocalDay(date = new Date()) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 function verifyLabel(verifyType: number | null | undefined) {
   if (verifyType === 1) return "Fingerprint";
   if (verifyType === 15 || verifyType === 6) return "Face";
@@ -136,7 +130,7 @@ export async function getAttendanceOverview(session: SessionUser): Promise<Atten
 
   const showPunches = canManageDevices(session.role) && workspace.mode === "org";
   const todayStart = startOfDayInZone(DEFAULT_BRANCH_TIMEZONE);
-  const today = startOfLocalDay();
+  const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
   const historyStart = new Date(todayStart.getTime() - 180 * 24 * 60 * 60 * 1000);
   const punchHistoryStart = new Date(todayStart.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -151,16 +145,17 @@ export async function getAttendanceOverview(session: SessionUser): Promise<Atten
       take: 400,
     }),
     session.employeeId
-      ? prisma.attendance.findUnique({
+      ? prisma.attendance.findFirst({
           where: {
-            employeeId_date: { employeeId: session.employeeId, date: today },
+            employeeId: session.employeeId,
+            date: { gte: todayStart, lt: tomorrowStart },
           },
         })
       : null,
     workspace.mode !== "self"
       ? prisma.attendance.count({
           where: {
-            date: today,
+            date: { gte: todayStart, lt: tomorrowStart },
             status: { in: ["PRESENT", "REMOTE", "LATE", "EARLY", "HALF_DAY"] },
             employee: scopedEmployee,
           },
@@ -289,14 +284,7 @@ export async function getAttendanceOverview(session: SessionUser): Promise<Atten
       const serverToday = fromDevice.filter(
         (p) => new Date(p.punchedAt).getTime() >= todayMs
       );
-      const latestPunchAt = fromDevice[0]?.punchedAt;
-      const deviceDayStart = latestPunchAt
-        ? startOfDayInZone(DEFAULT_BRANCH_TIMEZONE, new Date(latestPunchAt)).getTime()
-        : todayMs;
-      const todayFromDevice =
-        serverToday.length > 0
-          ? serverToday
-          : fromDevice.filter((p) => new Date(p.punchedAt).getTime() >= deviceDayStart);
+      const todayFromDevice = serverToday;
       const lastPunch = todayFromDevice[0] ?? fromDevice[0] ?? null;
       const users = new Set(
         todayFromDevice.map((p) => p.employee?.id || `pin:${p.pin}`)

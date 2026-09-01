@@ -27,7 +27,7 @@ export default async function OffboardingReportPage({
   return (
     <div>
       <ReportsBreadcrumb items={[{ label: "List Report", href: "/reports" }, { label: "Offboarding" }]} />
-      <PageHeader title="Offboarding Report" description="Employee exit tracking" />
+      <PageHeader title="Offboarding Report" description="Employee exits grouped by their recorded last working date" />
       <ReportsFiltersBar departments={departments} showDateRange exportSlug="offboarding" />
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
         <ReportsBarChart data={chart} />
@@ -40,7 +40,7 @@ export default async function OffboardingReportPage({
           { key: "jobTitle", label: "Job Title" },
           {
             key: "resignationDate",
-            label: "Resignation Date",
+            label: "Offboarding recorded",
             render: (r) => formatDate(String(r.resignationDate)),
           },
           { key: "lastWorkingDate", label: "Last Working Date", render: (r) => String(r.lastWorkingDate === "—" ? "—" : formatDate(String(r.lastWorkingDate))) },

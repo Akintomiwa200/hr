@@ -27,7 +27,7 @@ export default async function TurnoverReportPage({
   return (
     <div>
       <ReportsBreadcrumb items={[{ label: "List Report", href: "/reports" }, { label: "Turnover Rate" }]} />
-      <PageHeader title="Employee Turnover Rate" description="Monthly turnover percentage" />
+      <PageHeader title="Employee Turnover Rate" description="Monthly exits as a percentage of employees active at the start of each month" />
       <ReportsFiltersBar departments={departments} showType showStatus showDateRange exportSlug="turnover" />
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
         <ReportsBarChart data={chart} valueSuffix="%" />

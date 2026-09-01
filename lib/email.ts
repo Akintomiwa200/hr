@@ -68,9 +68,7 @@ function welcomeHtml(payload: WelcomeEmailPayload) {
 export async function sendWelcomeEmail(
   payload: WelcomeEmailPayload
 ): Promise<SendEmailResult> {
-  const from =
-    process.env.SMTP_FROM ||
-    `"Smart HR" <${process.env.SMTP_USER}>`;
+  const from = emailFromAddress();
 
   const mail = {
     from,
@@ -141,13 +139,37 @@ export async function verifyEmailTransport() {
   }
 }
 
-async function deliverMail(mail: {
+export function emailFromAddress() {
+  const configured = process.env.SMTP_FROM?.trim();
+  if (configured) return configured;
+  if (process.env.SMTP_USER) return `"Smart HR" <${process.env.SMTP_USER}>`;
+  return `"Smart HR" <no-reply@smart-hr.app>`;
+}
+
+export async function deliverMail(mail: {
   from: string;
   to: string;
+  cc?: Array<string>;
+  bcc?: Array<string>;
   subject: string;
   html: string;
   text: string;
+  attachments?: Array<{
+    filename: string;
+    content: string | Buffer;
+    contentType?: string;
+  }>;
 }): Promise<SendEmailResult> {
+  const mailOptions = {
+    from: mail.from,
+    to: mail.to,
+    ...(mail.cc?.length ? { cc: mail.cc } : {}),
+    ...(mail.bcc?.length ? { bcc: mail.bcc } : {}),
+    subject: mail.subject,
+    html: mail.html,
+    text: mail.text,
+    ...(mail.attachments ? { attachments: mail.attachments } : {}),
+  };
   const transport = getTransporter();
   if (!transport) {
     if (process.env.NODE_ENV === "development") {
@@ -158,14 +180,14 @@ async function deliverMail(mail: {
         secure: testAccount.smtp.secure,
         auth: { user: testAccount.user, pass: testAccount.pass },
       });
-      const info = await devTransport.sendMail(mail);
+      const info = await devTransport.sendMail(mailOptions);
       const previewUrl = nodemailer.getTestMessageUrl(info) || undefined;
       return { sent: true, messageId: info.messageId, ...(previewUrl ? { previewUrl } : {}) };
     }
     return { sent: false, error: "Email is not configured" };
   }
   try {
-    const info = await transport.sendMail(mail);
+    const info = await transport.sendMail(mailOptions);
     return { sent: true, messageId: info.messageId };
   } catch (err) {
     return {
@@ -185,9 +207,7 @@ export async function sendInterviewScheduledEmail(input: {
   meetLink: string | null;
   calendarSynced: boolean;
 }) {
-  const from =
-    process.env.SMTP_FROM ||
-    `"Smart HR" <${process.env.SMTP_USER}>`;
+  const from = emailFromAddress();
   const when = input.scheduledAt.toLocaleString(undefined, {
     dateStyle: "full",
     timeStyle: "short",

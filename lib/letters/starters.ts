@@ -23,8 +23,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
   {
     kind: "LETTER",
     category: "OFFER",
-    title: "Offer letter",
-    description: "Formal employment offer with role, start date, and salary.",
+    title: "Employment offer letter",
+    description: "Complete employment offer with duties, work terms, salary, and acceptance.",
     body: `{{today}}
 
 {{employeeName}}
@@ -32,17 +32,76 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
 
 Dear {{firstName}},
 
-We are pleased to offer you the position of {{jobTitle}} in the {{department}} department at {{companyName}}, reporting to {{managerName}}.
+EMPLOYMENT OFFER LETTER
 
-Your employment will commence on {{startDate}} on a {{employmentType}} basis. Your gross compensation will be {{salary}} per annum.
+Following the successful completion of our recruitment process, we are pleased to offer you employment with {{companyName}} as {{jobTitle}} in the {{department}} department. We believe your skills and experience will contribute meaningfully to our operations.
 
-Please sign and return this letter to confirm your acceptance. We look forward to welcoming you to the team.
+This letter sets out the terms and conditions of your employment.
+
+1. Position
+You will be employed as {{jobTitle}}. Your responsibilities will include, but are not limited to:
+
+{{responsibilities}}
+
+Additional duties may be assigned where necessary to support operational efficiency.
+
+2. Reporting line
+You will report to {{reportingLine}}.
+
+3. Start date and employment type
+Your employment will commence on {{startDate}} on a {{employmentType}} basis.
+
+4. Work schedule
+Your normal work schedule will be {{workSchedule}}. You may occasionally be required to work outside these hours where business needs reasonably require it.
+
+5. Compensation
+You will receive a monthly salary of {{salary}}, payable after statutory deductions in line with the company's payroll schedule. {{benefits}}
+
+6. Probation period
+Your employment will be subject to a probationary period of {{probationPeriod}}. Confirmation is based on satisfactory performance, reliability, and compliance with company standards. Either party may terminate employment during probation by giving {{probationNotice}} written notice.
+
+7. Annual leave
+Upon completion of the required qualifying period, you will be entitled to {{annualLeave}}, subject to operational scheduling.
+
+8. Confidentiality
+You must keep confidential all non-public company, customer, employee, and operational information you access during or after your employment. Any unauthorised disclosure may result in disciplinary action, including termination.
+
+9. Conflict of interest
+You must not engage in personal business dealings or relationships that create a conflict of interest with {{companyName}}. Any potential conflict must be disclosed to management immediately.
+
+10. Performance expectations
+You will be expected to perform your duties diligently, maintain accurate records, and support the operational standards of {{companyName}}.
+
+11. Documentation and company policies
+You may be required to submit identification, academic certificates, and other records for verification. Your employment is governed by the company's policies, procedures, and handbook, as amended from time to time.
+
+12. Termination of employment
+After confirmation, either party may end employment by giving {{noticePeriod}} written notice or payment in lieu of notice, subject to applicable law and company policy. All company property must be returned before your exit process is complete.
+
+Please sign and return this letter to confirm that you accept these terms. We look forward to welcoming you to the team.
 
 Yours sincerely,
-Human Resources
-{{companyName}}`,
+{{signatoryName}}
+{{signatoryTitle}}
+{{companyName}}
+
+Employee acceptance
+I, {{employeeName}}, accept the offer of employment under the terms outlined above.
+
+Signature: ________________________________
+Date: ____________________`,
     fields: letterFields([
       { id: "startDate", label: "Start date", type: "date", required: true },
+      { id: "responsibilities", label: "Key responsibilities (one per line)", type: "textarea", required: true },
+      { id: "reportingLine", label: "Reporting line", required: true },
+      { id: "workSchedule", label: "Work schedule", required: true },
+      { id: "probationPeriod", label: "Probation period", required: true },
+      { id: "probationNotice", label: "Probation notice period", required: true },
+      { id: "annualLeave", label: "Annual leave entitlement", required: true },
+      { id: "noticePeriod", label: "Termination notice period", required: true },
+      { id: "benefits", label: "Benefits note", type: "textarea" },
+      { id: "signatoryName", label: "Authorised signatory name", required: true },
+      { id: "signatoryTitle", label: "Authorised signatory title", required: true },
     ]),
   },
   {

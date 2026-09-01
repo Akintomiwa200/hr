@@ -62,8 +62,8 @@ export const reportCatalog: ReportCard[] = [
   },
   {
     id: "time-off-balance",
-    title: "Time Off Balance",
-    description: "An overview of employees' time off balances.",
+    title: "Time Off Usage",
+    description: "Approved leave used and pending requests by employee.",
     href: "/reports/time-off/balance",
     icon: Timer,
     roles: REPORTS_VIEW_ROLES,

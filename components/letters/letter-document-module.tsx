@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Check, Printer } from "lucide-react";
-import { Button, Card, statusBadge } from "@/components/ui";
+import { Button, statusBadge } from "@/components/ui";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { scheduleRouterRefresh } from "@/hooks/use-soft-refresh";
 import { notify, readApiError } from "@/lib/toast";
@@ -32,10 +32,14 @@ export function LetterDocumentModule({
   document: doc,
   canManage,
   isRecipient,
+  companyName,
+  companyLogo,
 }: {
   document: IssuedDocument;
   canManage: boolean;
   isRecipient: boolean;
+  companyName: string;
+  companyLogo: string | null;
 }) {
   const router = useRouter();
   useAppEvents({
@@ -99,19 +103,31 @@ export function LetterDocumentModule({
         </div>
       </div>
 
-      <Card className="p-8 max-w-3xl mx-auto print:shadow-none print:border-0">
-        <p className="text-xs uppercase tracking-wide text-violet-600 font-semibold mb-2">
-          {doc.kind === "FORM" ? "Form" : "Letter"}
-        </p>
-        <h1 className="text-2xl font-bold text-gray-900">{doc.title}</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {doc.employeeName}
-          {doc.issuedAt ? ` · ${formatDate(doc.issuedAt)}` : ""}
-          {doc.issuedByName ? ` · Issued by ${doc.issuedByName}` : ""}
-        </p>
-        <pre className="whitespace-pre-wrap font-sans text-sm text-gray-800 leading-relaxed mt-6">
-          {doc.body}
-        </pre>
+      <div id="letter-document" className="letter-document bg-white rounded-xl border border-gray-200 shadow-sm p-8 max-w-3xl mx-auto print:shadow-none print:border-0">
+        <header className="letterhead flex items-start justify-between gap-6 border-b border-gray-200 pb-5">
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-violet-600 font-semibold mb-2">
+              {doc.kind === "FORM" ? "HR form" : "Official correspondence"}
+            </p>
+            <p className="font-semibold text-gray-900">{companyName}</p>
+          </div>
+          {companyLogo ? (
+            <img src={companyLogo} alt={`${companyName} logo`} className="h-16 max-w-40 object-contain object-right" />
+          ) : (
+            <p className="text-right font-bold text-sm uppercase tracking-[0.16em] text-gray-800">{companyName}</p>
+          )}
+        </header>
+
+        <main className="letter-content">
+          <h1 className="text-2xl font-bold text-gray-900 mt-7">{doc.title}</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {doc.employeeName}
+            {doc.issuedAt ? ` · ${formatDate(doc.issuedAt)}` : ""}
+            {doc.issuedByName ? ` · Issued by ${doc.issuedByName}` : ""}
+          </p>
+          <pre className="whitespace-pre-wrap font-sans text-sm text-gray-800 leading-relaxed mt-6">
+            {doc.body}
+          </pre>
         {fields.length > 0 && (
           <div className="mt-8 space-y-4 border-t border-gray-100 pt-6">
             {fields.map((field) => (
@@ -165,7 +181,13 @@ export function LetterDocumentModule({
             ))}
           </div>
         )}
-      </Card>
+        </main>
+
+        <footer className="letter-footer border-t border-gray-200 mt-10 pt-3 flex items-center justify-between gap-3 text-[11px] uppercase tracking-wide text-gray-500">
+          <span>{companyName}</span>
+          <span>{doc.kind === "FORM" ? "HR form" : "Employment letter"}</span>
+        </footer>
+      </div>
     </div>
   );
 }

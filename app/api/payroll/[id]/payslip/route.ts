@@ -9,6 +9,7 @@ import {
 import { canViewPayrollRecord } from "@/lib/payroll-access";
 import { legacyBreakdownFromRecord } from "@/lib/payroll-engine";
 import { renderPayslipHtml } from "@/lib/payslip-template";
+import { htmlToPdf } from "@/lib/pdf/render-payslip";
 import { getAppCurrencyCode } from "@/lib/currency-server";
 
 export async function GET(
@@ -40,7 +41,7 @@ export async function GET(
     record.employee.user?.companyId
       ? prisma.company.findUnique({
           where: { id: record.employee.user.companyId },
-          select: { name: true },
+          select: { name: true, logo: true },
         })
       : Promise.resolve(null),
     getAppCurrencyCode(),
@@ -49,6 +50,7 @@ export async function GET(
   const html = renderPayslipHtml({
     id: record.id,
     companyName: company?.name ?? "Organization",
+    companyLogo: company?.logo ?? null,
     currencyCode,
     employee: {
       firstName: record.employee.firstName,
@@ -69,12 +71,15 @@ export async function GET(
     createdAt: record.createdAt,
   });
 
-  const filename = `payslip-${record.employee.employeeCode}-${record.periodStart.toISOString().slice(0, 7)}.html`;
+  const pdf = await htmlToPdf(html);
 
-  return new NextResponse(html, {
+  const filename = `payslip-${record.employee.employeeCode}-${record.periodStart.toISOString().slice(0, 7)}.pdf`;
+
+  return new NextResponse(Buffer.from(pdf), {
     headers: {
-      "Content-Type": "text/html; charset=utf-8",
+      "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "private, no-cache, no-store, must-revalidate",
     },
   });
 }

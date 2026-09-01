@@ -36,8 +36,8 @@ import type {
 } from "@/lib/attendance-overview";
 
 const STATUS_FILTERS = [
-  { id: "ALL", label: "All" },
-  { id: "PRESENT", label: "Present" },
+  { id: "ALL", label: "All statuses" },
+  { id: "PRESENT", label: "On time" },
   { id: "EARLY", label: "Early" },
   { id: "LATE", label: "Late" },
   { id: "ABSENT", label: "Absent" },
@@ -45,10 +45,10 @@ const STATUS_FILTERS = [
 ] as const;
 
 const PUNCH_FILTERS = [
-  { id: "ALL", label: "All operations" },
-  { id: "IN", label: "In" },
-  { id: "OUT", label: "Out" },
-  { id: "UNMATCHED", label: "Not in Smart HR yet" },
+  { id: "ALL", label: "All punches" },
+  { id: "IN", label: "Check-in" },
+  { id: "OUT", label: "Check-out" },
+  { id: "UNMATCHED", label: "Unmatched PINs" },
 ] as const;
 
 type PunchFilterId = (typeof PUNCH_FILTERS)[number]["id"];
@@ -120,39 +120,42 @@ function AttendanceFilterBar({
   if (!showPunchFilters && !showStatusFilters) return null;
 
   return (
-    <div className="px-5 py-3 border-b border-gray-100 bg-[#fafbfc] space-y-3">
-      {showPunchFilters && (
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:gap-4">
-          <div className="flex items-center gap-2 shrink-0 lg:w-36 pt-0.5">
-            <Fingerprint className="w-3.5 h-3.5 text-brand-500" />
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-              Thumbprints
-            </span>
+    <div className="mx-5 mb-5 rounded-xl border border-gray-100 bg-gray-50/70 p-3 sm:p-4">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-6">
+        {showPunchFilters && (
+          <div className="min-w-0 flex-1">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                <Fingerprint className="w-3.5 h-3.5" />
+              </span>
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Device activity</p>
+                <p className="text-[11px] text-gray-500">Filter terminal punches</p>
+              </div>
+            </div>
+            <FilterPills
+              items={PUNCH_FILTERS}
+              value={punchFilter}
+              onChange={onPunchFilter}
+              badgeFor={{ UNMATCHED: unmatchedCount }}
+            />
           </div>
-          <FilterPills
-            items={PUNCH_FILTERS}
-            value={punchFilter}
-            onChange={onPunchFilter}
-            badgeFor={{ UNMATCHED: unmatchedCount }}
-          />
-        </div>
-      )}
-      {showStatusFilters && (
-        <div
-          className={cn(
-            "flex flex-col gap-2 lg:flex-row lg:items-start lg:gap-4",
-            showPunchFilters && "pt-3 border-t border-gray-100/80 lg:pt-0 lg:border-t-0"
-          )}
-        >
-          <div className="flex items-center gap-2 shrink-0 lg:w-36 pt-0.5">
-            <Filter className="w-3.5 h-3.5 text-brand-500" />
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-              Daily roster
-            </span>
+        )}
+        {showStatusFilters && (
+          <div className={cn("min-w-0 flex-1", showPunchFilters && "xl:border-l xl:border-gray-200 xl:pl-6")}>
+            <div className="mb-2 flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                <Filter className="w-3.5 h-3.5" />
+              </span>
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Attendance status</p>
+                <p className="text-[11px] text-gray-500">Filter the daily roster</p>
+              </div>
+            </div>
+            <FilterPills items={STATUS_FILTERS} value={statusFilter} onChange={onStatusFilter} />
           </div>
-          <FilterPills items={STATUS_FILTERS} value={statusFilter} onChange={onStatusFilter} />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -261,7 +264,6 @@ export function AttendanceModule({
   overview,
   isEmployee,
   mode = isEmployee ? "self" : "org",
-  appUrl,
   showDevicePanel,
   showCheckIn,
   currentEmployeeId,
@@ -272,7 +274,6 @@ export function AttendanceModule({
   overview: AttendanceOverview;
   isEmployee: boolean;
   mode?: WorkspaceMode;
-  appUrl?: string;
   showDevicePanel?: boolean;
   showCheckIn?: boolean;
   currentEmployeeId?: string | null;
@@ -361,14 +362,18 @@ export function AttendanceModule({
   useEffect(() => {
     if (!data.showPunches) return;
     const controller = new AbortController();
-    const pull = () => {
-      void fetch("/api/attendance/devices/live-sync", {
-        method: "POST",
-        signal: controller.signal,
-      });
+    const pull = async () => {
+      try {
+        await fetch("/api/attendance/devices/live-sync", {
+          method: "POST",
+          signal: controller.signal,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+      }
     };
-    pull();
-    const timer = window.setInterval(pull, 45_000);
+    void pull();
+    const timer = window.setInterval(() => void pull(), 45_000);
     return () => {
       window.clearInterval(timer);
       controller.abort();
@@ -388,13 +393,6 @@ export function AttendanceModule({
         return d.getTime();
       })();
   const isPunchToday = (value: Date | string) => new Date(value).getTime() >= todayStartMs;
-  const latestPunchDayStart = useMemo(() => {
-    const latest = punches[0]?.punchedAt;
-    if (!latest) return todayStartMs;
-    const d = new Date(latest);
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  }, [punches, todayStartMs]);
-
   const myRecords = useMemo(
     () => (currentEmployeeId ? records.filter((r) => r.employee.id === currentEmployeeId) : []),
     [records, currentEmployeeId]
@@ -473,11 +471,10 @@ export function AttendanceModule({
     return list;
   }, [punches, branchId, deviceId, selectedDevice, punchFilter, search]);
 
-  const todayPunches = useMemo(() => {
-    const serverToday = punchesByFilters.filter((p) => isPunchToday(p.punchedAt));
-    if (serverToday.length > 0) return serverToday;
-    return punchesByFilters.filter((p) => new Date(p.punchedAt).getTime() >= latestPunchDayStart);
-  }, [punchesByFilters, todayStartMs, latestPunchDayStart]);
+  const todayPunches = useMemo(
+    () => punchesByFilters.filter((p) => isPunchToday(p.punchedAt)),
+    [punchesByFilters, todayStartMs]
+  );
 
   const historyPunches = punchesByFilters;
 
@@ -532,6 +529,10 @@ export function AttendanceModule({
     () =>
       todayPunches.filter((p) => !p.processed && p.error === "EMPLOYEE_NOT_FOUND").length,
     [todayPunches]
+  );
+  const onlineDeviceCount = useMemo(
+    () => devicesByBranch.filter((device) => device.online).length,
+    [devicesByBranch]
   );
 
   const showPeople = mode !== "self" && tab !== "mine";
@@ -621,13 +622,22 @@ export function AttendanceModule({
         </div>
       )}
 
-      {showDevicePanel && tab === "live" && (devicesByBranch.length > 0 || appUrl) && (
-        <div className="space-y-3">
+      {showDevicePanel && tab === "live" && (
+        <div className="rounded-2xl border border-brand-100 bg-white p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">Live terminals</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-900">Live terminals</h3>
+                <span className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                  onlineDeviceCount > 0 ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"
+                )}>
+                  <span className={cn("h-1.5 w-1.5 rounded-full", onlineDeviceCount > 0 ? "bg-emerald-500 animate-pulse" : "bg-gray-400")} />
+                  {onlineDeviceCount} online
+                </span>
+              </div>
               <p className="text-xs text-gray-500">
-                Status and thumbprints from the machines — same cards as ZKTeco console.
+                Real-time heartbeat and attendance events from registered ZKTeco terminals.
               </p>
             </div>
             <Link
@@ -638,7 +648,15 @@ export function AttendanceModule({
             </Link>
           </div>
           {devicesByBranch.length === 0 ? (
-            <p className="text-sm text-gray-500">No terminals registered yet.</p>
+            <div className="rounded-xl border border-dashed border-brand-200 bg-brand-50/40 px-4 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">No terminals registered</p>
+                <p className="text-xs text-gray-500 mt-1">Add a branch and register its serial number to begin receiving live punches.</p>
+              </div>
+              <Link href="/attendance/devices">
+                <Button size="sm"><Fingerprint className="w-3.5 h-3.5" />Add terminal</Button>
+              </Link>
+            </div>
           ) : (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
               {devicesByBranch.map((device) => (
