@@ -8,6 +8,7 @@ import { canManageChecklists } from "@/lib/checklist/access";
 import { findOrCreateChecklistInstance } from "@/lib/checklist/instantiate";
 import { parseDocumentNames } from "@/lib/checklist/documents";
 import { hydrateChecklistTasks, setTaskRequiredDocumentsById } from "@/lib/checklist/document-store";
+import { createNotification } from "@/lib/notifications";
 
 export async function GET(request: NextRequest) {
   const session = await requireSession();
@@ -136,6 +137,16 @@ export async function POST(request: NextRequest) {
   });
   if (docs.length) {
     await setTaskRequiredDocumentsById(task.id, docs, "DOCUMENT");
+  }
+
+  if (task.assignee?.userId) {
+    await createNotification({
+      userId: task.assignee.userId,
+      type: "checklist",
+      title: `New task assigned to you: ${task.title}`,
+      message: `You've been assigned "${task.title}" for ${task.instance.employee.firstName} ${task.instance.employee.lastName}'s ${task.instance.type.toLowerCase()} checklist.`,
+      href: "/checklist/todos",
+    });
   }
 
   const [hydrated] = await hydrateChecklistTasks([task]);

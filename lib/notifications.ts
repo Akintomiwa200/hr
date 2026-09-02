@@ -8,9 +8,11 @@ export type NotificationType =
   | "attendance"
   | "performance"
   | "subscription"
-  | "integration"
-  | "general";
-
+| "integration"
+
+  | "checklist"
+
+  | "general";
 export type NotificationRecord = {
   id: string;
   userId: string;
@@ -36,10 +38,11 @@ const PREFERENCE_KEY: Record<NotificationType, string> = {
   payroll: "payroll",
   attendance: "announcements",
   performance: "performance",
-  subscription: "announcements",
-  integration: "announcements",
-  general: "announcements",
-};
+subscription: "announcements",
+  integration: "announcements",
+  checklist: "checklist",
+  general: "announcements",
+};
 
 export function parseUserPreferences(raw: string | null | undefined): Record<string, boolean> {
   if (!raw) {

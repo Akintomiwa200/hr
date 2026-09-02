@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -8,11 +7,12 @@ import {
   Fingerprint,
   Globe,
   Hash,
+  MapPin,
   Radio,
+  Settings,
   Wifi,
   WifiOff,
 } from "lucide-react";
-import { Button } from "@/components/ui";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { DEFAULT_ZK_PORT, formatDeviceEndpoint } from "@/lib/zkteco/device-ip";
 import { isDeviceLive, isDeviceOnline } from "@/lib/attendance-device-spec";
@@ -34,10 +34,7 @@ export type LiveTerminalCardData = {
   todayUserCount?: number;
 };
 
-export function terminalOnline(
-  lastSeenAt: string | null,
-  isActive = true
-) {
+export function terminalOnline(lastSeenAt: string | null, isActive = true) {
   return isActive && isDeviceOnline(lastSeenAt);
 }
 
@@ -45,7 +42,8 @@ function statusLabel(device: LiveTerminalCardData) {
   if (!device.isActive) {
     return {
       text: "Disabled",
-      tone: "gray" as const,
+      badgeBg: "bg-gray-100 text-gray-600 border-gray-200",
+      dotBg: "bg-gray-400",
       live: false,
     };
   }
@@ -53,7 +51,8 @@ function statusLabel(device: LiveTerminalCardData) {
   if (isDeviceLive(device.lastSeenAt)) {
     return {
       text: "Live",
-      tone: "green" as const,
+      badgeBg: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+      dotBg: "bg-emerald-500 animate-pulse",
       live: true,
     };
   }
@@ -61,7 +60,8 @@ function statusLabel(device: LiveTerminalCardData) {
   if (isDeviceOnline(device.lastSeenAt)) {
     return {
       text: "Connected",
-      tone: "green" as const,
+      badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      dotBg: "bg-emerald-500",
       live: false,
     };
   }
@@ -69,14 +69,25 @@ function statusLabel(device: LiveTerminalCardData) {
   if (device.lastSeenAt) {
     return {
       text: "Offline",
-      tone: "gray" as const,
+      badgeBg: "bg-red-50 text-red-700 border-red-200",
+      dotBg: "bg-red-500",
+      live: false,
+    };
+  }
+
+  if (!device.ipAddress) {
+    return {
+      text: "Enter IP to Connect",
+      badgeBg: "bg-amber-50 text-amber-800 border-amber-200",
+      dotBg: "bg-amber-500",
       live: false,
     };
   }
 
   return {
-    text: "Not connected",
-    tone: "gray" as const,
+    text: "Click Connect to Test IP",
+    badgeBg: "bg-amber-50 text-amber-800 border-amber-200",
+    dotBg: "bg-amber-500 animate-pulse",
     live: false,
   };
 }
@@ -85,13 +96,13 @@ export function LiveTerminalCard({
   device,
   actions,
   compact = false,
-  admsUrl,
+  onClick,
 }: {
   device: LiveTerminalCardData;
   actions?: React.ReactNode;
   compact?: boolean;
-  /** The ADMS / aciclock URL the terminal must be set to PUSH to. Shown only when not connected. */
   admsUrl?: string;
+  onClick?: () => void;
 }) {
   useLiveClock(30_000);
 
@@ -100,10 +111,7 @@ export function LiveTerminalCard({
   const status = statusLabel(device);
 
   const endpoint = device.ipAddress
-    ? formatDeviceEndpoint(
-        device.ipAddress,
-        device.commPort ?? DEFAULT_ZK_PORT
-      )
+    ? formatDeviceEndpoint(device.ipAddress, device.commPort ?? DEFAULT_ZK_PORT)
     : null;
 
   const heartbeatValue = device.lastSeenAt
@@ -113,287 +121,152 @@ export function LiveTerminalCard({
   return (
     <div
       className={cn(
-        "group overflow-hidden rounded-2xl border bg-white transition-all duration-200",
+        "group relative overflow-hidden rounded-2xl border bg-white transition-all duration-300 shadow-sm hover:shadow-md",
         connected
-          ? "border-emerald-200 shadow-sm hover:-translate-y-0.5 hover:shadow-md"
-          : "border-gray-200 shadow-sm hover:border-gray-300 hover:shadow-md"
+          ? "border-emerald-200/80 hover:border-emerald-300"
+          : "border-gray-200 hover:border-gray-300"
       )}
     >
-      {/* Header */}
-      <div className="relative px-5 pt-5 pb-4">
-        <div
-          className={cn(
-            "absolute inset-x-0 top-0 h-1",
-            live
-              ? "bg-emerald-500"
-              : connected
-                ? "bg-emerald-300"
-                : "bg-gray-200"
-          )}
-        />
+      {/* Top Accent Bar */}
+      <div
+        className={cn(
+          "h-1.5 w-full transition-colors",
+          live
+            ? "bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 animate-pulse"
+            : connected
+              ? "bg-emerald-400"
+              : "bg-gradient-to-r from-amber-400 to-amber-500"
+        )}
+      />
 
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
+      {/* Main Content Area (Clickable to open side modal) */}
+      <div
+        onClick={onClick}
+        className={cn(
+          "p-5 pb-4 transition-colors cursor-pointer",
+          onClick && "hover:bg-slate-50/50"
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3.5 min-w-0">
             {/* Device Icon */}
             <div
               className={cn(
-                "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+                "relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border transition-colors shadow-2xs",
                 connected
-                  ? "bg-emerald-50 text-emerald-600"
-                  : "bg-gray-100 text-gray-400"
+                  ? "bg-gradient-to-br from-emerald-50 to-teal-50/50 border-emerald-200 text-emerald-600"
+                  : "bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200 text-gray-400"
               )}
             >
-              {connected ? (
-                <Wifi className="h-5 w-5" />
-              ) : (
-                <WifiOff className="h-5 w-5" />
-              )}
+              {connected ? <Wifi className="h-6 w-6" /> : <WifiOff className="h-6 w-6" />}
 
               {live && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                  <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 ring-2 ring-white" />
                 </span>
               )}
             </div>
 
-            {/* Name + Status */}
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h3 className="truncate text-sm font-semibold text-gray-900">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-bold text-gray-900 truncate tracking-tight">
                   {device.name}
                 </h3>
 
-                {device.isActive && (
-                  <span
-                    className={cn(
-                      "hidden shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide sm:inline-flex",
-                      live
-                        ? "bg-emerald-100 text-emerald-700"
-                        : connected
-                          ? "bg-emerald-50 text-emerald-600"
-                          : "bg-gray-100 text-gray-500"
-                    )}
-                  >
-                    {live ? "Live" : connected ? "Online" : "Offline"}
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border tracking-wider",
+                    status.badgeBg
+                  )}
+                >
+                  <span className={cn("h-1.5 w-1.5 rounded-full", status.dotBg)} />
+                  {status.text}
+                </span>
+
+                {live && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500 text-white text-[9px] font-extrabold uppercase tracking-wider shadow-2xs">
+                    <Radio className="w-2.5 h-2.5" />
+                    Live
                   </span>
                 )}
               </div>
 
               {device.branchName && (
-                <p className="mt-0.5 truncate text-xs text-gray-500">
-                  {device.branchName}
-                </p>
+                <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                  <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  <span className="font-semibold text-gray-700 truncate">{device.branchName}</span>
+                </div>
               )}
-
-              <div
-                className={cn(
-                  "mt-1.5 flex items-center gap-1.5 text-[11px] font-medium",
-                  live
-                    ? "text-emerald-600"
-                    : connected
-                      ? "text-emerald-600"
-                      : "text-gray-500"
-                )}
-              >
-                <span
-                  className={cn(
-                    "h-1.5 w-1.5 rounded-full",
-                    live
-                      ? "animate-pulse bg-emerald-500"
-                      : connected
-                        ? "bg-emerald-500"
-                        : "bg-gray-300"
-                  )}
-                />
-                {status.text}
-              </div>
             </div>
           </div>
 
-          {actions && (
-            <div className="shrink-0">
-              {actions}
+          {onClick && (
+            <div className="shrink-0 flex items-center gap-1 text-xs text-brand-600 font-semibold opacity-80 group-hover:opacity-100 transition-opacity bg-brand-50 px-2.5 py-1 rounded-lg border border-brand-100">
+              <Settings className="w-3.5 h-3.5" />
+              <span>Details & Setup</span>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Live activity summary */}
-      <div
-        className={cn(
-          "mx-5 mb-4 rounded-xl border p-3",
-          connected
-            ? "border-emerald-100 bg-emerald-50/60"
-            : "border-gray-100 bg-gray-50"
-        )}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div
+        {/* Quick Info Grid */}
+        <div className="mt-4 grid grid-cols-3 gap-2 pt-3 border-t border-gray-100 text-xs">
+          <div className="bg-gray-50/80 rounded-xl p-2.5 border border-gray-100">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block">
+              Serial
+            </span>
+            <span className="font-mono font-bold text-gray-800 truncate block mt-0.5">
+              {device.serialNumber || "—"}
+            </span>
+          </div>
+
+          <div className="bg-gray-50/80 rounded-xl p-2.5 border border-gray-100">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block">
+              Device IP
+            </span>
+            <span className="font-mono font-bold text-gray-800 truncate block mt-0.5">
+              {endpoint || "Not set"}
+            </span>
+          </div>
+
+          <div className="bg-gray-50/80 rounded-xl p-2.5 border border-gray-100">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block">
+              Heartbeat
+            </span>
+            <span
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-lg",
-                connected
-                  ? "bg-white text-emerald-600"
-                  : "bg-white text-gray-400"
+                "font-semibold truncate block mt-0.5",
+                live ? "text-emerald-700 font-bold" : "text-gray-700"
               )}
             >
-              <Activity className="h-4 w-4" />
-            </div>
-
-            <div>
-              <p className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
-                Heartbeat
-              </p>
-              <p
-                className={cn(
-                  "mt-0.5 text-xs font-semibold",
-                  live
-                    ? "text-emerald-700"
-                    : connected
-                      ? "text-amber-700"
-                      : "text-gray-600"
-                )}
-              >
-                {heartbeatValue}
-              </p>
-            </div>
-          </div>
-
-          {live && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-700">
-              <Radio className="h-3 w-3" />
-              Real-time
+              {heartbeatValue}
             </span>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* Device information */}
-      <div className="grid grid-cols-2 gap-px border-y border-gray-100 bg-gray-100">
-        <div className="bg-white px-5 py-3">
-          <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">
-            <Hash className="h-3 w-3" />
-            Serial
-          </div>
-          <p className="mt-1 truncate text-xs font-semibold text-gray-800">
-            {device.serialNumber ?? "—"}
-          </p>
-        </div>
-
-        <div className="bg-white px-5 py-3">
-          <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">
-            <Globe className="h-3 w-3" />
-            Device IP
-          </div>
-          <p className="mt-1 truncate text-xs font-semibold text-gray-800">
-            {endpoint ?? "Not configured"}
-          </p>
-        </div>
-      </div>
-
-      {!connected && admsUrl && (
-        <div className="border-t border-amber-100 bg-amber-50/60 px-5 py-3">
-          <p className="text-[11px] font-semibold text-amber-800">
-            Terminal hasn&apos;t reached Smart HR yet
-          </p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700">
-            On the device set Cloud Server (iclock / ADMS) to:
-          </p>
-          <code className="mt-1 block break-all rounded-md bg-white px-2 py-1 text-[11px] text-gray-800">
-            {admsUrl}
-          </code>
-          <p className="mt-1 text-[11px] text-amber-700">
-            Transfer Mode = Real-time (PUSH). It connects on its own.
-          </p>
+      {/* Action Bar Footer */}
+      {actions && (
+        <div className="px-5 py-3 bg-gray-50/50 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2">
+          {actions}
         </div>
       )}
 
-      {/* Today's activity */}
-      {(typeof device.todayPunchCount === "number" ||
-        device.lastPunchAt) && (
-        <div className="px-5 py-4">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-Today&apos;s activity
-            </span>
-
-            {typeof device.todayPunchCount === "number" && (
-              <span className="text-[10px] font-medium text-gray-400">
-                Attendance
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between gap-3">
-            {typeof device.todayPunchCount === "number" ? (
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-                  <Fingerprint className="h-4 w-4" />
-                </div>
-
-                <div>
-                  <p className="text-base font-bold leading-none text-gray-900">
-                    {device.todayPunchCount}
-                  </p>
-                  <p className="mt-1 text-[10px] text-gray-500">
-                    punches
-                    {typeof device.todayUserCount === "number"
-                      ? ` · ${device.todayUserCount} ${
-                          device.todayUserCount === 1
-                            ? "person"
-                            : "people"
-                        }`
-                      : ""}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div />
-            )}
-
-            {device.lastPunchAt && (
-              <div className="min-w-0 text-right">
-                <p className="truncate text-[10px] text-gray-400">
-                  Last punch
-                </p>
-                <p className="mt-1 truncate text-xs font-medium text-gray-700">
-                  {device.lastPunchName ||
-                    `PIN ${device.lastPunchPin ?? "—"}`}
-                </p>
-                <p className="mt-0.5 text-[10px] text-gray-400">
-                  {formatRelativeTime(device.lastPunchAt)}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Footer */}
       {compact && (
         <Link
           href="/attendance/devices"
-          className="flex items-center justify-between border-t border-gray-100 px-5 py-3 text-xs font-semibold text-brand-600 transition-colors hover:bg-brand-50/50"
+          className="flex items-center justify-between border-t border-gray-100 px-5 py-3 text-xs font-bold text-brand-600 transition-colors hover:bg-brand-50/50"
         >
-          <span>Open terminal</span>
-          <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          <span>Open ZKTeco terminal</span>
+          <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
         </Link>
       )}
     </div>
   );
 }
 
-export function LiveTerminalActions({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex shrink-0 flex-col items-end gap-1">
-      {children}
-    </div>
-  );
+export function LiveTerminalActions({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-wrap items-center gap-2">{children}</div>;
 }
 
 export function ConnectButton({
@@ -404,13 +277,13 @@ export function ConnectButton({
   disabled?: boolean;
 }) {
   return (
-    <Button
-      size="sm"
-      variant="secondary"
+    <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
+      className="px-3 py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-xl transition-colors border border-brand-200/80 disabled:opacity-50"
     >
-      Connect
-    </Button>
+      Connect / Edit
+    </button>
   );
 }

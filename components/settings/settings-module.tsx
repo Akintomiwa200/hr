@@ -58,6 +58,12 @@ const NOTIFICATION_KEYS = [
     desc: "Notifications for review cycles",
     helpHref: "/help/performance",
   },
+  {
+    key: "checklist",
+    label: "Checklist task updates",
+    desc: "Get notified when tasks are assigned, updated, or completed",
+    helpHref: "/help/checklist",
+  },
 ] as const;
 
 const quickHelpLinks = [

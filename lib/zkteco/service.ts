@@ -221,7 +221,13 @@ async function touchDevice(device: ZkDeviceContext, extra?: { attStamp?: string;
   }
 }
 
-export async function heartbeatBySerial(serialNumber: string, _peerIp?: string | null) {
+export async function touchDeviceById(deviceId: string) {
+  const device = await loadDeviceById(deviceId);
+  if (!device) return;
+  await touchDevice(device);
+}
+
+export async function heartbeatBySerial(serialNumber: string, peerIp?: string | null) {
   const sn = normalizeSerial(serialNumber);
   if (!sn) return;
   let device = await loadDeviceBySn(sn);
@@ -229,6 +235,12 @@ export async function heartbeatBySerial(serialNumber: string, _peerIp?: string |
     device = await ensureDeviceAutoRegistered(sn);
   }
   if (!device?.isActive) return;
+  if (peerIp) {
+    const ip = parsePeerIpv4(peerIp);
+    if (ip) {
+      await rememberDevicePeerIp(device.id, ip).catch(() => undefined);
+    }
+  }
   const attStamp = sanitizeZkStamp(device.attStamp);
   const opStamp = sanitizeZkStamp(device.opStamp);
   if (attStamp !== (device.attStamp || "0") || opStamp !== (device.opStamp || "0")) {
@@ -566,6 +578,13 @@ export async function ingestAttLog(
   }
 
   await touchDevice(device);
+
+  if (peerIp) {
+    const ip = parsePeerIpv4(peerIp);
+    if (ip) {
+      await rememberDevicePeerIp(device.id, ip).catch(() => undefined);
+    }
+  }
 
   let processed = 0;
   for (const row of rows) {

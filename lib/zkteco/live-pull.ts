@@ -8,7 +8,7 @@ import { loadDeviceEndpoints } from "@/lib/zkteco/device-endpoint-store";
 
 import { pullAttendanceLogs } from "@/lib/zkteco/pull";
 
-import { ingestPullAttendance } from "@/lib/zkteco/service";
+import { ingestPullAttendance, touchDeviceById } from "@/lib/zkteco/service";
 
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
@@ -198,7 +198,9 @@ function downloadInChild(ip: string, port: number) {
 
 async function importPunches(deviceId: string, punches: Pulled[]) {
 
-  if (punches.length === 0) return false;
+  await touchDeviceById(deviceId);
+
+  if (punches.length === 0) return true;
 
   await ingestPullAttendance(deviceId, punches);
 

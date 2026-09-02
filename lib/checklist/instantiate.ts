@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { createNotification } from "@/lib/notifications";
 import { parseDocumentNames } from "@/lib/checklist/documents";
 import {
   fetchTemplateTaskRequiredDocumentsMap,
@@ -71,6 +72,9 @@ export async function createChecklistFromTemplate(opts: {
     },
   });
 
+  const notifiedEmployeeIds = new Set<string>();
+  const createdTaskRows: Array<{ id: string; title: string; assigneeId: string | null }> = [];
+
   for (const task of template.tasks) {
     let assigneeId: string | null = null;
     if (task.assigneeType === "EMPLOYEE") assigneeId = employee.id;
@@ -109,6 +113,32 @@ export async function createChecklistFromTemplate(opts: {
     });
     if (requiredDocuments.length) {
       await setTaskRequiredDocumentsById(createdTask.id, requiredDocuments, "DOCUMENT");
+    }
+    createdTaskRows.push({
+      id: createdTask.id,
+      title: createdTask.title,
+      assigneeId,
+    });
+    if (assigneeId) notifiedEmployeeIds.add(assigneeId);
+  }
+
+  if (notifiedEmployeeIds.size > 0) {
+    const assignees = await prisma.employee.findMany({
+      where: { id: { in: [...notifiedEmployeeIds] } },
+      select: { id: true, userId: true },
+    });
+    const userIdByEmployee = new Map(assignees.map((a) => [a.id, a.userId]));
+    for (const row of createdTaskRows) {
+      if (!row.assigneeId) continue;
+      const userId = userIdByEmployee.get(row.assigneeId);
+      if (!userId) continue;
+      await createNotification({
+        userId,
+        type: "checklist",
+        title: `New task assigned to you: ${row.title}`,
+        message: `You've been assigned "${row.title}" on ${employee.firstName} ${employee.lastName}'s ${opts.type.toLowerCase()} checklist.`,
+        href: "/checklist/todos",
+      });
     }
   }
 

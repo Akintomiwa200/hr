@@ -7,6 +7,7 @@ import {
   CalendarOff,
   ChevronsUpDown,
   CircleHelp,
+  ClipboardList,
   LogOut,
   Megaphone,
   Medal,
@@ -35,6 +36,7 @@ const notificationIcons: Record<NavNotification["type"], typeof Bell> = {
   performance: Medal,
   subscription: Bell,
   integration: Bell,
+  checklist: ClipboardList,
   general: Bell,
 };
 

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getCompanyScope, deviceCompanyWhere } from "@/lib/company-scope";
 import { DEFAULT_ZK_PORT, parseHostAndPort } from "@/lib/zkteco/device-ip";
 import { pullAttendanceLogs } from "@/lib/zkteco/pull";
-import { ingestPullAttendance } from "@/lib/zkteco/service";
+import { ingestPullAttendance, touchDeviceById } from "@/lib/zkteco/service";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { loadDeviceEndpoint, saveDeviceEndpoint } from "@/lib/zkteco/device-endpoint-store";
 
@@ -55,6 +55,7 @@ export async function POST(
 
   try {
     const pulled = await pullAttendanceLogs({ ip: endpoint.ip, port: endpoint.port });
+    await touchDeviceById(id);
     const ingested = await ingestPullAttendance(id, pulled.punches);
 
     broadcastAppEvent("attendance_updated", { id, action: "device_synced" });

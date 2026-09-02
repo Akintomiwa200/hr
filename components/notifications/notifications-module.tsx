@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
   CalendarOff,
+  ClipboardList,
   Megaphone,
   Medal,
   Wallet,
@@ -21,6 +22,7 @@ const icons: Record<string, typeof Bell> = {
   performance: Medal,
   subscription: Bell,
   integration: Bell,
+  checklist: ClipboardList,
   general: Bell,
 };
 

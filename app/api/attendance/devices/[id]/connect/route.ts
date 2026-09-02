@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getCompanyScope, deviceCompanyWhere } from "@/lib/company-scope";
 import { DEFAULT_ZK_PORT, parseHostAndPort } from "@/lib/zkteco/device-ip";
 import { probeDevicePort } from "@/lib/zkteco/probe";
-import { queueRealtimePushCommands } from "@/lib/zkteco/service";
+import { queueRealtimePushCommands, touchDeviceById } from "@/lib/zkteco/service";
 import { saveDeviceEndpoint } from "@/lib/zkteco/device-endpoint-store";
 import { getReachableOriginFromRequest } from "@/lib/app-url-server";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
@@ -98,12 +98,6 @@ export async function POST(
 
   const alreadyLive = isDeviceOnline(existing.lastSeenAt);
 
-  // NON-BLOCKING: save settings and respond immediately so the UI never waits
-  // on a port probe. ZKTeco PUSH mode has the device dial OUT to /iclock, so
-  // reaching port 4370 from the server is optional — online status is driven
-  // entirely by the device's own heartbeat. The probe runs in the background
-  // only to opportunistically trigger a history pull when the server can reach
-  // the terminal directly (PULL mode).
   void (async () => {
     try {
       const probe = await Promise.race([
@@ -114,6 +108,7 @@ export async function POST(
       ]);
       const reachedDevice = probe === "open";
       if (reachedDevice) {
+        await touchDeviceById(id);
         scheduleDevicePull(id, true);
       }
       broadcastAppEvent("attendance_updated", {

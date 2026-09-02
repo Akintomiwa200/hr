@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageChecklists } from "@/lib/checklist/access";
+import { createNotification } from "@/lib/notifications";
 import {
   canAccessChecklistTask,
   canCompleteChecklistTask,
@@ -117,6 +118,26 @@ export async function PATCH(
     revalidatePath("/checklist/todos");
     revalidatePath("/checklist/onboarding");
     revalidatePath("/checklist/offboarding");
+
+    const taskEmployee = task.instance.employee;
+    const taskAssignee = task.assignee;
+    const notifyIds = new Set<string>();
+    if (taskEmployee.userId && taskEmployee.userId !== session.id) {
+      notifyIds.add(taskEmployee.userId);
+    }
+    if (taskAssignee?.userId && taskAssignee.userId !== session.id) {
+      notifyIds.add(taskAssignee.userId);
+    }
+    for (const userId of notifyIds) {
+      await createNotification({
+        userId,
+        type: "checklist",
+        title: `Task completed: ${task.title}`,
+        message: `"${task.title}" was marked complete on ${task.instance.employee.firstName} ${task.instance.employee.lastName}'s ${task.instance.type.toLowerCase()} checklist.`,
+        href: "/checklist/todos",
+      });
+    }
+
     return NextResponse.json(await serializeTask(task));
   }
 
@@ -130,6 +151,15 @@ export async function PATCH(
       },
       include: taskInclude,
     });
+    if (task.assignee?.userId) {
+      await createNotification({
+        userId: task.assignee.userId,
+        type: "checklist",
+        title: `New task assigned to you: ${task.title}`,
+        message: `You've been assigned "${task.title}" for ${task.instance.employee.firstName} ${task.instance.employee.lastName}'s ${task.instance.type.toLowerCase()} checklist.`,
+        href: "/checklist/todos",
+      });
+    }
     broadcastAppEvent("checklist_updated", { id, action: "task_assigned" });
     revalidatePath("/checklist/todos");
     return NextResponse.json(await serializeTask(task));

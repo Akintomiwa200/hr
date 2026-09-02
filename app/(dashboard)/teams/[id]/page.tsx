@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getOrgChartData, getDepartmentOrgTree } from "@/lib/org-chart-data";
 import { getTeamDetailData } from "@/lib/teams-data";
 import { getCompanyScope } from "@/lib/company-scope";
+import { canManageEmployees } from "@/lib/roles";
 import { DepartmentDetailModule } from "@/components/departments/department-detail-module";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
@@ -62,6 +63,7 @@ export default async function TeamDetailPage({
         orgChartHref="/departments"
         hierarchyTitle="Team hierarchy"
         isMyTeam={isMyTeam}
+        canManage={canManageEmployees(session.role)}
       />
     </div>
   );

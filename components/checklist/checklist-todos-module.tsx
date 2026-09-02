@@ -46,9 +46,9 @@ const PRIORITY_VARIANT: Record<string, "neutral" | "info" | "warning" | "error">
 };
 
 const COLUMNS = [
-  { key: "PENDING", label: "To Do", color: "border-gray-200 bg-gray-50/50" },
-  { key: "IN_PROGRESS", label: "In Progress", color: "border-blue-200 bg-blue-50/30" },
-  { key: "COMPLETED", label: "Done", color: "border-emerald-200 bg-emerald-50/30" },
+  { key: "PENDING", label: "To Do", color: "border-gray-200 bg-gradient-to-b from-gray-50/60 to-white" },
+  { key: "IN_PROGRESS", label: "In Progress", color: "border-blue-200 bg-gradient-to-b from-blue-50/40 to-white" },
+  { key: "COMPLETED", label: "Done", color: "border-emerald-200 bg-gradient-to-b from-emerald-50/40 to-white" },
 ] as const;
 
 export function ChecklistTodosModule({
@@ -290,7 +290,10 @@ export function ChecklistTodosModule({
           {COLUMNS.map((col) => {
             const colTasks = tasks.filter((t) => t.status === col.key);
             return (
-              <div key={col.key} className={`rounded-xl border p-3 min-h-[320px] ${col.color}`}>
+              <div
+                key={col.key}
+                className={`rounded-2xl border p-3 min-h-[320px] shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${col.color}`}
+              >
                 <div className="flex items-center justify-between mb-3 px-1">
                   <h3 className="text-sm font-semibold text-gray-700">{col.label}</h3>
                   <span className="text-xs text-gray-400 bg-white/80 px-2 py-0.5 rounded-full">
@@ -307,7 +310,7 @@ export function ChecklistTodosModule({
           })}
         </div>
       ) : (
-        <Card className="overflow-hidden p-0">
+        <Card className="rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden p-0">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/80 text-left text-xs uppercase text-gray-400">
@@ -507,7 +510,7 @@ function TaskCard({ task, onOpen }: { task: TodoTask; onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="w-full text-left bg-white rounded-lg border border-gray-200 p-3 shadow-sm hover:border-violet-300 hover:shadow transition-all"
+      className="w-full text-left bg-white rounded-xl border border-gray-200 p-3 shadow-sm hover:border-violet-300 hover:shadow-md transition-all"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="font-medium text-sm text-gray-900 line-clamp-2">{task.title}</span>

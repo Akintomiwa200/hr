@@ -5,11 +5,15 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Building2,
+  Check,
+  Copy,
   Fingerprint,
   MapPin,
   Plus,
   RefreshCw,
+  Terminal,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { Button, Skeleton } from "@/components/ui";
 import { Sheet } from "@/components/ui/sheet";
@@ -118,6 +122,7 @@ export function DeviceIntegrationHub() {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [pullingId, setPullingId] = useState<string | null>(null);
   const [connectNote, setConnectNote] = useState<string | null>(null);
+  const [copiedSheetAdms, setCopiedSheetAdms] = useState(false);
   const connectAbortRef = useRef<AbortController | null>(null);
 
   const loadDocsAbortRef = useRef<AbortController | null>(null);
@@ -450,6 +455,7 @@ export function DeviceIntegrationHub() {
       <LiveTerminalCard
         key={device.id}
         admsUrl={admsUrl}
+        onClick={() => openConnect(live)}
         device={{
           id: live.id,
           name: live.name,
@@ -463,37 +469,51 @@ export function DeviceIntegrationHub() {
           lastPunchPin: live.lastPunchPin,
         }}
         actions={
-          <div className="flex flex-col gap-1 shrink-0 items-end">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => openConnect(live)}
+              onClick={(e) => {
+                e.stopPropagation();
+                openConnect(live);
+              }}
               disabled={!live.isActive}
+              className="rounded-xl text-xs font-semibold px-3"
             >
-              Connect
+              Connect / Edit
             </Button>
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => void syncDeviceLogs(live)}
+              onClick={(e) => {
+                e.stopPropagation();
+                void syncDeviceLogs(live);
+              }}
               disabled={!live.isActive || pullingId === live.id}
               loading={pullingId === live.id}
+              className="rounded-xl text-xs font-semibold px-3"
             >
               Sync logs
             </Button>
             <button
               type="button"
-              onClick={() => toggleDevice(live)}
-              className="text-[11px] text-brand-600 hover:underline"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleDevice(live);
+              }}
+              className="px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 rounded-xl hover:bg-gray-100 transition-colors border border-gray-200/60"
             >
               {live.isActive ? "Disable" : "Enable"}
             </button>
             <button
               type="button"
-              onClick={() => removeDevice(live)}
-              className="text-[11px] text-red-500 hover:underline inline-flex items-center gap-0.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeDevice(live);
+              }}
+              className="px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:text-red-700 rounded-xl hover:bg-red-50 transition-colors border border-red-100 inline-flex items-center gap-1"
             >
-              <Trash2 className="w-3 h-3" />
+              <Trash2 className="w-3.5 h-3.5" />
               Delete
             </button>
           </div>
@@ -893,131 +913,172 @@ export function DeviceIntegrationHub() {
           if (syncingId) return;
           setConnectDevice(null);
         }}
-        title="Edit device"
-        description="Device IP is the hardware address. Transfer mode is real-time PUSH."
-        width="md"
+        title={connectDevice ? `Device Details: ${connectDevice.name}` : "Edit device"}
+        description="Edit terminal properties, hardware IP, and view real-time ADMS PUSH configuration."
+        width="lg"
       >
-        <div className="p-6 space-y-4">
-          <label className="block space-y-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-              Device name
-            </span>
-            <input
-              className={inputClass}
-              value={sheetName}
-              onChange={(e) => setSheetName(e.target.value)}
-              disabled={Boolean(syncingId)}
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-              Serial number
-            </span>
-            <input
-              className={inputClass}
-              value={sheetSn}
-              onChange={(e) => setSheetSn(e.target.value)}
-              disabled={Boolean(syncingId)}
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-              Area / branch
-            </span>
-            <select
-              className={inputClass}
-              value={sheetBranchId}
-              onChange={(e) => setSheetBranchId(e.target.value)}
-              disabled={Boolean(syncingId)}
-            >
-              <option value="">Select branch</option>
-              {docs.branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name} — {branch.location}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="grid grid-cols-3 gap-3">
-            <label className="block space-y-1.5 col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Device IP
-              </span>
-              <input
-                className={inputClass}
-                placeholder="102.88.54.109"
-                value={sheetIp}
-                onChange={(e) => setSheetIp(e.target.value)}
-                inputMode="decimal"
-                autoComplete="off"
-                disabled={Boolean(syncingId)}
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Port
-              </span>
-              <input
-                className={inputClass}
-                placeholder={String(DEFAULT_ZK_PORT)}
-                value={sheetPort}
-                onChange={(e) => setSheetPort(e.target.value)}
-                inputMode="numeric"
-                autoComplete="off"
-                disabled={Boolean(syncingId)}
-              />
-            </label>
-          </div>
-          <div className="rounded-xl border border-gray-100 px-3 py-2.5 text-sm text-gray-600">
-            Device type <span className="font-medium text-gray-900">PUSH</span>
-            <span className="text-gray-300 mx-2">·</span>
-            Transfer mode <span className="font-medium text-gray-900">Real-time</span>
-            <span className="text-gray-300 mx-2">·</span>
-            Interval <span className="font-medium text-gray-900">1</span>
-            <span className="text-gray-300 mx-2">·</span>
-            Transfer time <span className="font-medium text-gray-900">00:00;14:05</span>
-          </div>
-          {connectDevice?.lastSeenAt && (
-            <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-700">
-              {isDeviceLive(connectDevice.lastSeenAt) ? (
-                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full font-medium bg-emerald-50 text-emerald-700">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Live now
-                </span>
-              ) : connectDevice.online ? (
-                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full font-medium bg-emerald-50 text-emerald-700">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Connected
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full font-medium bg-gray-100 text-gray-500">
-                  <span className="w-2 h-2 rounded-full bg-gray-400" />
-                  Offline
-                </span>
-              )}
-              <span>
-                Last seen {new Date(connectDevice.lastSeenAt).toLocaleString()}
-              </span>
+        <div className="p-6 space-y-5">
+          {/* Header Status Banner */}
+          {connectDevice && (
+            <div className="rounded-2xl border border-gray-100 bg-slate-50/80 p-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-bold text-gray-900">{sheetName || connectDevice.name}</h4>
+                <p className="text-xs text-gray-500 font-mono mt-0.5">SN: {sheetSn || "—"}</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {isDeviceLive(connectDevice.lastSeenAt) ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 border border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Live now
+                  </span>
+                ) : connectDevice.online ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    Connected
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    Awaiting Connection
+                  </span>
+                )}
+                {connectDevice.lastSeenAt && (
+                  <span className="text-xs text-gray-500">
+                    Last seen {new Date(connectDevice.lastSeenAt).toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
             </div>
           )}
+
+          {/* Form Fields Section */}
+          <div className="space-y-3.5">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+              Terminal Settings
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="block space-y-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Device name *
+                </span>
+                <input
+                  className={inputClass}
+                  value={sheetName}
+                  onChange={(e) => setSheetName(e.target.value)}
+                  disabled={Boolean(syncingId)}
+                  placeholder="e.g. Lagos HQ Main Entrance"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Serial number (SN) *
+                </span>
+                <input
+                  className={cn(inputClass, "font-mono")}
+                  value={sheetSn}
+                  onChange={(e) => setSheetSn(e.target.value)}
+                  disabled={Boolean(syncingId)}
+                  placeholder="GED7251500360"
+                />
+              </label>
+            </div>
+
+            <label className="block space-y-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Area / Branch *
+              </span>
+              <select
+                className={inputClass}
+                value={sheetBranchId}
+                onChange={(e) => setSheetBranchId(e.target.value)}
+                disabled={Boolean(syncingId)}
+              >
+                <option value="">Select branch</option>
+                {docs?.branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name} — {branch.location}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="grid grid-cols-3 gap-3">
+              <label className="block space-y-1.5 col-span-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Device IP Address
+                </span>
+                <input
+                  className={cn(inputClass, "font-mono")}
+                  placeholder="102.88.54.109"
+                  value={sheetIp}
+                  onChange={(e) => setSheetIp(e.target.value)}
+                  inputMode="decimal"
+                  autoComplete="off"
+                  disabled={Boolean(syncingId)}
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Port
+                </span>
+                <input
+                  className={cn(inputClass, "font-mono")}
+                  placeholder={String(DEFAULT_ZK_PORT)}
+                  value={sheetPort}
+                  onChange={(e) => setSheetPort(e.target.value)}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  disabled={Boolean(syncingId)}
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* Direct Local IP Connection Setup Box (Method 1 Only) */}
+          <div className="rounded-2xl bg-slate-950 text-slate-100 p-5 border border-slate-800 space-y-3.5 shadow-xl">
+            <div className="flex items-center gap-2 pb-2.5 border-b border-slate-800">
+              <Zap className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-xs font-extrabold tracking-wider uppercase text-emerald-400">
+                Direct Local IP Setup Guide (Port 4370)
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Connect your ZKTeco biometric machine directly over your office local network (Wi-Fi or Ethernet):
+            </p>
+
+            <ol className="list-decimal list-inside text-xs text-slate-300 space-y-2 pl-1">
+              <li>On your hardware device, go to <code className="text-amber-300 bg-slate-900 px-1.5 py-0.5 rounded font-mono">Menu → COMM. → Ethernet</code> (or <code className="text-amber-300 bg-slate-900 px-1.5 py-0.5 rounded font-mono">Wi-Fi</code>) to view its local IP address (e.g. <code>10.1.1.135</code>).</li>
+              <li>Enter the IP address in the <strong>Device IP Address</strong> field above (default port is <code className="text-emerald-400 font-mono">4370</code>).</li>
+              <li>Click <strong>Save & Connect</strong> or <strong>Sync logs</strong>. Smart HR connects to the terminal, pulls attendance logs, and sets the status to <strong>Online</strong>.</li>
+            </ol>
+
+            <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2 text-[11px] text-slate-400">
+              <RefreshCw className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Smart HR automatically polls this IP in the background for real-time punches.</span>
+            </div>
+          </div>
+
           {connectNote && (
             <p
               className={cn(
-                "text-xs rounded-xl px-3 py-2 border",
+                "text-xs rounded-xl p-3 border font-medium",
                 connectNote.toLowerCase().includes("fail") ||
                   connectNote.toLowerCase().includes("timed out") ||
                   connectNote.toLowerCase().includes("no reply") ||
                   connectNote.toLowerCase().includes("cannot reach") ||
                   connectNote.toLowerCase().includes("refused")
-                  ? "text-amber-900 bg-amber-50 border-amber-100"
-                  : "text-emerald-800 bg-emerald-50 border-emerald-100"
+                  ? "text-amber-900 bg-amber-50 border-amber-200"
+                  : "text-emerald-800 bg-emerald-50 border-emerald-200"
               )}
             >
               {connectNote}
             </p>
           )}
         </div>
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2 bg-gray-50/50">
           <Button
             variant="secondary"
             onClick={() => {
@@ -1032,8 +1093,9 @@ export function DeviceIntegrationHub() {
             onClick={() => void connectRealtime()}
             loading={Boolean(syncingId)}
             disabled={!connectDevice?.isActive || Boolean(syncingId)}
+            className="rounded-xl px-5"
           >
-            {syncingId ? "Checking device…" : "Confirm"}
+            {syncingId ? "Checking device…" : "Save & Connect"}
           </Button>
         </div>
       </Sheet>

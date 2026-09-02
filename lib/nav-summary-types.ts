@@ -1,6 +1,6 @@
 export type NavNotification = {
   id: string;
-  type: "leave" | "announcement" | "payroll" | "attendance" | "performance" | "subscription" | "integration" | "general";
+  type: "leave" | "announcement" | "payroll" | "attendance" | "performance" | "subscription" | "integration" | "checklist" | "general";
   title: string;
   message: string;
   href: string;

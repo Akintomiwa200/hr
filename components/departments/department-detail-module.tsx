@@ -1,25 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Briefcase,
   Building2,
+  Check,
   GitBranch,
   MapPin,
   Medal,
   Network,
   Search,
   Target,
+  UserPlus,
   Users,
   X,
 } from "lucide-react";
-import { Avatar, EmptyState, StatCard, statusBadge } from "@/components/ui";
+import { Avatar, Button, EmptyState, StatCard, statusBadge } from "@/components/ui";
+import { Dialog } from "@/components/ui/dialog";
 import { OrgChartLegend, OrgChartTree } from "@/components/departments/org-chart-tree";
 import { useAutoHideScrollbar } from "@/hooks/use-auto-hide-scrollbar";
 import type { OrgChartNode } from "@/lib/org-chart-data";
 import { LINE_MANAGER_ROLES } from "@/lib/roles";
+import { notify, readApiError } from "@/lib/toast";
 import { cn, fullName } from "@/lib/utils";
 
 type Member = {
@@ -70,6 +75,7 @@ export function DepartmentDetailModule({
   orgChartHref,
   hierarchyTitle = "Department hierarchy",
   isMyTeam = false,
+  canManage = false,
 }: {
   departmentId: string;
   name: string;
@@ -84,11 +90,125 @@ export function DepartmentDetailModule({
   orgChartHref?: string;
   hierarchyTitle?: string;
   isMyTeam?: boolean;
+  canManage?: boolean;
 }) {
+  const router = useRouter();
   const [memberSearch, setMemberSearch] = useState("");
   const [jobSearch, setJobSearch] = useState("");
   const membersScroll = useAutoHideScrollbar();
   const jobsScroll = useAutoHideScrollbar();
+
+  const memberIds = useMemo(() => new Set(members.map((m) => m.id)), [members]);
+
+  // Assign members dialog state
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [candidates, setCandidates] = useState<
+    Array<{ id: string; firstName: string; lastName: string; jobTitle: string; departmentName: string | null; avatar: string | null }>
+  >([]);
+  const [candidateSearch, setCandidateSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+
+  const loadCandidates = useCallback(async () => {
+    setLoadingCandidates(true);
+    try {
+      const res = await fetch("/api/employees");
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Could not load employees"));
+        return;
+      }
+      const list = (await res.json()) as Array<{
+        id: string;
+        firstName: string;
+        lastName: string;
+        jobTitle: string;
+        department?: { id: string; name: string } | null;
+        avatar: string | null;
+      }>;
+      setCandidates(
+        list
+          .filter((emp) => !memberIds.has(emp.id))
+          .map((emp) => ({
+            id: emp.id,
+            firstName: emp.firstName,
+            lastName: emp.lastName,
+            jobTitle: emp.jobTitle,
+            departmentName: emp.department?.name ?? null,
+            avatar: emp.avatar,
+          }))
+      );
+    } catch {
+      notify.error("Could not load employees");
+    } finally {
+      setLoadingCandidates(false);
+    }
+  }, [memberIds]);
+
+  const openAssign = () => {
+    setMemberSearch("");
+    setCandidates([]);
+    setSelected(new Set());
+    setAssignOpen(true);
+    void loadCandidates();
+  };
+
+  const filteredCandidates = useMemo(() => {
+    const q = candidateSearch.trim().toLowerCase();
+    if (!q) return candidates;
+    return candidates.filter(
+      (c) =>
+        fullName(c.firstName, c.lastName).toLowerCase().includes(q) ||
+        c.jobTitle.toLowerCase().includes(q) ||
+        (c.departmentName ?? "").toLowerCase().includes(q)
+    );
+  }, [candidates, candidateSearch]);
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const closeAssign = () => {
+    setAssignOpen(false);
+    setCandidates([]);
+    setCandidateSearch("");
+    setSelected(new Set());
+  };
+
+  const assignMembers = async () => {
+    if (selected.size === 0) return;
+    setAssigning(true);
+    try {
+      const res = await fetch("/api/employees/bulk", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: [...selected],
+          action: "set_department",
+          departmentId,
+        }),
+      });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Could not assign members"));
+        return;
+      }
+      notify.success(
+        `${selected.size} ${selected.size === 1 ? "member" : "members"} added to ${name}`,
+        "The team updates in real time."
+      );
+      closeAssign();
+      router.refresh();
+    } catch {
+      notify.error("Could not assign members");
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   const managerCount = useMemo(
     () => members.filter((m) => LINE_MANAGER_ROLES.includes(m.role as (typeof LINE_MANAGER_ROLES)[number])).length,
@@ -213,7 +333,14 @@ export function DepartmentDetailModule({
               </h2>
               <p className="text-xs text-gray-500 mt-0.5">{members.length} people in this department</p>
             </div>
-            <div className="relative">
+            <div className="flex items-center gap-2">
+              {canManage && (
+                <Button size="sm" variant="secondary" onClick={openAssign}>
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Add people
+                </Button>
+              )}
+              <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <input
                 value={memberSearch}
@@ -231,6 +358,7 @@ export function DepartmentDetailModule({
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
+              </div>
             </div>
           </div>
 
@@ -413,6 +541,115 @@ export function DepartmentDetailModule({
           )}
         </div>
       </div>
+
+      <Dialog
+        open={assignOpen}
+        onClose={closeAssign}
+        title={`Add people to ${name}`}
+        description="Select employees to move into this department. Changes sync in real time."
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={candidateSearch}
+              onChange={(e) => setCandidateSearch(e.target.value)}
+              placeholder="Search employees by name, title, or department..."
+              className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25 focus:border-brand-500"
+            />
+            {candidateSearch && (
+              <button
+                type="button"
+                onClick={() => setCandidateSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                aria-label="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {loadingCandidates ? (
+            <EmptyState
+              icon={Users}
+              title="Loading employees"
+              description="Fetching the company roster..."
+            />
+          ) : candidates.length === 0 ? (
+            <EmptyState
+              icon={UserPlus}
+              title="No one to add"
+              description="Every employee is already in this department."
+            />
+          ) : filteredCandidates.length === 0 ? (
+            <EmptyState icon={Search} title="No matches" description="Try a different search." />
+          ) : (
+            <>
+              <ul className="divide-y divide-gray-100 rounded-xl border border-gray-100">
+                {filteredCandidates.map((c) => {
+                  const isSelected = selected.has(c.id);
+                  return (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleSelected(c.id)}
+                        className={cn(
+                          "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+                          isSelected ? "bg-brand-50/60" : "hover:bg-gray-50"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border",
+                            isSelected
+                              ? "border-brand-500 bg-brand-500 text-white"
+                              : "border-gray-300 bg-white"
+                          )}
+                        >
+                          {isSelected && <Check className="w-3.5 h-3.5" />}
+                        </span>
+                        <Avatar
+                          firstName={c.firstName}
+                          lastName={c.lastName}
+                          src={c.avatar}
+                          size="sm"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-gray-900">
+                            {fullName(c.firstName, c.lastName)}
+                          </p>
+                          <p className="truncate text-xs text-gray-500">
+                            {c.jobTitle}
+                            {c.departmentName ? ` · ${c.departmentName}` : ""}
+                          </p>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="text-xs text-gray-500">
+                {selected.size} selected
+              </p>
+            </>
+          )}
+
+          <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
+            <Button variant="secondary" onClick={closeAssign} disabled={assigning}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void assignMembers()}
+              disabled={selected.size === 0 || candidates.length === 0}
+              loading={assigning}
+            >
+              <UserPlus className="w-4 h-4" />
+              Add {selected.size > 0 ? `${selected.size} ` : ""}to {name}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

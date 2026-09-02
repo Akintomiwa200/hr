@@ -7,6 +7,7 @@ import {
   departmentCompanyWhere,
   employeeCompanyWhere,
 } from "@/lib/company-scope";
+import { canManageEmployees } from "@/lib/roles";
 import { DepartmentDetailModule } from "@/components/departments/department-detail-module";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
@@ -99,6 +100,7 @@ export default async function DepartmentDetailPage({
           targetValue: kpi.targetValue,
           scopedToDepartment: kpi.departmentId === id,
         }))}
+        canManage={canManageEmployees(session.role)}
       />
     </div>
   );

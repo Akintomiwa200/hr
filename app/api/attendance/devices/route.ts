@@ -6,9 +6,11 @@ import { randomBytes } from "crypto";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { getCompanyScope, deviceCompanyWhere, requireOrgCompanyId } from "@/lib/company-scope";
 import { isDeviceOnline } from "@/lib/attendance-device-spec";
-import { replayUnprocessedPunches } from "@/lib/zkteco/service";
+import { replayUnprocessedPunches, touchDeviceById } from "@/lib/zkteco/service";
 import { parseHostAndPort, parseOptionalDeviceEndpoint } from "@/lib/zkteco/device-ip";
 import { loadDeviceEndpoints, saveDeviceEndpoint, withDeviceEndpoint } from "@/lib/zkteco/device-endpoint-store";
+import { probeDevicePort } from "@/lib/zkteco/probe";
+import { scheduleDevicePull } from "@/lib/zkteco/live-pull";
 
 function generateDeviceApiKey() {
   return `dev_${randomBytes(24).toString("hex")}`;
@@ -137,6 +139,23 @@ export async function POST(request: Request) {
 
   await saveDeviceEndpoint(device.id, endpoint.ip, endpoint.port);
   await replayUnprocessedPunches(serialNumber);
+
+  if (endpoint.ip) {
+    const ip = endpoint.ip;
+    const port = endpoint.port;
+    void (async () => {
+      try {
+        const probe = await probeDevicePort(ip, port, 4_000);
+        if (probe === "open") {
+          await touchDeviceById(device.id);
+          scheduleDevicePull(device.id, true);
+        }
+      } catch {
+        // Ignore probe errors
+      }
+    })();
+  }
+
   broadcastAppEvent("attendance_updated", { id: device.id, action: "device_created" });
 
   return NextResponse.json({
