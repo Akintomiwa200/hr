@@ -198,6 +198,7 @@ export async function getCalendarData(session: {
       avatar: e.avatar,
       jobTitle: e.jobTitle,
       employeeCode: e.employeeCode,
+      dateOfBirth: e.dateOfBirth?.toISOString() ?? null,
     })),
   };
 }

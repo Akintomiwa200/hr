@@ -41,9 +41,13 @@ const notificationIcons: Record<NavNotification["type"], typeof Bell> = {
 };
 
 function NotificationsMenu() {
-  const { summary } = useNavSummary();
+  const { summary, refresh } = useNavSummary();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  function markRead(id: string) {
+    void fetch(`/api/notifications/${id}`, { method: "PATCH" }).then(() => refresh());
+  }
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -74,14 +78,41 @@ function NotificationsMenu() {
       {open && (
         <div className="absolute right-0 top-full mt-2 w-[320px] sm:w-[360px] bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <p className="text-[13px] font-semibold text-gray-900">Notifications</p>
-            <Link
-              href="/notifications"
-              className="text-[11px] font-medium text-brand-600 hover:underline"
-              onClick={() => setOpen(false)}
-            >
-              View all
-            </Link>
+            <p className="text-[13px] font-semibold text-gray-900">
+              Notifications
+              {summary.notificationCount > 0 && (
+                <span className="ml-2 text-[10px] font-bold text-brand-600">
+                  {summary.notificationCount} unread
+                </span>
+              )}
+            </p>
+            <div className="flex items-center gap-3">
+              {summary.notificationCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void fetch("/api/notifications", {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ all: true }),
+                    }).finally(() => {
+                      void refresh();
+                      setOpen(false);
+                    });
+                  }}
+                  className="text-[11px] font-medium text-brand-600 hover:text-brand-700 hover:underline"
+                >
+                  Mark all as read
+                </button>
+              )}
+              <Link
+                href="/notifications"
+                className="text-[11px] font-medium text-gray-500 hover:text-brand-600 hover:underline"
+                onClick={() => setOpen(false)}
+              >
+                View all
+              </Link>
+            </div>
           </div>
           <div className="max-h-[360px] overflow-y-auto">
             {summary.notifications.length > 0 ? (
@@ -90,6 +121,7 @@ function NotificationsMenu() {
                   key={item.id}
                   item={item}
                   onNavigate={() => setOpen(false)}
+                  onRead={markRead}
                 />
               ))
             ) : (
@@ -107,23 +139,36 @@ function NotificationsMenu() {
 function NotificationRow({
   item,
   onNavigate,
+  onRead,
 }: {
   item: NavNotification;
   onNavigate: () => void;
+  onRead: (id: string) => void;
 }) {
   const Icon = notificationIcons[item.type] ?? Bell;
+  const unread = item.persistent ? !item.readAt : true;
 
   return (
     <Link
       href={item.href}
-      onClick={onNavigate}
-      className="flex gap-3 px-4 py-3 hover:bg-gray-50 border-b border-gray-50 last:border-0"
+      onClick={() => {
+        if (item.persistent && !item.readAt) onRead(item.id);
+        onNavigate();
+      }}
+      className={`flex gap-3 px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 ${
+        unread ? "bg-brand-50/30" : ""
+      }`}
     >
       <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
         <Icon className="w-4 h-4 text-brand-600" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[12px] font-semibold text-gray-900 truncate">{item.title}</p>
+        <p className="text-[12px] font-semibold text-gray-900 truncate">
+          <span className="flex items-center gap-1.5">
+            {unread && <span className="w-1.5 h-1.5 rounded-full bg-brand-500 shrink-0" />}
+            <span className="truncate">{item.title}</span>
+          </span>
+        </p>
         <p className="text-[11px] text-gray-500 line-clamp-2 mt-0.5">{item.message}</p>
         <p className="text-[10px] text-gray-400 mt-1">
           {formatRelativeTime(item.createdAt)}

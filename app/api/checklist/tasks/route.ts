@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const scope = getCompanyScope(session);
 
   const statusFilter =
-    status === "ALL"
+    status === "ALL" || status === "BOARD"
       ? {}
       : status === "ACTIVE" || status === "IN_PROGRESS"
         ? { status: { in: ["PENDING", "IN_PROGRESS"] } }

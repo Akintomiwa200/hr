@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Briefcase,
+  Cake,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -40,7 +41,10 @@ const inputClass =
   "w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500";
 
 function dateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function parseDate(value: string) {
@@ -87,7 +91,7 @@ type ScheduleItem = {
   icon: typeof Wallet;
   iconBg: string;
   iconColor: string;
-  kind: "holiday" | "leave" | "interview" | "payroll" | "attendance";
+  kind: "holiday" | "leave" | "interview" | "payroll" | "attendance" | "birthday";
   holiday?: CalendarHoliday;
 };
 
@@ -114,6 +118,7 @@ export function CalendarModule({
     avatar: string | null;
     jobTitle: string;
     employeeCode: string;
+    dateOfBirth?: string | null;
   }[];
   canManage: boolean;
   showEmployeeColumn?: boolean;
@@ -141,6 +146,16 @@ export function CalendarModule({
   const [loading, setLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const categories = [
+    { key: "holiday", label: "Holidays" },
+    { key: "birthday", label: "Birthdays" },
+    { key: "leave", label: "Leave" },
+    { key: "payroll", label: "Payroll" },
+    { key: "interview", label: "Interviews" },
+    { key: "attendance", label: "Attendance" },
+  ] as const;
+  const [activeCategory, setActiveCategory] = useState<string>("holiday");
+
   const weekDays = useMemo(() => {
     const start = startOfWeek(weekAnchor);
     return Array.from({ length: 7 }, (_, i) => {
@@ -162,25 +177,54 @@ export function CalendarModule({
     return map;
   }, [holidays]);
 
+  const birthdaysByDay = useMemo(() => {
+    const map = new Map<string, { id: string; firstName: string; lastName: string; employeeCode: string; avatar: string | null; jobTitle: string }[]>();
+    for (const emp of employees) {
+      if (!emp.dateOfBirth) continue;
+      const d = new Date(emp.dateOfBirth);
+      if (Number.isNaN(d.getTime())) continue;
+      const key = dateKey(d);
+      const list = map.get(key) ?? [];
+      list.push({
+        id: emp.id,
+        firstName: emp.firstName,
+        lastName: emp.lastName,
+        employeeCode: emp.employeeCode,
+        avatar: emp.avatar,
+        jobTitle: emp.jobTitle,
+      });
+      map.set(key, list);
+    }
+    return map;
+  }, [employees]);
+
+  const dayBirthdays = (date: Date) =>
+    birthdaysByDay.get(dateKey(date)) ?? [];
+
   const dayHasEvents = (date: Date) => {
     const key = dateKey(date);
-    if ((holidaysByDay.get(key)?.length ?? 0) > 0) return true;
+
+    if (activeCategory === "holiday" && (holidaysByDay.get(key)?.length ?? 0) > 0) return true;
 
     const inLeave = leaveRequests.some((l) => {
       const start = parseDate(l.startDate);
       const end = parseDate(l.endDate);
       return date >= start && date <= end;
     });
-    if (inLeave) return true;
+    if (activeCategory === "leave" && inLeave) return true;
 
     const payroll = payrollRecords.some((p) => dateKey(parseDate(p.periodStart)) === key);
-    if (payroll) return true;
+    if (activeCategory === "payroll" && payroll) return true;
 
     const interview = interviews.some((i) => dateKey(parseDate(i.scheduledAt)) === key);
-    if (interview) return true;
+    if (activeCategory === "interview" && interview) return true;
 
     const attendance = attendanceRows.some((row) => row.date.slice(0, 10) === key);
-    return attendance;
+    if (activeCategory === "attendance" && attendance) return true;
+
+    if (activeCategory === "birthday" && dayBirthdays(date).length > 0) return true;
+
+    return false;
   };
 
   const scheduleItems = useMemo(() => {
@@ -197,6 +241,20 @@ export function CalendarModule({
         iconColor: "text-violet-600",
         kind: "holiday",
         holiday,
+      });
+    }
+
+    const birthdaysOnDay = birthdaysByDay.get(key) ?? [];
+    for (const b of birthdaysOnDay) {
+      items.push({
+        id: `birthday-${b.id}`,
+        title: `${fullName(b.firstName, b.lastName)}'s birthday`,
+        time: "Happy Birthday!",
+        href: `/employees/${b.id}`,
+        icon: Cake,
+        iconBg: "bg-rose-100",
+        iconColor: "text-rose-500",
+        kind: "birthday",
       });
     }
 
@@ -266,8 +324,8 @@ export function CalendarModule({
       });
     }
 
-    return items;
-  }, [selectedDate, holidaysByDay, leaveRequests, payrollRecords, interviews, attendanceRows]);
+    return items.filter((i) => i.kind === activeCategory);
+  }, [selectedDate, holidaysByDay, birthdaysByDay, leaveRequests, payrollRecords, interviews, attendanceRows, activeCategory]);
 
   const shiftWeek = (delta: number) => {
     const next = new Date(weekAnchor);
@@ -399,6 +457,27 @@ export function CalendarModule({
           </div>
         </div>
 
+        {/* Category filter */}
+        <div className="flex items-center gap-2 px-6 pb-4 flex-wrap">
+          {categories.map((cat) => {
+            const active = cat.key === activeCategory;
+            return (
+              <button
+                key={cat.key}
+                type="button"
+                onClick={() => setActiveCategory(cat.key)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  active
+                    ? "bg-[#7B61FF] text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Schedule header */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
           <h3 className="text-sm font-semibold text-gray-900">
@@ -461,6 +540,13 @@ export function CalendarModule({
                     >
                       View payroll
                     </Link>
+                    <Link
+                      href="/reports/employee-data/birthday"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      View birthdays
+                    </Link>
                   </div>
                 </>
               )}
@@ -473,8 +559,12 @@ export function CalendarModule({
           {scheduleItems.length === 0 ? (
             <div className="mx-2 py-10 text-center rounded-2xl bg-gray-50 border border-dashed border-gray-200">
               <CalendarDays className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No events scheduled for this day.</p>
-              {canManage && (
+              <p className="text-sm text-gray-500">
+                {activeCategory === "holiday"
+                  ? "No holidays scheduled for this day."
+                  : `No ${categories.find((c) => c.key === activeCategory)?.label.toLowerCase()} for this day.`}
+              </p>
+              {canManage && activeCategory === "holiday" && (
                 <Button variant="secondary" size="sm" className="mt-4" onClick={openCreate}>
                   Add holiday
                 </Button>

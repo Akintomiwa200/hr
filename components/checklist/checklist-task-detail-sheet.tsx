@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, Input, Select, Textarea } from "@/components/ui";
 import { Sheet } from "@/components/ui/sheet";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
@@ -148,7 +148,7 @@ export function ChecklistTaskDetailSheet({
       ) : !task ? (
         <p className="text-sm text-gray-500 py-8 text-center">Task not found</p>
       ) : (
-        <div className="space-y-6">
+        <div className="p-6 space-y-8">
           <div className="flex flex-wrap gap-2">
             <Badge variant={task.status === "COMPLETED" ? "success" : task.status === "IN_PROGRESS" ? "info" : "neutral"}>
               {task.status.replace("_", " ")}
@@ -156,64 +156,53 @@ export function ChecklistTaskDetailSheet({
             <Badge variant={PRIORITY_VARIANT[task.priority] ?? "neutral"}>{task.priority}</Badge>
           </div>
 
-          {canManage ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Title</label>
-                <input
+          <section className="space-y-5">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Details</h3>
+            {canManage ? (
+              <div className="space-y-4">
+                <Input
+                  label="Title"
                   defaultValue={task.title}
                   onBlur={(e) => e.target.value !== task.title && patch({ title: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
-                <textarea
+                <Textarea
+                  label="Description"
                   defaultValue={task.description ?? ""}
-                  rows={3}
+                  rows={4}
+                  placeholder="Add a description for this task…"
                   onBlur={(e) =>
                     e.target.value !== (task.description ?? "") && patch({ description: e.target.value })
                   }
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
-                  <select
+                <div className="grid grid-cols-2 gap-4">
+                  <Select
+                    label="Status"
                     value={task.status}
                     onChange={(e) => patch({ status: e.target.value })}
                     disabled={saving}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   >
                     <option value="PENDING">To Do</option>
                     <option value="IN_PROGRESS">In Progress</option>
                     <option value="COMPLETED">Done</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Priority</label>
-                  <select
+                  </Select>
+                  <Select
+                    label="Priority"
                     value={task.priority}
                     onChange={(e) => patch({ priority: e.target.value })}
                     disabled={saving}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   >
                     <option value="LOW">Low</option>
                     <option value="MEDIUM">Medium</option>
                     <option value="HIGH">High</option>
                     <option value="URGENT">Urgent</option>
-                  </select>
+                  </Select>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Assignee</label>
-                  <select
+                <div className="grid grid-cols-2 gap-4">
+                  <Select
+                    label="Assignee"
                     value={task.assignee?.id ?? ""}
                     onChange={(e) => patch({ assigneeId: e.target.value || null })}
                     disabled={saving}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   >
                     <option value="">Anyone / unassigned</option>
                     {employees.map((emp) => (
@@ -221,102 +210,106 @@ export function ChecklistTaskDetailSheet({
                         {fullName(emp.firstName, emp.lastName)}
                       </option>
                     ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Due date</label>
-                  <input
-                    type="date"
-                    defaultValue={task.dueDate ? task.dueDate.slice(0, 10) : ""}
-                    onBlur={(e) => {
-                      const val = e.target.value ? new Date(e.target.value).toISOString() : null;
-                      const cur = task.dueDate ? task.dueDate.slice(0, 10) : "";
-                      if (e.target.value !== cur) patch({ dueDate: val });
-                    }}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  />
+                  </Select>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Due date</label>
+                    <input
+                      type="date"
+                      defaultValue={task.dueDate ? task.dueDate.slice(0, 10) : ""}
+                      onBlur={(e) => {
+                        const val = e.target.value ? new Date(e.target.value).toISOString() : null;
+                        const cur = task.dueDate ? task.dueDate.slice(0, 10) : "";
+                        if (e.target.value !== cur) patch({ dueDate: val });
+                      }}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-3 text-sm">
-              <p className="text-gray-600">{task.description || "No description"}</p>
-              <p>
-                <span className="text-gray-500">Due:</span>{" "}
-                {task.dueDate ? formatDate(task.dueDate) : "Not set"}
-              </p>
-              <p>
-                <span className="text-gray-500">Assignee:</span>{" "}
-                {task.assignee ? fullName(task.assignee.firstName, task.assignee.lastName) : "Anyone"}
-              </p>
-              {task.status !== "COMPLETED" && (
-                <div className="flex gap-2 pt-2">
-                  {task.status === "PENDING" && (
-                    <Button loading={saving} onClick={() => patch({ status: "IN_PROGRESS" })}>
-                      Start Working
-                    </Button>
-                  )}
-                  <Button loading={saving} onClick={() => patch({ action: "complete" })}>
-                    Mark Complete
-                  </Button>
+            ) : (
+              <div className="space-y-3 text-sm">
+                <p className="text-gray-600">{task.description || "No description"}</p>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Status</p>
+                    <p className="font-medium text-gray-900 mt-0.5">{task.status.replace("_", " ")}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Due</p>
+                    <p className="font-medium text-gray-900 mt-0.5">
+                      {task.dueDate ? formatDate(task.dueDate) : "Not set"}
+                    </p>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
-
-          <ChecklistTaskDocumentsPanel
-            taskId={task.id}
-            requiredDocuments={task.requiredDocuments}
-            files={task.files ?? []}
-            canManage={canManage}
-            canUpload
-            onChanged={() => {
-              fetch(`/api/checklist/tasks/${task.id}`)
-                .then((res) => (res.ok ? res.json() : null))
-                .then((next) => next && setTask(next));
-              onUpdated();
-            }}
-          />
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500">Assignee</p>
+                  <p className="font-medium text-gray-900 mt-0.5">
+                    {task.assignee ? fullName(task.assignee.firstName, task.assignee.lastName) : "Anyone"}
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
 
           {canManage && task.status !== "COMPLETED" && (
-            <Button loading={saving} onClick={() => patch({ action: "complete" })}>
-              Complete task
-            </Button>
+            <section className="pt-6 border-t border-gray-100">
+              <Button loading={saving} onClick={() => patch({ action: "complete" })} className="w-full">
+                Complete task
+              </Button>
+            </section>
           )}
 
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900 mb-3">Activity & Comments</h4>
-            <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
-              {task.comments.length === 0 ? (
-                <p className="text-sm text-gray-400">No comments yet</p>
-              ) : (
-                task.comments.map((c) => (
-                  <div key={c.id} className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-gray-700">{c.authorName}</span>
-                      <span className="text-xs text-gray-400">{formatDate(c.createdAt)}</span>
-                    </div>
-                    <p className="text-sm text-gray-600">{c.content}</p>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Add a comment…"
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && postComment()}
-              />
-              <Button loading={posting} onClick={postComment} disabled={!comment.trim()}>
-                Post
-              </Button>
-            </div>
-          </div>
+          <section className="pt-5 border-t border-gray-100">
+            <ChecklistTaskDocumentsPanel
+              taskId={task.id}
+              requiredDocuments={task.requiredDocuments}
+              files={task.files ?? []}
+              canManage={canManage}
+              canUpload
+              onChanged={() => {
+                fetch(`/api/checklist/tasks/${task.id}`)
+                  .then((res) => (res.ok ? res.json() : null))
+                  .then((next) => next && setTask(next));
+                onUpdated();
+              }}
+            />
+          </section>
 
-          {canManage && (
-            <div className="pt-4 border-t border-gray-100">
+          <section className="space-y-4 pt-5 border-t border-gray-100">
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-3">Activity & Comments</h4>
+              <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+                {task.comments.length === 0 ? (
+                  <p className="text-sm text-gray-400">No comments yet</p>
+                ) : (
+                  task.comments.map((c) => (
+                    <div key={c.id} className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-gray-700">{c.authorName}</span>
+                        <span className="text-xs text-gray-400">{formatDate(c.createdAt)}</span>
+                      </div>
+                      <p className="text-sm text-gray-600">{c.content}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Add a comment…"
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && postComment()}
+                />
+                <Button loading={posting} onClick={postComment} disabled={!comment.trim()}>
+                  Post
+                </Button>
+              </div>
+            </div>
+          </section>
+
+          {canManage && task.status !== "COMPLETED" && (
+            <div className="pt-5 border-t border-gray-100">
               <Button variant="danger" size="sm" onClick={deleteTask}>
                 <Trash2 className="w-4 h-4" />
                 Delete Task

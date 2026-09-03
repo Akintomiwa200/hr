@@ -22,6 +22,7 @@ export const EMPLOYEE_IMPORT_COLUMNS = [
   { key: "role", header: "Role", width: 18 },
   { key: "salary", header: "Salary", width: 14 },
   { key: "hireDate", header: "Start date", width: 16 },
+  { key: "dateOfBirth", header: "Date of birth", width: 16 },
 ] as const;
 
 export type EmployeeImportRow = {
@@ -37,6 +38,7 @@ export type EmployeeImportRow = {
   role: string;
   salary: string;
   hireDate: string;
+  dateOfBirth: string;
 };
 
 const EMPLOYMENT_OPTIONS = ["Full-time", "Freelance"];
@@ -259,6 +261,7 @@ export function parseEmployeeImportWorkbook(buffer: Buffer): EmployeeImportRow[]
         role: String(row["Role"] ?? "").trim(),
         salary: String(row["Salary"] ?? "").trim(),
         hireDate: String(row["Start date"] ?? "").trim(),
+        dateOfBirth: String(row["Date of birth"] ?? "").trim(),
       });
     }
   }
@@ -362,6 +365,7 @@ export async function importEmployeesFromTemplate(
     const employment = /freelance/i.test(row.employment) ? "FREELANCE" : "FULL_TIME";
     const salary = Number(String(row.salary).replace(/[^0-9.-]/g, "")) || 0;
     const hireDate = parseLocalDate(row.hireDate) ?? new Date();
+    const dateOfBirth = row.dateOfBirth ? parseLocalDate(row.dateOfBirth) : null;
 
     const requestedCode = row.employeeCode.trim();
     const existingId = requestedCode ? codeToId.get(requestedCode.toLowerCase()) : null;
@@ -380,6 +384,7 @@ export async function importEmployeesFromTemplate(
       status: "ACTIVE",
       companyId,
       hireDate,
+      dateOfBirth,
       employeeCode: requestedCode || null,
     };
 
@@ -424,6 +429,7 @@ async function updateImportedEmployee(employeeId: string, input: CreateEmployeeI
       managerId: input.managerId ?? null,
       salary: Number(input.salary) || 0,
       hireDate: parseLocalDate(input.hireDate) ?? undefined,
+      dateOfBirth: parseLocalDate(input.dateOfBirth) ?? null,
     },
   });
   if (!input.email || !input.email.includes("@")) return;

@@ -65,3 +65,7 @@ export function isPortalTemplateModelReady() {
 export function isBranchModelsReady() {
   return hasDelegate(getPrismaClient(), "branch", "findMany");
 }
+
+export function isNoteModelReady() {
+  return hasDelegate(getPrismaClient(), "note", "findMany");
+}

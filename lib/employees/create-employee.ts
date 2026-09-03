@@ -25,6 +25,7 @@ export type CreateEmployeeInput = {
   biometricPin?: string | null;
   branchId?: string | null;
   hireDate?: string | Date | null;
+  dateOfBirth?: string | Date | null;
   employeeCode?: string | null;
 };
 
@@ -203,6 +204,7 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
           biometricPin,
           managerId,
           hireDate: parseLocalDate(input.hireDate) ?? new Date(),
+          dateOfBirth: parseLocalDate(input.dateOfBirth),
           salary: Number(input.salary) || 0,
           status: input.status || "ACTIVE",
         },

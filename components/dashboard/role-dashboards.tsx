@@ -1,11 +1,19 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import {
+  ArrowRight,
+  Briefcase,
   CalendarClock,
+  CalendarDays,
   ChevronRight,
+  CircleDollarSign,
+  Clock,
   TrendingDown,
   TrendingUp,
+  Trophy,
+  UserRound,
   UserSearch,
+  Wallet,
 } from "lucide-react";
 import { employmentLabel, employmentVariant, resolveEmploymentType } from "@/lib/employment";
 import { fullName } from "@/lib/utils";
@@ -41,14 +49,22 @@ function WidgetCard({
   );
 }
 
-function StatusPill({ label, variant }: { label: string; variant: "fulltime" | "freelance" }) {
+function StatusPill({
+  label,
+  variant,
+}: {
+  label: string;
+  variant: "fulltime" | "freelance" | "rejected";
+}) {
   const styles = {
     fulltime: "bg-emerald-50 text-emerald-700",
     freelance: "bg-amber-50 text-amber-700",
+    rejected: "bg-red-50 text-red-700",
   };
   const dot = {
     fulltime: "bg-emerald-500",
     freelance: "bg-amber-500",
+    rejected: "bg-red-500",
   };
 
   return (
@@ -522,6 +538,18 @@ export function EmployeeDashboard({
   data: Awaited<ReturnType<typeof import("@/lib/dashboard-data").getEmployeeDashboardData>>;
 }) {
   const empType = data.employee ? resolveEmploymentType(data.employee) : "FULL_TIME";
+  const attendance = data.attendance;
+
+  const todayChip =
+    data.todayStatus === "PRESENT" || data.todayStatus === "REMOTE"
+      ? { label: "Checked in today", color: "bg-emerald-50 text-emerald-700" }
+      : data.todayStatus === "LATE"
+      ? { label: "Checked in late", color: "bg-amber-50 text-amber-700" }
+      : data.todayStatus === "ABSENT"
+      ? { label: "Marked absent", color: "bg-red-50 text-red-700" }
+      : data.todayStatus
+      ? { label: "On record today", color: "bg-sky-50 text-sky-700" }
+      : null;
 
   return (
     <div className="w-full">
@@ -542,29 +570,255 @@ export function EmployeeDashboard({
         />
       </Suspense>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <p className="text-[12px] text-gray-500">Days Present</p>
-          <p className="text-2xl font-bold text-[#7B61FF] mt-1">{data.presentDays}</p>
-          <p className="text-[11px] text-gray-400 mt-1">This period</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[12px] text-gray-500">Days Present</p>
+            <span className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center">
+              <CalendarDays className="w-4 h-4 text-[#7B61FF]" />
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-[#7B61FF] mt-2">{data.presentDays}</p>
+          <p className="text-[11px] text-gray-400 mt-1">
+            {attendance.workedDays} worked in this period
+          </p>
         </div>
+
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <p className="text-[12px] text-gray-500">Leave Requests</p>
-          <p className="text-2xl font-bold text-amber-600 mt-1">{data.leaveRequests.length}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[12px] text-gray-500">Days Late</p>
+            <span className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-amber-600" />
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-amber-600 mt-2">{attendance.late}</p>
+          <p className="text-[11px] text-gray-400 mt-1">Late arrivals this period</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between">
+            <p className="text-[12px] text-gray-500">Leave Requests</p>
+            <span className="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center">
+              <UserRound className="w-4 h-4 text-sky-600" />
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-sky-600 mt-2">{data.leaveRequests.length}</p>
           <p className="text-[11px] text-gray-400 mt-1">Recent submissions</p>
         </div>
+
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <p className="text-[12px] text-gray-500">Latest Net Pay</p>
-          <p className="text-2xl font-bold text-emerald-600 mt-1">
+          <div className="flex items-center justify-between">
+            <p className="text-[12px] text-gray-500">Latest Net Pay</p>
+            <span className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <Wallet className="w-4 h-4 text-emerald-600" />
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-emerald-600 mt-2">
             {data.latestPayroll ? <Money amount={data.latestPayroll.netPay} /> : "—"}
           </p>
-          <p className="text-[11px] text-gray-400 mt-1">Most recent payslip</p>
+          <p className="text-[11px] text-gray-400 mt-1">
+            {data.payrollStats.totalRuns > 0
+              ? `${data.payrollStats.totalRuns} total payslips`
+              : "Most recent payslip"}
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <WidgetCard title="My Profile">
+      {/* Today status + profile quick link */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <span
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium ${
+              todayChip?.color ?? "bg-gray-50 text-gray-500"
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-current" />
+            {todayChip?.label ?? "No check-in recorded today"}
+          </span>
           {data.employee && (
+            <span className="text-[12px] text-gray-400">
+              Joined {new Date(data.employee.hireDate).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}
+            </span>
+          )}
+        </div>
+        {data.employee?.manager && (
+          <span className="text-[12px] text-gray-400 flex items-center gap-1.5">
+            <UserRound className="w-3.5 h-3.5" />
+            Reports to{" "}
+            <span className="font-medium text-gray-700">
+              {fullName(data.employee.manager.firstName, data.employee.manager.lastName)}
+            </span>
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        {/* Attendance overview */}
+        <WidgetCard
+          title="Attendance this period"
+          action={
+            <Link
+              href="/attendance"
+              className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
+            >
+              View all <ChevronRight className="w-3 h-3" />
+            </Link>
+          }
+        >
+          {attendance.total > 0 ? (
+            <>
+              <div className="flex h-3 rounded-full overflow-hidden bg-gray-100">
+                {attendance.onTime > 0 && (
+                  <div
+                    className="bg-[#7B61FF]"
+                    style={{ width: `${(attendance.onTime / attendance.total) * 100}%` }}
+                  />
+                )}
+                {attendance.late > 0 && (
+                  <div
+                    className="bg-amber-400"
+                    style={{ width: `${(attendance.late / attendance.total) * 100}%` }}
+                  />
+                )}
+                {attendance.halfDay > 0 && (
+                  <div
+                    className="bg-sky-400"
+                    style={{ width: `${(attendance.halfDay / attendance.total) * 100}%` }}
+                  />
+                )}
+                {attendance.absent > 0 && (
+                  <div
+                    className="bg-red-400"
+                    style={{ width: `${(attendance.absent / attendance.total) * 100}%` }}
+                  />
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-4 text-[11px] text-gray-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#7B61FF]" /> On time{" "}
+                  {attendance.onTime}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" /> Late {attendance.late}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-sky-400" /> Half day{" "}
+                  {attendance.halfDay}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-400" /> Absent {attendance.absent}
+                </span>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">No attendance logged in this period yet.</p>
+          )}
+        </WidgetCard>
+
+        {/* Payslip summary */}
+        <WidgetCard
+          title="Pay summary"
+          action={
+            data.latestPayroll ? (
+              <Link
+                href="/payroll"
+                className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
+              >
+                Payslips <ChevronRight className="w-3 h-3" />
+              </Link>
+            ) : undefined
+          }
+        >
+          {data.latestPayroll ? (
+            <div className="space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-[13px] text-gray-500">Net pay</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-0.5">
+                    <Money amount={data.latestPayroll.netPay} />
+                  </p>
+                </div>
+                <span className="text-[11px] text-gray-400">
+                  {new Date(data.latestPayroll.periodStart).toLocaleDateString("en-GB", {
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+              <div className="border-t border-gray-50 pt-3 space-y-2 text-[12px]">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Gross</span>
+                  <span className="font-medium">
+                    <Money amount={data.latestPayroll.grossPay} />
+                  </span>
+                </div>
+                {data.latestPayroll.bonus > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Bonus</span>
+                    <span className="font-medium text-emerald-600">
+                      <Money amount={data.latestPayroll.bonus} />
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Deductions</span>
+                  <span className="font-medium text-red-500">
+                    <Money amount={data.latestPayroll.deductions} />
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No payslips issued yet.</p>
+          )}
+        </WidgetCard>
+
+        {/* Performance */}
+        <WidgetCard
+          title="Performance"
+          action={
+            <Link
+              href="/performance"
+              className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
+            >
+              Reviews <ChevronRight className="w-3 h-3" />
+            </Link>
+          }
+        >
+          {data.recentAppraisals.length > 0 ? (
+            <div className="space-y-3.5">
+              {data.recentAppraisals.map((appraisal) => {
+                const rating = appraisal.overallRating ?? 0;
+                return (
+                  <div key={appraisal.id}>
+                    <div className="flex justify-between text-[12px] mb-1.5">
+                      <span className="text-gray-700 font-medium">{appraisal.cycle.name}</span>
+                      <span className="text-gray-400">{rating}/5</span>
+                    </div>
+                    <div className="h-2.5 rounded-full overflow-hidden bg-gray-100">
+                      <div
+                        className="h-full bg-[#7B61FF] rounded-full"
+                        style={{ width: `${Math.max(rating * 20, 4)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <Trophy className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">No completed reviews yet.</p>
+            </div>
+          )}
+        </WidgetCard>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        {/* My profile */}
+        <WidgetCard title="My Profile">
+          {data.employee ? (
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <dt className="text-gray-500">Department</dt>
@@ -587,21 +841,63 @@ export function EmployeeDashboard({
                   />
                 </dd>
               </div>
+              {data.employee.manager && (
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">Manager</dt>
+                  <dd className="font-medium">
+                    {fullName(data.employee.manager.firstName, data.employee.manager.lastName)}
+                  </dd>
+                </div>
+              )}
             </dl>
+          ) : (
+            <p className="text-sm text-gray-500">Profile not available.</p>
           )}
         </WidgetCard>
 
-        <WidgetCard title="Recent Leave">
+        {/* Recent leave */}
+        <WidgetCard
+          title="Recent Leave"
+          action={
+            <Link
+              href="/leave"
+              className="text-[11px] text-[#7B61FF] font-medium flex items-center gap-0.5 hover:underline"
+            >
+              Manage <ChevronRight className="w-3 h-3" />
+            </Link>
+          }
+        >
           <div className="space-y-3">
             {data.leaveRequests.length > 0 ? (
               data.leaveRequests.map((leave) => (
                 <div key={leave.id} className="flex items-center justify-between">
-                  <span className="text-sm capitalize text-gray-700">
-                    {leave.type.toLowerCase()}
-                  </span>
+                  <div>
+                    <span className="text-sm capitalize text-gray-700">
+                      {leave.type.toLowerCase().replace("_", " ")}
+                    </span>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      {new Date(leave.startDate).toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                      })}
+                      {" – "}
+                      {new Date(leave.endDate).toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                      })}
+                    </p>
+                  </div>
                   <StatusPill
                     label={leave.status}
-                    variant={leave.status === "APPROVED" ? "fulltime" : "freelance"}
+                    variant={
+                      leave.status === "APPROVED"
+                        ? "fulltime"
+                        : leave.status === "PENDING"
+                        ? "freelance"
+                        : leave.status === "REJECTED"
+                        ? "rejected"
+                        : "freelance"
+                    }
                   />
                 </div>
               ))
@@ -611,6 +907,39 @@ export function EmployeeDashboard({
           </div>
         </WidgetCard>
 
+        {/* Quick actions */}
+        <WidgetCard title="Quick Actions">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {[
+              { href: "/leave", label: "Request leave", icon: UserRound },
+              { href: "/attendance", label: "My attendance", icon: CalendarDays },
+              { href: "/payroll", label: "View payslips", icon: CircleDollarSign },
+              { href: "/performance", label: "My reviews", icon: Briefcase },
+              { href: "/documents", label: "My documents", icon: CalendarClock },
+              { href: "/notifications", label: "Notifications", icon: Wallet },
+            ].map((action) => {
+              const Icon = action.icon;
+              return (
+                <Link
+                  key={action.href}
+                  href={action.href}
+                  className="group rounded-xl border border-gray-100 px-3 py-3 hover:border-brand-200 hover:bg-brand-50/30 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-[13px] font-semibold text-gray-900">
+                      <Icon className="w-4 h-4 text-[#7B61FF]" />
+                      {action.label}
+                    </span>
+                    <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-[#7B61FF] transition-colors" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </WidgetCard>
+      </div>
+
+      <div className="mb-4">
         <UpcomingScheduleWidget events={upcomingEvents} />
       </div>
     </div>

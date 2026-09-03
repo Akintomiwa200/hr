@@ -22,6 +22,8 @@ function orgDeviceWhere(companyId?: string | null) {
   if (!companyId) return {};
   return { companyId };
 }
+type AttendanceStatus = "PRESENT" | "ABSENT" | "LATE" | "EARLY" | "REMOTE" | "HALF_DAY";
+
 const CHART_MONTHS = [
   "Jan",
   "Feb",
@@ -463,45 +465,108 @@ export async function getEmployeeDashboardData(
 ) {
   const rangeKey = parseDashboardRangeKey(rangeInput);
   const period = resolveDashboardRange(rangeKey);
+  const today = startOfDay();
 
-  const [employee, leaveRequests, attendanceRecords, payrollRecords, reviews] =
-    await Promise.all([
-      prisma.employee.findUnique({
-        where: { id: employeeId },
-        include: { department: true, manager: true },
-      }),
-      prisma.leaveRequest.findMany({
-        where: { employeeId },
-        orderBy: { createdAt: "desc" },
-        take: 3,
-      }),
-      prisma.attendance.findMany({
-        where: { employeeId, date: { gte: period.start, lte: period.end } },
-        orderBy: { date: "desc" },
-      }),
-      prisma.payrollRecord.findMany({
-        where: { employeeId },
-        orderBy: { periodStart: "desc" },
-        take: 1,
-      }),
-      prisma.performanceAppraisal.findFirst({
-        where: { employeeId },
-        include: { cycle: true },
-        orderBy: { updatedAt: "desc" },
-      }),
-    ]);
+  const [
+    employee,
+    leaveRequests,
+    attendanceRecords,
+    todayAttendance,
+    attendanceSummary,
+    payrollRecords,
+    payrollStats,
+    reviews,
+  ] = await Promise.all([
+    prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: { department: true, manager: true, user: { select: { email: true } } },
+    }),
+    prisma.leaveRequest.findMany({
+      where: { employeeId },
+      orderBy: { createdAt: "desc" },
+      take: 4,
+    }),
+    prisma.attendance.findMany({
+      where: { employeeId, date: { gte: period.start, lte: period.end } },
+      orderBy: { date: "desc" },
+    }),
+    prisma.attendance.findFirst({
+      where: { employeeId, date: { gte: today } },
+    }),
+    prisma.attendance.groupBy({
+      by: ["status"],
+      _count: { status: true },
+      where: { employeeId, date: { gte: period.start, lte: period.end } },
+    }),
+    prisma.payrollRecord.findMany({
+      where: { employeeId },
+      orderBy: { periodStart: "desc" },
+      take: 12,
+    }),
+    prisma.payrollRecord.aggregate({
+      where: { employeeId, status: { in: ["PROCESSED", "PAID"] } },
+      _sum: { grossPay: true, deductions: true, netPay: true },
+      _count: { _all: true },
+    }),
+    prisma.performanceAppraisal.findMany({
+      where: { employeeId, status: "COMPLETED", overallRating: { not: null } },
+      include: { cycle: true },
+      orderBy: { completedAt: "desc" },
+      take: 3,
+    }),
+  ]);
 
   const presentDays = attendanceRecords.filter((a) =>
     ["PRESENT", "REMOTE"].includes(a.status)
   ).length;
 
+  const summaryByStatus = new Map(
+    attendanceSummary.map((row) => [row.status, row._count.status])
+  );
+  const count = (status: AttendanceStatus) => summaryByStatus.get(status) ?? 0;
+  const onTime = count("PRESENT") + count("REMOTE");
+  const late = count("LATE");
+  const absent = count("ABSENT");
+  const halfDay = count("HALF_DAY");
+  const early = count("EARLY");
+  const workedDays = onTime + late + halfDay + early;
+
+  const latestPayroll = payrollRecords[0] ?? null;
+
+  const leaveUsage = leaveRequests.reduce(
+    (acc, leave) => {
+      const key = leave.type;
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+
   return {
     employee,
     leaveRequests,
     attendanceRecords,
-    latestPayroll: payrollRecords[0] ?? null,
-    latestAppraisal: reviews,
+    latestPayroll,
+    latestAppraisal: reviews[0] ?? null,
+    recentAppraisals: reviews,
     presentDays,
+    attendance: {
+      onTime,
+      late,
+      absent,
+      halfDay,
+      early,
+      workedDays,
+      total: onTime + late + absent + halfDay + early,
+    },
+    todayStatus: todayAttendance?.status ?? null,
+    leaveUsage,
+    payrollStats: {
+      totalRuns: payrollStats._count._all,
+      totalGross: payrollStats._sum.grossPay ?? 0,
+      totalNet: payrollStats._sum.netPay ?? 0,
+      totalDeductions: payrollStats._sum.deductions ?? 0,
+    },
     rangeKey,
     dateRange: {
       start: period.start.toISOString(),

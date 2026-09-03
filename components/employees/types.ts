@@ -31,4 +31,5 @@ export type EmployeeFormData = {
   address: string;
   hireDate: string;
   endDate: string;
+  dateOfBirth: string;
 };

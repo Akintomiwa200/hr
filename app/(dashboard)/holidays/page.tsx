@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { canManageOrgContent } from "@/lib/roles";
@@ -7,6 +6,7 @@ import { isHolidayDbEnabled } from "@/lib/holidays-data";
 import { CalendarModule } from "@/components/holidays/calendar-module";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function HolidaysPage({
   searchParams,
@@ -40,6 +40,17 @@ export default async function HolidaysPage({
         canManage={canManageOrgContent(session.role) && isHolidayDbEnabled()}
         showEmployeeColumn={session.role !== "EMPLOYEE"}
         initialDate={date}
+      />
+      <PageLiveRefresh
+        types={[
+          "holiday_updated",
+          "leave_updated",
+          "payroll_updated",
+          "interview_updated",
+          "attendance_updated",
+          "employee_updated",
+          "notification_updated",
+        ]}
       />
     </div>
   );

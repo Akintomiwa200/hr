@@ -114,6 +114,13 @@ export function NewEmployeeForm({
               Login credentials are emailed to this address immediately.
             </p>
           </div>
+          <div>
+            <label className={labelClass}>Date of birth</label>
+            <input name="dateOfBirth" type="date" className={inputClass} />
+            <p className="text-[12px] text-gray-500 mt-1.5">
+              Used for birthday celebrations and notifications.
+            </p>
+          </div>
         </div>
       </section>
 

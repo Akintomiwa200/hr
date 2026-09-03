@@ -185,6 +185,10 @@ export function OnboardingPeopleModule({
                   placeholder="alex@company.com"
                 />
               </div>
+              <div>
+                <label className={labelClass}>Date of birth</label>
+                <input name="dateOfBirth" type="date" className={inputClass} />
+              </div>
               <div className="sm:col-span-2 xl:col-span-3">
                 <label className={labelClass}>Job title</label>
                 {!customJobTitle && jobTitles.length > 0 ? (

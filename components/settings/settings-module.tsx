@@ -30,6 +30,7 @@ type EmployeeProfile = {
   address: string | null;
   jobTitle: string;
   hireDate: Date | string;
+  dateOfBirth: Date | string | null;
   department: { name: string };
 };
 
@@ -181,10 +182,18 @@ export function SettingsModule({
                   <dt className="text-gray-500">Department</dt>
                   <dd className="font-medium text-gray-900">{employee.department.name}</dd>
                 </div>
-                <div className="flex justify-between py-3">
+                <div className="flex justify-between py-3 border-b border-gray-100">
                   <dt className="text-gray-500">Start date</dt>
                   <dd className="font-medium text-gray-900">{formatDate(employee.hireDate)}</dd>
                 </div>
+                {employee.dateOfBirth && (
+                  <div className="flex justify-between py-3">
+                    <dt className="text-gray-500">Date of birth</dt>
+                    <dd className="font-medium text-gray-900">
+                      {formatDate(employee.dateOfBirth)}
+                    </dd>
+                  </div>
+                )}
               </>
             )}
           </dl>

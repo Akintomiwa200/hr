@@ -248,6 +248,9 @@ export function EmployeeDetailContent({
             }
           />
           <InfoRow icon={CalendarDays} label="Start Date" value={formatDate(employee.hireDate)} />
+          {employee.dateOfBirth && (
+            <InfoRow icon={Star} label="Date of Birth" value={formatDate(employee.dateOfBirth)} />
+          )}
           {(employee as { endDate?: Date | string | null }).endDate ? (
             <InfoRow
               icon={CalendarDays}

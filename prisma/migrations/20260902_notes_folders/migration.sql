@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Note" ADD COLUMN IF NOT EXISTS "folder" TEXT;

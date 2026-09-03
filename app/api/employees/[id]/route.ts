@@ -92,6 +92,7 @@ export async function PATCH(
     status,
     hireDate,
     endDate,
+    dateOfBirth,
   } = body;
 
   if (role && existing.user) {
@@ -144,6 +145,9 @@ export async function PATCH(
       ...(status !== undefined && { status }),
       ...(hireDate !== undefined && {
         hireDate: parseLocalDate(hireDate) ?? existing.hireDate,
+      }),
+      ...(dateOfBirth !== undefined && {
+        dateOfBirth: dateOfBirth ? parseLocalDate(dateOfBirth) : null,
       }),
     },
     include: {

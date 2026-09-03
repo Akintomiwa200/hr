@@ -29,9 +29,11 @@ import {
   UserMinus,
   PenLine,
   ShieldCheck,
+  StickyNote,
 } from "lucide-react";
 import {
   ALL_STAFF,
+  ALL_ROLES,
   CONTENT_ADMIN_ROLES,
   DEVICE_ADMIN_ROLES,
   DASHBOARD_ROLES,
@@ -259,6 +261,15 @@ export const appFeatures: AppFeature[] = [
     icon: Megaphone,
     roles: ALL_STAFF,
     helpSlug: "announcements",
+  },
+  {
+    id: "notes",
+    label: "Notes",
+    description: "Personal and company note taker for every role",
+    href: "/notes",
+    section: "Workspace",
+    icon: StickyNote,
+    roles: ALL_ROLES,
   },
   {
     id: "documents",

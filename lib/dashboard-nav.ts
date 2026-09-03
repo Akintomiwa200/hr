@@ -32,10 +32,12 @@ import {
   Trash2,
   BarChart3,
   PenLine,
+  StickyNote,
 } from "lucide-react";
 import { CHECKLIST_ADMIN_ROLES, CHECKLIST_TEMPLATE_ROLES, CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
 import {
   ALL_STAFF,
+  ALL_ROLES,
   DEVICE_ADMIN_ROLES,
   DASHBOARD_ROLES,
   INTEGRATION_ADMIN_ROLES,
@@ -342,6 +344,14 @@ export const dashboardNavSections: NavSection[] = [
         pageTitle: "Announcements",
         icon: Megaphone,
         roles: ALL_STAFF,
+      },
+      {
+        id: "notes",
+        href: "/notes",
+        label: "Notes",
+        pageTitle: "Notes",
+        icon: StickyNote,
+        roles: ALL_ROLES,
       },
       {
         id: "documents",

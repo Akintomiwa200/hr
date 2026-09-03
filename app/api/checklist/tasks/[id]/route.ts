@@ -248,6 +248,10 @@ export async function DELETE(
   const existing = await prisma.checklistTask.findUnique({ where: { id } });
   if (!existing) return notFound();
 
+  if (existing.status === "COMPLETED") {
+    return badRequest("Completed tasks cannot be deleted.");
+  }
+
   await prisma.checklistTask.delete({ where: { id } });
   broadcastAppEvent("checklist_updated", { id, action: "task_deleted" });
   revalidatePath("/checklist/todos");

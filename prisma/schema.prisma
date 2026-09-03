@@ -171,6 +171,7 @@ model Company {
   portalTemplates   PortalTemplate[]
   portalDocuments   PortalDocument[]
   roleDefinitions   RoleDefinition[]
+  notes             Note[]
 }
 
 model Notification {
@@ -202,6 +203,7 @@ model User {
   employee      Employee?
   preferences   String?
   notifications Notification[]
+  notes         Note[]
 }
 
 model Department {
@@ -317,6 +319,7 @@ model Employee {
   assignedChecklistTasks ChecklistTask[] @relation("ChecklistTaskAssignee")
   completedChecklistTasks ChecklistTask[] @relation("ChecklistTaskCompleter")
   portalDocuments      PortalDocument[]
+  notes                Note[]
 
   @@index([branchId])
   @@index([biometricPin])
@@ -1106,6 +1109,37 @@ model Holiday {
   createdAt DateTime @default(now())
 
   company Company? @relation(fields: [companyId], references: [id])
+}
+
+/**
+ * Personal / shared notes & note-taker.
+ * Scope: PRIVATE notes are owned by userId and visible only to that user;
+ * SHARED notes belong to a company and are visible to everyone in the org.
+ * Every role can take their own notes; SHARED creation is limited to content
+ * admins (Company Admin / HR).
+ */
+model Note {
+  id         String   @id @default(cuid())
+  companyId  String?
+  userId     String
+  employeeId String?
+  title      String
+  content    String
+  folder     String?
+  column     String   @default("TODO")
+  pinned     Boolean  @default(false)
+  color      String   @default("violet")
+  scope      String   @default("PRIVATE") // PRIVATE | SHARED
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company?  @relation(fields: [companyId], references: [id])
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, scope])
+  @@index([companyId, scope])
+  @@index([pinned])
 }
 
 /** Singleton platform config (id = "platform"). Currency defaults to Naira. */

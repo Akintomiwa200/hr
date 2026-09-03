@@ -11,6 +11,7 @@ import { canAssignRole, normalizeRole } from "@/lib/roles";
 import { parseLocalDate } from "@/lib/dates";
 import { parseEmployeeShiftFields } from "@/lib/employee-shift";
 import { replayUnprocessedPunchesForEmployee } from "@/lib/zkteco/service";
+import { celebrateNewEmployee } from "@/lib/birthdays";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
     salary = 0,
     status = "ACTIVE",
     hireDate,
+    dateOfBirth,
   } = body;
 
   if (!firstName || !lastName || !email || !jobTitle || !departmentId) {
@@ -137,6 +139,7 @@ export async function POST(request: NextRequest) {
       status,
       companyId: session.companyId,
       hireDate,
+      dateOfBirth,
     });
 
     const shiftFields = parseEmployeeShiftFields(body);
@@ -148,6 +151,13 @@ export async function POST(request: NextRequest) {
     }
 
     notifyEmployeeChange(employee.id, "created");
+
+    // If the new employee's birthday is today, celebrate immediately (real-time).
+    try {
+      await celebrateNewEmployee({ companyId: session.companyId, employeeId: employee.id });
+    } catch {
+      // best-effort; never block employee creation on birthday celebration
+    }
 
     if (biometricPin || employee.employeeCode) {
       void replayUnprocessedPunchesForEmployee(employee.id);

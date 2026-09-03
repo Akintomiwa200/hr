@@ -21,7 +21,7 @@ export default async function ChecklistTodosPage() {
   });
 
   return (
-    <div>
+    <div className="pt-6 pb-8">
       <PageHeader
         title="To-Dos"
         description="Track onboarding and offboarding tasks with boards, filters, and comments."

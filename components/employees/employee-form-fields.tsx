@@ -30,6 +30,7 @@ export function employeeToFormData(employee: {
   address?: string | null;
   hireDate?: Date | string | null;
   endDate?: Date | string | null;
+  dateOfBirth?: Date | string | null;
   user?: { role: Role } | null;
 }): EmployeeFormData {
   return {
@@ -55,6 +56,7 @@ export function employeeToFormData(employee: {
     address: employee.address ?? "",
     hireDate: toDateInputValue(employee.hireDate) || todayInputValue(),
     endDate: toDateInputValue(employee.endDate),
+    dateOfBirth: toDateInputValue(employee.dateOfBirth),
   };
 }
 
@@ -287,7 +289,19 @@ export function EmployeeFormFields({
             className={inputClass}
           />
         </div>
-        {isEdit ? (
+        <div>
+          <label className={labelClass}>Date of birth</label>
+          <input
+            type="date"
+            value={data.dateOfBirth}
+            onChange={(e) => set("dateOfBirth", e.target.value)}
+            className={inputClass}
+          />
+          <p className="mt-1 text-[11px] text-gray-400">
+            Used for birthday celebrations and notifications.
+          </p>
+        </div>
+        {isEdit && (
           <div>
             <label className={labelClass}>End date</label>
             <input
@@ -300,7 +314,7 @@ export function EmployeeFormFields({
               Last working day. Set automatically when offboarding starts.
             </p>
           </div>
-        ) : null}
+        )}
       </div>
 
       <div>
@@ -337,4 +351,5 @@ export const emptyEmployeeForm = (
   address: "",
   hireDate: todayInputValue(),
   endDate: "",
+  dateOfBirth: "",
 });

@@ -92,3 +92,9 @@ export function checklistCompanyWhere(scope: CompanyScope): Prisma.ChecklistTemp
   if (!scope.companyId) return { OR: [{ companyId: null }, { companyId: scope.companyId }] };
   return { OR: [{ companyId: scope.companyId }, { companyId: null }] };
 }
+
+export function noteCompanyWhere(scope: CompanyScope): Prisma.NoteWhereInput {
+  if (scope.isPlatformAdmin && !scope.companyId) return {};
+  if (!scope.companyId) return { OR: [{ companyId: null }, { companyId: scope.companyId }] };
+  return { OR: [{ companyId: scope.companyId }, { companyId: null }] };
+}

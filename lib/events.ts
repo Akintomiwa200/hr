@@ -21,7 +21,8 @@ export type RealtimeEventType =
   | "integration_updated"
   | "settings_updated"
   | "subscription_updated"
-  | "notification_updated";
+  | "notification_updated"
+  | "notes_updated";
 
 export type RealtimeEvent = {
   type: RealtimeEventType;

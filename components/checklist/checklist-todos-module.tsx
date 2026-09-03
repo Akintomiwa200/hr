@@ -14,7 +14,7 @@ import {
   User,
 } from "lucide-react";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
-import { Dialog } from "@/components/ui/dialog";
+import { Sheet } from "@/components/ui/sheet";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
 import { useAppEvents } from "@/hooks/use-app-events";
@@ -64,6 +64,7 @@ export function ChecklistTodosModule({
   const [tasks, setTasks] = useState<TodoTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"board" | "list">("board");
+  const [dragId, setDragId] = useState<string | null>(null);
   const [selected, setSelected] = useState<TodoTask | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -87,13 +88,13 @@ export function ChecklistTodosModule({
 
   const buildQuery = useCallback(() => {
     const q = new URLSearchParams();
-    q.set("status", filters.status);
+    q.set("status", view === "board" ? "BOARD" : filters.status);
     if (filters.priority !== "ALL") q.set("priority", filters.priority);
     if (filters.type !== "ALL") q.set("type", filters.type);
     if (filters.assigneeId !== "ALL") q.set("assigneeId", filters.assigneeId);
     if (filters.search.trim()) q.set("search", filters.search.trim());
     return q.toString();
-  }, [filters]);
+  }, [filters, view]);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -150,6 +151,9 @@ export function ChecklistTodosModule({
   };
 
   const updateStatus = async (taskId: string, status: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status } : t))
+    );
     const res = await fetch(`/api/checklist/tasks/${taskId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -157,9 +161,16 @@ export function ChecklistTodosModule({
     });
     if (!res.ok) {
       notify.error(await readApiError(res, "Failed to update task"));
+      load();
       return;
     }
-    load();
+    load({ silent: true });
+  };
+
+  const moveTask = (taskId: string, targetStatus: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || task.status === targetStatus) return;
+    updateStatus(taskId, targetStatus);
   };
 
   const activeCount = tasks.filter((t) => t.status !== "COMPLETED").length;
@@ -289,10 +300,24 @@ export function ChecklistTodosModule({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {COLUMNS.map((col) => {
             const colTasks = tasks.filter((t) => t.status === col.key);
+            const isOver = dragId !== null && colTasks.length === 0;
             return (
               <div
                 key={col.key}
-                className={`rounded-2xl border p-3 min-h-[320px] shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${col.color}`}
+                onDragOver={(e) => {
+                  if (dragId) e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const id = dragId ?? (e.dataTransfer.getData("text/plain") || null);
+                  setDragId(null);
+                  if (id && !colTasks.some((t) => t.id === id)) {
+                    moveTask(id, col.key);
+                  }
+                }}
+                className={`rounded-2xl border p-3 min-h-[320px] shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${col.color} ${
+                  isOver ? "border-violet-400 ring-2 ring-violet-200" : ""
+                }`}
               >
                 <div className="flex items-center justify-between mb-3 px-1">
                   <h3 className="text-sm font-semibold text-gray-700">{col.label}</h3>
@@ -302,7 +327,13 @@ export function ChecklistTodosModule({
                 </div>
                 <div className="space-y-2">
                   {colTasks.map((task) => (
-                    <TaskCard key={task.id} task={task} onOpen={() => setSelected(task)} />
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onOpen={() => setSelected(task)}
+                      onDragStart={() => setDragId(task.id)}
+                      onDragEnd={() => setDragId(null)}
+                    />
                   ))}
                 </div>
               </div>
@@ -389,8 +420,8 @@ export function ChecklistTodosModule({
         }}
       />
 
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title="Create Task">
-        <div className="space-y-4">
+      <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title="Create Task">
+        <div className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
             <input
@@ -498,19 +529,36 @@ export function ChecklistTodosModule({
             </Button>
           </div>
         </div>
-      </Dialog>
+      </Sheet>
     </>
   );
 }
 
-function TaskCard({ task, onOpen }: { task: TodoTask; onOpen: () => void }) {
+function TaskCard({
+  task,
+  onOpen,
+  onDragStart,
+  onDragEnd,
+}: {
+  task: TodoTask;
+  onOpen: () => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+}) {
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "COMPLETED";
 
   return (
     <button
       type="button"
+      draggable
       onClick={onOpen}
-      className="w-full text-left bg-white rounded-xl border border-gray-200 p-3 shadow-sm hover:border-violet-300 hover:shadow-md transition-all"
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", task.id);
+        onDragStart();
+      }}
+      onDragEnd={onDragEnd}
+      className="w-full text-left bg-white rounded-xl border border-gray-200 p-3 shadow-sm cursor-grab active:cursor-grabbing hover:border-violet-300 hover:shadow-md transition-all"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="font-medium text-sm text-gray-900 line-clamp-2">{task.title}</span>
