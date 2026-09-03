@@ -124,7 +124,7 @@ export function DashboardShell({
         <main
           ref={mainScroll.ref}
           className={cn(
-            "flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5 lg:px-6 pb-6",
+            "flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5 lg:px-6 pt-5 sm:pt-6 pb-8",
             mainScroll.className
           )}
         >

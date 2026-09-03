@@ -101,15 +101,10 @@ export function NotificationsModule() {
     void loadNotifications();
   }, [loadNotifications]);
 
-  useEffect(() => {
-    setItems(summary.notifications);
-  }, [summary.notifications]);
-
   useAppEvents({
     types: ["notification_updated"],
     onEvent: () => {
       void loadNotifications();
-      void refresh();
     },
   });
 

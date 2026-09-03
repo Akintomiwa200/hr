@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { IntegrationsHub } from "@/components/integrations/integrations-hub";
@@ -12,6 +14,13 @@ export default async function IntegrationsSettingsPage() {
 
   return (
     <div>
+      <Link
+        href="/settings"
+        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-gray-500 hover:text-brand-600 mb-4"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to settings
+      </Link>
       <PageHeader
         title="Integrations"
         description="Google Workspace and Zoho — real-time sync for HR, payroll, recruitment, and mail"
