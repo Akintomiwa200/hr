@@ -6,6 +6,7 @@ import { getTurnoverReport, getReportFilterOptions } from "@/lib/reports/data";
 import { PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { ReportsBreadcrumb, ReportsDataTable } from "@/components/reports/reports-data-table";
+import { ReportsBackLink } from "@/components/reports/report-detail-shell";
 import { ReportsFiltersBar } from "@/components/reports/reports-filters-bar";
 import { ReportsBarChart } from "@/components/reports/reports-bar-chart";
 
@@ -26,6 +27,7 @@ export default async function TurnoverReportPage({
 
   return (
     <div>
+      <ReportsBackLink />
       <ReportsBreadcrumb items={[{ label: "List Report", href: "/reports" }, { label: "Turnover Rate" }]} />
       <PageHeader title="Employee Turnover Rate" description="Monthly exits as a percentage of employees active at the start of each month" />
       <ReportsFiltersBar departments={departments} showType showStatus showDateRange exportSlug="turnover" />

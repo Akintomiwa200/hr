@@ -5,6 +5,7 @@ import { parseReportFiltersFromRecord } from "@/lib/reports/scope";
 import { getTimeOffBalanceReport, getReportFilterOptions } from "@/lib/reports/data";
 import { PageHeader } from "@/components/ui";
 import { ReportsBreadcrumb, ReportsDataTable } from "@/components/reports/reports-data-table";
+import { ReportsBackLink } from "@/components/reports/report-detail-shell";
 import { ReportsFiltersBar } from "@/components/reports/reports-filters-bar";
 
 export default async function TimeOffBalancePage({
@@ -23,7 +24,8 @@ export default async function TimeOffBalancePage({
   ]);
 
   return (
-    <div>
+<div>
+      <ReportsBackLink />
       <ReportsBreadcrumb
         items={[
           { label: "List Report", href: "/reports" },

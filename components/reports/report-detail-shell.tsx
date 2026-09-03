@@ -1,4 +1,17 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+
+export function ReportsBackLink({ href = "/reports", label = "Back to Reports" }: { href?: string; label?: string }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1.5 mb-3 text-sm font-medium text-brand-600 hover:text-brand-700"
+    >
+      <ArrowLeft className="w-4 h-4" />
+      {label}
+    </Link>
+  );
+}
 
 export function ReportsPageHeader({
   title,

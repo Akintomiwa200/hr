@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { canViewOrgReports, canViewTeamReports } from "@/lib/reports/access";
 import { employeeDataTabs } from "@/lib/reports/catalog";
-import { ReportsPageHeader } from "@/components/reports/report-detail-shell";
+import { ReportsPageHeader, ReportsBackLink } from "@/components/reports/report-detail-shell";
 import { EmployeeDataSidebar } from "@/components/reports/employee-data-sidebar";
 
 export default async function EmployeeDataLayout({ children }: { children: React.ReactNode }) {
@@ -14,6 +14,7 @@ export default async function EmployeeDataLayout({ children }: { children: React
 
   return (
     <div>
+      <ReportsBackLink />
       <ReportsPageHeader
         title="Employee Data Reports"
         breadcrumb={[

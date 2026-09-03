@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getCompanyScope } from "@/lib/company-scope";
 import { canManageTemplates } from "@/lib/checklist/access";
@@ -22,6 +24,13 @@ export default async function ChecklistSettingsPage() {
 
   return (
     <div>
+      <Link
+        href="/checklist/todos"
+        className="inline-flex items-center gap-1.5 text-sm text-brand-600 hover:underline mb-4"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to checklist
+      </Link>
       <PageHeader
         title="Templates"
         description="Settings for the tasks that run when you add or remove people."

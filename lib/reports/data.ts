@@ -381,32 +381,68 @@ export async function getTimeOffScheduleReport(session: SessionUser, filters: Re
   return { rows };
 }
 
+const RECRUITMENT_STAGE_ORDER = ["APPLIED", "SCREENING", "INTERVIEW", "OFFER", "HIRED", "REJECTED"];
+
 export async function getRecruitmentReport(session: SessionUser) {
   const scope = getCompanyScope(session);
-  const jobs = await prisma.job.findMany({
-    where: scope.companyId ? { companyId: scope.companyId } : {},
-    include: {
-      department: true,
-      _count: { select: { applications: true } },
-    },
-  });
+  const jobWhere = scope.companyId ? { companyId: scope.companyId } : {};
+  const jobApplicationWhere = scope.companyId
+    ? { job: { companyId: scope.companyId } }
+    : {};
 
+  const [jobs, apps] = await Promise.all([
+    prisma.job.findMany({
+      where: jobWhere,
+      include: {
+        department: true,
+        _count: { select: { applications: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.jobApplication.findMany({
+      where: jobApplicationWhere,
+      select: { status: true, appliedAt: true },
+    }),
+  ]);
+
+  const openRoles = jobs.filter((j) => j.status === "OPEN").length;
+
+  // Candidates per application stage (doughnut).
   const stageMap = new Map<string, number>();
-  const apps = await prisma.jobApplication.findMany({
-    where: scope.companyId
-      ? { job: { companyId: scope.companyId } }
-      : {},
-    select: { status: true },
-  });
   for (const app of apps) {
-    stageMap.set(app.status, (stageMap.get(app.status) ?? 0) + 1);
+    const status = (app.status || "APPLIED").toUpperCase();
+    stageMap.set(status, (stageMap.get(status) ?? 0) + 1);
   }
-
-  const chart: ChartSegment[] = [...stageMap.entries()].map(([label, value], i) => ({
+  const declared = new Set(RECRUITMENT_STAGE_ORDER);
+  for (const status of stageMap.keys()) {
+    if (!declared.has(status)) declared.add(status);
+  }
+  const stageOrder = Array.from(declared);
+  const chart: ChartSegment[] = stageOrder.map((label, i) => ({
     label,
-    value,
+    value: stageMap.get(label) ?? 0,
     color: CHART_COLORS[i % CHART_COLORS.length],
   }));
+
+  // Applications per month, last 6 months (line).
+  const monthTotals = new Map<string, number>();
+  for (const app of apps) {
+    const d = new Date(app.appliedAt);
+    const key = d.toLocaleString("en-US", { month: "short" }) + " " + d.getFullYear();
+    monthTotals.set(key, (monthTotals.get(key) ?? 0) + 1);
+  }
+  const applicantsLine: BarPoint[] = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const cursor = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const label = cursor.toLocaleString("en-US", { month: "short", year: "numeric" });
+    applicantsLine.push({
+      label,
+      value: monthTotals.get(label) ?? 0,
+      month: cursor.toLocaleString("en-US", { month: "short" }),
+      year: cursor.getFullYear(),
+    });
+  }
 
   const rows = jobs.map((job) => ({
     id: job.id,
@@ -416,7 +452,18 @@ export async function getRecruitmentReport(session: SessionUser) {
     applicants: job._count.applications,
     postedAt: job.createdAt.toISOString(),
   }));
-  return { chart, rows };
+
+  return {
+    chart,
+    applicantsLine,
+    stats: {
+      openRoles,
+      totalCandidates: apps.length,
+      applicants: apps.length,
+      hired: stageMap.get("HIRED") ?? 0,
+    },
+    rows,
+  };
 }
 
 export async function getReportFilterOptions(session: SessionUser) {

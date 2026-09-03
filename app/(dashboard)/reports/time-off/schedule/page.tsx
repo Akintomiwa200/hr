@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui";
 import { ReportsBreadcrumb, ReportsDataTable, statusBadge } from "@/components/reports/reports-data-table";
+import { ReportsBackLink } from "@/components/reports/report-detail-shell";
 import { ReportsFiltersBar } from "@/components/reports/reports-filters-bar";
 
 export default async function TimeOffSchedulePage({
@@ -33,6 +34,7 @@ export default async function TimeOffSchedulePage({
 
   return (
     <div>
+      <ReportsBackLink />
       <ReportsBreadcrumb
         items={[
           { label: "List Report", href: "/reports" },

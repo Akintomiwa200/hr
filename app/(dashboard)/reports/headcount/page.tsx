@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { canViewReports, canViewTeamReports } from "@/lib/reports/access";
 import { parseReportFiltersFromRecord } from "@/lib/reports/scope";
 import { getHeadcountReport, getReportFilterOptions } from "@/lib/reports/data";
-import { ReportsPageHeader, ReportDetailCard } from "@/components/reports/report-detail-shell";
+import { ReportsPageHeader, ReportDetailCard, ReportsBackLink } from "@/components/reports/report-detail-shell";
 import { ReportsHeadcountFilters } from "@/components/reports/reports-headcount-filters";
 import { ReportsDownloadButton } from "@/components/reports/reports-download-button";
 import { ReportsDonutChart } from "@/components/reports/reports-donut-chart";
@@ -46,6 +46,7 @@ export default async function HeadcountReportPage({
 
   return (
     <div>
+      <ReportsBackLink />
       <ReportsPageHeader
         title="Headcount (Point-in-time)"
         breadcrumb={[

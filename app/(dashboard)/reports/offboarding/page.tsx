@@ -6,6 +6,7 @@ import { getOffboardingReport, getReportFilterOptions } from "@/lib/reports/data
 import { PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { ReportsBreadcrumb, ReportsDataTable, statusBadge } from "@/components/reports/reports-data-table";
+import { ReportsBackLink } from "@/components/reports/report-detail-shell";
 import { ReportsFiltersBar } from "@/components/reports/reports-filters-bar";
 import { ReportsBarChart } from "@/components/reports/reports-bar-chart";
 
@@ -26,6 +27,7 @@ export default async function OffboardingReportPage({
 
   return (
     <div>
+      <ReportsBackLink />
       <ReportsBreadcrumb items={[{ label: "List Report", href: "/reports" }, { label: "Offboarding" }]} />
       <PageHeader title="Offboarding Report" description="Employee exits grouped by their recorded last working date" />
       <ReportsFiltersBar departments={departments} showDateRange exportSlug="offboarding" />

@@ -6,6 +6,7 @@ import { getOnboardingReport, getReportFilterOptions } from "@/lib/reports/data"
 import { PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { ReportsBreadcrumb, ReportsDataTable, statusBadge } from "@/components/reports/reports-data-table";
+import { ReportsBackLink } from "@/components/reports/report-detail-shell";
 import { ReportsFiltersBar } from "@/components/reports/reports-filters-bar";
 import { ReportsBarChart } from "@/components/reports/reports-bar-chart";
 
@@ -26,6 +27,7 @@ export default async function OnboardingReportPage({
 
   return (
     <div>
+      <ReportsBackLink />
       <ReportsBreadcrumb items={[{ label: "List Report", href: "/reports" }, { label: "New hires" }]} />
       <PageHeader title="New hires report" description="Employees grouped by their actual join date, with onboarding progress" />
       <ReportsFiltersBar departments={departments} showDateRange exportSlug="onboarding" />
