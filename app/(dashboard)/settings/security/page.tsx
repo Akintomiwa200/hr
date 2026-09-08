@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageOrgContent } from "@/lib/roles";
 import type { Role } from "@prisma/client";
+import { ChangePasswordCard } from "@/components/settings/change-password-card";
 
 export default async function SecuritySettingsPage() {
   const session = await getSession();
@@ -78,6 +79,10 @@ export default async function SecuritySettingsPage() {
             </Link>
           ) : null}
         </section>
+      </div>
+
+      <div className="mt-6 max-w-3xl">
+        <ChangePasswordCard />
       </div>
     </div>
   );

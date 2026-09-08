@@ -125,6 +125,49 @@ export async function sendWelcomeEmail(
   }
 }
 
+export async function sendPasswordResetEmail(input: {
+  to: string;
+  firstName?: string | null;
+  resetUrl: string;
+  expiresInMinutes: number;
+}): Promise<SendEmailResult> {
+  const from = emailFromAddress();
+  const name = input.firstName?.trim() || "there";
+  const subject = "Reset your Smart HR password";
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><title>Reset your Smart HR password</title></head>
+<body style="font-family:Arial,sans-serif;color:#111827;line-height:1.6;max-width:560px;margin:0 auto;padding:24px;">
+  <div style="font-size:22px;font-weight:700;color:#7B61FF;margin-bottom:16px;">Smart HR</div>
+  <h1 style="font-size:20px;margin:0 0 12px;">Hi ${name},</h1>
+  <p>We received a request to reset your Smart HR password. Click the button below to choose a new one. This link is valid for the next <strong>${input.expiresInMinutes} minutes</strong>.</p>
+  <div style="text-align:center;margin:28px 0;">
+    <a href="${input.resetUrl}" style="display:inline-block;background:#7B61FF;color:#fff;text-decoration:none;padding:14px 24px;border-radius:10px;font-weight:600;">Reset my password</a>
+  </div>
+  <p style="font-size:13px;color:#6b7280;">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+  <p style="font-size:12px;color:#9ca3af;">Smart HR — Modern HR for teams that move fast.</p>
+</body>
+</html>`;
+
+  return deliverMail({
+    from,
+    to: input.to,
+    subject,
+    html,
+    text: [
+      `Hi ${name},`,
+      "",
+      "We received a request to reset your Smart HR password.",
+      `Use the link below to choose a new one. It's valid for ${input.expiresInMinutes} minutes:`,
+      "",
+      input.resetUrl,
+      "",
+      "If you didn't request this, you can safely ignore this email.",
+    ].join("\n"),
+  });
+}
+
 export async function verifyEmailTransport() {
   const transport = getTransporter();
   if (!transport) return { ok: false, error: "SMTP not configured" };

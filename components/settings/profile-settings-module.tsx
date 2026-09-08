@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleHelp } from "lucide-react";
+import { CircleHelp, ImagePlus, Trash2, UserRound } from "lucide-react";
 import { Button, Card, CardHeader } from "@/components/ui";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
@@ -20,6 +20,7 @@ type EmployeeProfile = {
   jobTitle: string;
   hireDate: Date | string;
   dateOfBirth: Date | string | null;
+  avatar: string | null;
   department: { name: string };
 };
 
@@ -94,6 +95,9 @@ export function ProfileSettingsModule({
   const router = useRouter();
   const [phone, setPhone] = useState(employee?.phone ?? "");
   const [address, setAddress] = useState(employee?.address ?? "");
+  const [avatar, setAvatar] = useState(employee?.avatar ?? null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [prefs, setPrefs] = useState<Record<string, boolean>>({
     leave: preferences.leave ?? true,
     payroll: preferences.payroll ?? true,
@@ -124,6 +128,49 @@ export function ProfileSettingsModule({
     }
   };
 
+  const removeAvatar = async () => {
+    setUploading(true);
+    try {
+      const res = await fetch("/api/settings/avatar", { method: "DELETE" });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Could not remove photo"));
+        return;
+      }
+      setAvatar(null);
+      notify.success("Profile photo removed");
+      router.refresh();
+    } catch {
+      notify.error("Could not remove photo. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const uploadAvatar = async (file: File) => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/settings/avatar", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Could not upload photo"));
+        return;
+      }
+      const data = await res.json();
+      setAvatar(data.avatar);
+      notify.success("Profile photo updated");
+      router.refresh();
+    } catch {
+      notify.error("Could not upload photo. Please try again.");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card className="overflow-hidden">
@@ -132,6 +179,50 @@ export function ProfileSettingsModule({
           description="Your account and employee details"
           action={<SectionHelpLink href="/help/settings" visible={canAccessHelp} />}
         />
+        {employee && (
+          <div className="px-6 pt-2 pb-4 flex items-center gap-4 border-b border-gray-100">
+            <div className="w-16 h-16 rounded-full bg-violet-100 flex items-center justify-center shrink-0 overflow-hidden ring-2 ring-violet-50">
+              {avatar ? (
+                <img src={avatar} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <UserRound className="w-7 h-7 text-violet-600" />
+              )}
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-xl hover:bg-violet-100 disabled:opacity-60"
+              >
+                <ImagePlus className="w-3.5 h-3.5" />
+                {uploading ? "Uploading…" : avatar ? "Change photo" : "Upload photo"}
+              </button>
+              {avatar && (
+                <button
+                  type="button"
+                  onClick={removeAvatar}
+                  disabled={uploading}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 ml-2 text-[13px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 disabled:opacity-60"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Remove
+                </button>
+              )}
+              <p className="text-[11px] text-gray-400 mt-1.5">PNG, JPG or WEBP · max 2 MB</p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadAvatar(f);
+                }}
+              />
+            </div>
+          </div>
+        )}
         <dl className="px-6 pb-2 space-y-0 text-sm">
           <div className="flex justify-between py-3 border-b border-gray-100">
             <dt className="text-gray-500">Email</dt>

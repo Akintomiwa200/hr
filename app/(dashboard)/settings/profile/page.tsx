@@ -17,7 +17,19 @@ export default async function ProfileSettingsPage() {
   const employee = session.employeeId
     ? await prisma.employee.findUnique({
         where: { id: session.employeeId },
-        include: { department: true },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          employeeCode: true,
+          phone: true,
+          address: true,
+          jobTitle: true,
+          hireDate: true,
+          dateOfBirth: true,
+          avatar: true,
+          department: { select: { name: true } },
+        },
       })
     : null;
 
