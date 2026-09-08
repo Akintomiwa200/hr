@@ -31,7 +31,7 @@ export default async function AgeProfilePage({
   const empIds = rows.map((r) => String(r.id));
   const employees = await prisma.employee.findMany({
     where: { id: { in: empIds } },
-    select: { id: true, firstName: true, lastName: true, email: true, hireDate: true, status: true },
+    select: { id: true, firstName: true, lastName: true, email: true, avatar: true, hireDate: true, status: true },
   });
   const hrStatuses = await resolveHrStatuses(employees);
   const empMap = new Map(employees.map((e) => [e.id, e]));
@@ -43,6 +43,7 @@ export default async function AgeProfilePage({
       firstName: emp?.firstName ?? "",
       lastName: emp?.lastName ?? "",
       email: emp?.email ?? "",
+      avatar: emp?.avatar ?? null,
       hrStatus: hrStatuses.get(String(r.id)) ?? "ACTIVE",
     };
   });
@@ -67,6 +68,7 @@ export default async function AgeProfilePage({
                 firstName={String(r.firstName)}
                 lastName={String(r.lastName)}
                 email={String(r.email)}
+                avatar={r.avatar as string | undefined}
               />
             ),
           },

@@ -87,10 +87,11 @@ export async function getHeadcountReport(session: SessionUser, filters: ReportFi
     color: CHART_COLORS[i % CHART_COLORS.length],
   }));
 
-  let rows = employees.map((emp) => ({
+  const rows = employees.map((emp) => ({
     id: emp.id,
     firstName: emp.firstName,
     lastName: emp.lastName,
+    avatar: emp.avatar,
     name: fullName(emp.firstName, emp.lastName),
     email: emp.email,
     employeeCode: emp.employeeCode,

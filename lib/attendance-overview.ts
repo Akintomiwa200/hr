@@ -21,6 +21,7 @@ export type AttendancePerson = {
   id: string;
   firstName: string;
   lastName: string;
+  avatar: string | null;
   employeeCode: string;
   biometricPin: string | null;
   branchId: string | null;
@@ -110,6 +111,7 @@ const employeeSelect = {
   id: true,
   firstName: true,
   lastName: true,
+  avatar: true,
   employeeCode: true,
   biometricPin: true,
   branchId: true,

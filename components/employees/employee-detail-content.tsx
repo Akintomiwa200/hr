@@ -133,6 +133,7 @@ export function EmployeeDetailContent({
             <Avatar
               firstName={employee.firstName}
               lastName={employee.lastName}
+              src={employee.avatar}
               size="lg"
             />
             <div>
@@ -298,7 +299,7 @@ export function EmployeeDetailContent({
                     href={`/employees/${report.id}`}
                     className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-violet-200 hover:bg-violet-50/40 transition-colors"
                   >
-                    <Avatar firstName={report.firstName} lastName={report.lastName} size="sm" />
+                    <Avatar firstName={report.firstName} lastName={report.lastName} src={report.avatar} size="sm" />
                     <div className="min-w-0">
                       <p className="text-[13px] font-medium text-gray-900 truncate">
                         {fullName(report.firstName, report.lastName)}

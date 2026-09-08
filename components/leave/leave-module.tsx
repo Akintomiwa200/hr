@@ -28,7 +28,7 @@ type LeaveRow = {
   reason: string;
   status: string;
   createdAt: Date | string;
-  employee: { id: string; firstName: string; lastName: string };
+  employee: { id: string; firstName: string; lastName: string; avatar?: string | null };
   approver: { firstName: string; lastName: string } | null;
 };
 
@@ -272,6 +272,7 @@ export function LeaveModule({
                           <Avatar
                             firstName={leave.employee.firstName}
                             lastName={leave.employee.lastName}
+                            src={leave.employee.avatar}
                             size="sm"
                           />
                         )}

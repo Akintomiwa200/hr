@@ -206,7 +206,7 @@ function PunchRows({ punches }: { punches: AttendancePunchRow[] }) {
         >
           <div className="flex items-center gap-3 min-w-0">
             {punch.employee ? (
-              <Avatar firstName={punch.employee.firstName} lastName={punch.employee.lastName} size="sm" />
+              <Avatar firstName={punch.employee.firstName} lastName={punch.employee.lastName} src={punch.employee.avatar} size="sm" />
             ) : (
               <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
                 <Fingerprint className="w-4 h-4" />
@@ -945,6 +945,7 @@ export function AttendanceModule({
                       <Avatar
                         firstName={record.employee.firstName}
                         lastName={record.employee.lastName}
+                        src={record.employee.avatar}
                         size="sm"
                       />
                     )}

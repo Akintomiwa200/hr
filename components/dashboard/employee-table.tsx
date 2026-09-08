@@ -143,7 +143,7 @@ export function EmployeeTable({ employees: initialEmployees }: { employees: Empl
                   </td>
                   <td className="px-3 py-3.5">
                     <Link href={`/employees/${emp.id}`} className="flex items-center gap-2.5 group">
-                      <Avatar firstName={emp.firstName} lastName={emp.lastName} size="sm" />
+                      <Avatar firstName={emp.firstName} lastName={emp.lastName} src={emp.avatar} size="sm" />
                       <span className="font-medium text-[13px] text-gray-900 group-hover:text-violet-600 whitespace-nowrap">
                         {fullName(emp.firstName, emp.lastName)}
                       </span>

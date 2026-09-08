@@ -806,7 +806,7 @@ export function EmployeesModule({
                         onClick={() => openView(emp)}
                         className="flex items-center gap-2.5 group text-left"
                       >
-                        <Avatar firstName={emp.firstName} lastName={emp.lastName} size="sm" />
+                        <Avatar firstName={emp.firstName} lastName={emp.lastName} src={emp.avatar} size="sm" />
                         <span className="font-medium text-[13px] text-gray-900 group-hover:text-violet-600 whitespace-nowrap">
                           {fullName(emp.firstName, emp.lastName)}
                         </span>
@@ -952,6 +952,7 @@ export function EmployeesModule({
               <Avatar
                 firstName={viewEmployee.firstName}
                 lastName={viewEmployee.lastName}
+                src={viewEmployee.avatar}
                 size="lg"
               />
               <div>

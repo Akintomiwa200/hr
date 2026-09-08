@@ -73,6 +73,7 @@ type Appraisal = {
     id: string;
     firstName: string;
     lastName: string;
+    avatar?: string | null;
     department?: { id?: string; name: string } | null;
   };
   manager: { firstName: string; lastName: string };
@@ -728,6 +729,7 @@ export function PerformanceHub({
                                 <Avatar
                                   firstName={appraisal.employee.firstName}
                                   lastName={appraisal.employee.lastName}
+                                  src={appraisal.employee.avatar}
                                   size="sm"
                                 />
                                 <div>

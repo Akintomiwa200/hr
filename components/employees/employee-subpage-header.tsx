@@ -14,6 +14,7 @@ export function EmployeeSubpageHeader({
     firstName: string;
     lastName: string;
     jobTitle: string;
+    avatar: string | null;
     department: { name: string };
   };
   title: string;
@@ -35,6 +36,7 @@ export function EmployeeSubpageHeader({
           <Avatar
             firstName={employee.firstName}
             lastName={employee.lastName}
+            src={employee.avatar}
             size="lg"
           />
           <div>

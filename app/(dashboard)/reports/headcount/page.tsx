@@ -81,6 +81,7 @@ export default async function HeadcountReportPage({
                   firstName={String(r.firstName)}
                   lastName={String(r.lastName)}
                   email={String(r.email)}
+                  avatar={r.avatar as string | undefined}
                 />
               ),
             },
