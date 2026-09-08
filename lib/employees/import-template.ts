@@ -23,6 +23,7 @@ export const EMPLOYEE_IMPORT_COLUMNS = [
   { key: "salary", header: "Salary", width: 14 },
   { key: "hireDate", header: "Start date", width: 16 },
   { key: "dateOfBirth", header: "Date of birth", width: 16 },
+  { key: "address", header: "Address", width: 30 },
 ] as const;
 
 export type EmployeeImportRow = {
@@ -39,6 +40,7 @@ export type EmployeeImportRow = {
   salary: string;
   hireDate: string;
   dateOfBirth: string;
+  address: string;
 };
 
 const EMPLOYMENT_OPTIONS = ["Full-time", "Freelance"];
@@ -135,6 +137,8 @@ export async function buildEmployeeImportWorkbook(
     roleLabel("EMPLOYEE"),
     "85000",
     "08/30/2026",
+    "",
+    "",
   ]);
   example.eachCell((cell) => {
     cell.fill = {
@@ -219,7 +223,7 @@ export async function buildEmployeeImportWorkbook(
   setList("I", empOptionRange);
   setList("J", roleOptionRange);
 
-  sheet.autoFilter = { from: "A1", to: "L1" };
+  sheet.autoFilter = { from: "A1", to: "M1" };
   sheet.views = [{ state: "frozen", ySplit: 2 }];
 
   const buffer = await workbook.xlsx.writeBuffer();
@@ -261,7 +265,8 @@ export function parseEmployeeImportWorkbook(buffer: Buffer): EmployeeImportRow[]
         role: String(row["Role"] ?? "").trim(),
         salary: String(row["Salary"] ?? "").trim(),
         hireDate: String(row["Start date"] ?? "").trim(),
-        dateOfBirth: String(row["Date of birth"] ?? "").trim(),
+        dateOfBirth: String(row["Date of birth"] ?? row["Date of Birth"] ?? "").trim(),
+        address: String(row["Address"] ?? "").trim(),
       });
     }
   }
@@ -335,22 +340,43 @@ export async function importEmployeesFromTemplate(
   for (const row of rows) {
     const name = `${row.firstName} ${row.lastName}`.trim() || row.email;
 
-    const departmentId = deptByName.get(row.department.toLowerCase());
+    // Resolve or auto-create the department so rows aren't dropped for a missing match.
+    const deptName = row.department.trim();
+    let departmentId = deptName
+      ? deptByName.get(deptName.toLowerCase())
+      : undefined;
+    if (deptName && !departmentId) {
+      const created = await prisma.department.create({
+        data: {
+          name: deptName,
+          ...(companyId ? { companyId } : {}),
+        },
+      });
+      departmentId = created.id;
+      deptByName.set(deptName.toLowerCase(), created.id);
+    }
     if (!departmentId) {
-      result.errors.push(`${name}: unknown Department "${row.department || "(blank)"}"`);
+      result.errors.push(`${name}: Department is required`);
       result.skipped += 1;
       continue;
     }
 
+    // Resolve or auto-create the branch. Blank or "none" leaves it unset.
     const branchKey = row.branch.trim().toLowerCase();
-    const branchId =
+    let branchId =
       branchKey === "none" || !branchKey
         ? null
         : branchByName.get(branchKey) || null;
     if (branchKey && branchKey !== "none" && !branchId) {
-      result.errors.push(`${name}: unknown Branch "${row.branch.trim()}"`);
-      result.skipped += 1;
-      continue;
+      const created = await prisma.branch.create({
+        data: {
+          name: row.branch.trim(),
+          location: row.branch.trim(),
+          ...(companyId ? { companyId } : {}),
+        },
+      });
+      branchId = created.id;
+      branchByName.set(branchKey, created.id);
     }
 
     const mgrKey = row.manager.trim().toLowerCase();
@@ -386,6 +412,7 @@ export async function importEmployeesFromTemplate(
       hireDate,
       dateOfBirth,
       employeeCode: requestedCode || null,
+      address: row.address || null,
     };
 
     try {
@@ -430,6 +457,7 @@ async function updateImportedEmployee(employeeId: string, input: CreateEmployeeI
       salary: Number(input.salary) || 0,
       hireDate: parseLocalDate(input.hireDate) ?? undefined,
       dateOfBirth: parseLocalDate(input.dateOfBirth) ?? null,
+      address: input.address?.trim() || null,
     },
   });
   if (!input.email || !input.email.includes("@")) return;

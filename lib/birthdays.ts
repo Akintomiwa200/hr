@@ -193,7 +193,7 @@ async function celebrateOne(
 ) {
   const docId = await issueBirthdayLetter(companyId, celebrant, companyName, currency);
 
-  if (celebrant.userId) {
+  if (celebrant.userId && !(await hasNotificationToday(celebrant.userId, "Happy Birthday! 🎉"))) {
     await createNotification({
       userId: celebrant.userId,
       type: "general",
@@ -267,14 +267,30 @@ async function notifyColleagues(
   });
 
   for (const user of colleagueUsers) {
+    const title = `🎉 ${name} is celebrating a birthday`;
+    if (await hasNotificationToday(user.id, title)) continue;
     await createNotification({
       userId: user.id,
       type: "general",
-      title: `🎉 ${name} is celebrating a birthday`,
+      title,
       message: `Wish ${celebrant.firstName} a happy birthday today!`,
       href: "/reports/employee-data/birthday",
     });
   }
+}
+
+async function hasNotificationToday(userId: string, title: string): Promise<boolean> {
+  if (!isNotificationModelReady()) return false;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const existing = await prisma.notification.count({
+    where: {
+      userId,
+      title,
+      createdAt: { gte: start },
+    },
+  });
+  return existing > 0;
 }
 
 function birthdayEmailHtml(celebrant: BirthdayCelebrant, companyName: string): string {

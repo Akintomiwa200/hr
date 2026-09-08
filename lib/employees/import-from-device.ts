@@ -92,10 +92,12 @@ export async function importDeviceEmployees(
   }
 
   for (const row of options.rows) {
-    const pin = row.pin.trim();
+    // If the file gave no PIN/code, auto-generate one so every staff row imports.
+    let pin = row.pin?.trim() || "";
+    let employeeCode = row.employeeCode?.trim() || "";
     if (!pin) {
-      skipped += 1;
-      continue;
+      employeeCode = employeeCode || (await resolveEmployeeCode(row));
+      pin = employeeCode;
     }
 
     const pinKey = pin.toUpperCase();
@@ -139,7 +141,7 @@ export async function importDeviceEmployees(
         continue;
       }
 
-      const employeeCode = await resolveEmployeeCode(row);
+      if (!employeeCode) employeeCode = await resolveEmployeeCode(row);
       const user = await withPrismaRetry(() =>
         prisma.user.create({
           data: {
