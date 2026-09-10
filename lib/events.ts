@@ -22,7 +22,9 @@ export type RealtimeEventType =
   | "settings_updated"
   | "subscription_updated"
   | "notification_updated"
-  | "notes_updated";
+  | "notes_updated"
+  | "bulk_message_created"
+  | "bulk_message_updated";
 
 export type RealtimeEvent = {
   type: RealtimeEventType;

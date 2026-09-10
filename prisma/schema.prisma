@@ -172,6 +172,62 @@ model Company {
   portalDocuments   PortalDocument[]
   roleDefinitions   RoleDefinition[]
   notes             Note[]
+  bulkMessages      BulkMessage[]
+}
+
+enum MessageChannel {
+  SMS
+  EMAIL
+  WHATSAPP
+}
+
+enum MessageStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+}
+
+model BulkMessage {
+  id          String         @id @default(cuid())
+  companyId   String?
+  channel     MessageChannel
+  subject     String?
+  message     String
+  recipientType String      @default("ALL") // ALL | DEPARTMENT | CUSTOM
+  departmentId String?
+  recipientCount Int         @default(0)
+  sentCount   Int            @default(0)
+  failedCount Int            @default(0)
+  status      MessageStatus  @default(PENDING)
+  sentByName  String?
+  sentById    String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  company    Company?               @relation(fields: [companyId], references: [id])
+  recipients BulkMessageRecipient[]
+
+  @@index([companyId, createdAt])
+  @@index([status])
+}
+
+model BulkMessageRecipient {
+  id            String    @id @default(cuid())
+  messageId     String
+  employeeId    String
+  recipientEmail String?
+  recipientPhone String?
+  recipientName String?
+  status        MessageStatus @default(PENDING)
+  error         String?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  message BulkMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([employeeId])
 }
 
 model Notification {

@@ -33,6 +33,7 @@ import {
   BarChart3,
   PenLine,
   StickyNote,
+  MessageSquare,
 } from "lucide-react";
 import { CHECKLIST_ADMIN_ROLES, CHECKLIST_TEMPLATE_ROLES, CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
 import {
@@ -338,6 +339,14 @@ export const dashboardNavSections: NavSection[] = [
     title: "More",
     items: [
       {
+        id: "bulk-messaging",
+        href: "/bulk-messaging",
+        label: "Bulk Messaging",
+        pageTitle: "Bulk Messaging",
+        icon: MessageSquare,
+        roles: ["COMPANY_ADMIN", "HR"],
+      },
+      {
         id: "announcements",
         href: "/announcements",
         label: "Announcements",
@@ -516,8 +525,12 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
     title: "Recruitment Settings",
   },
   {
-    test: (p) => p === "/recruitment",
-    title: "Recruitment",
+    test: (p) => p === "/bulk-messaging",
+    title: "Bulk Messaging",
+  },
+  {
+    test: (p) => p === "/announcements",
+    title: "Announcements",
   },
   {
     test: (p) =>
