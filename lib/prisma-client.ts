@@ -25,7 +25,12 @@ function isPrismaClientFresh(client: PrismaClient) {
     hasDelegate(client, "checklistInstance", "findMany") &&
     hasDelegate(client, "checklistTask", "findMany") &&
     hasDelegate(client, "checklistTaskComment", "create") &&
-    hasDelegate(client, "branch", "findMany")
+    hasDelegate(client, "branch", "findMany") &&
+    hasDelegate(client, "loan", "findMany") &&
+    hasDelegate(client, "loanInstallment", "findMany") &&
+    hasDelegate(client, "leaveSettings", "findMany") &&
+    hasDelegate(client, "leaveAllocation", "findMany") &&
+    hasDelegate(client, "auditLog", "findMany")
   );
 }
 

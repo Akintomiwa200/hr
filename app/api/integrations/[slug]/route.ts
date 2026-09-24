@@ -7,6 +7,7 @@ import { isGoogleWorkspaceConfigured } from "@/lib/integrations/google/workspace
 import { isZohoConfigured } from "@/lib/integrations/zoho/oauth";
 import { INTEGRATION_ADMIN_ROLES } from "@/lib/roles";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { audit } from "@/lib/audit";
 
 export async function GET(
   _request: Request,
@@ -62,6 +63,13 @@ export async function DELETE(
   }
 
   broadcastAppEvent("integration_updated", { provider, action: "disconnected" });
+  await audit({
+    actor: session,
+    module: "integrations",
+    action: "DELETE",
+    entityLabel: slug,
+    meta: { provider, action: "disconnected" },
+  });
 
   return NextResponse.json({ success: true });
 }

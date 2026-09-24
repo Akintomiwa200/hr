@@ -7,6 +7,7 @@ import { startEmployeeOffboarding } from "@/lib/checklist/instantiate";
 import { notifyEmployeeChange } from "@/lib/employees/mutations";
 import { prisma } from "@/lib/prisma";
 import { parseLocalDate } from "@/lib/dates";
+import { audit } from "@/lib/audit";
 
 export async function POST(
   request: NextRequest,
@@ -38,6 +39,14 @@ export async function POST(
     });
 
     notifyEmployeeChange(id, deactivate ? "deleted" : "updated");
+    void audit({
+      actor: session,
+      module: "offboarding",
+      action: "OFFBOARD",
+      entityId: id,
+      entityLabel: `${employee.firstName} ${employee.lastName}`.trim(),
+      meta: { deactivate, endDate: endDate.toISOString() },
+    });
     revalidatePath("/checklist/offboarding");
     revalidatePath("/checklist/todos");
     revalidatePath("/employees");

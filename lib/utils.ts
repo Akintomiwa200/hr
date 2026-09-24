@@ -22,6 +22,16 @@ export function formatDate(date: Date | string) {
   }).format(new Date(date));
 }
 
+/** Formats a "YYYY-MM" period key, e.g. "2026-03" -> "March 2026". */
+export function formatMonthLabel(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  if (!year || !month) return monthKey;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(year, month - 1, 1));
+}
+
 export function getInitials(firstName: string, lastName: string) {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }

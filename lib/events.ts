@@ -24,7 +24,8 @@ export type RealtimeEventType =
   | "notification_updated"
   | "notes_updated"
   | "bulk_message_created"
-  | "bulk_message_updated";
+  | "bulk_message_updated"
+  | "loan_updated";
 
 export type RealtimeEvent = {
   type: RealtimeEventType;

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { listPendingPayrollDeductions } from "@/lib/payroll-deductions";
+import { getAttendanceSettings } from "@/lib/attendance-settings";
 import {
   countDaysWorked,
   countExpectedWorkingDays,
@@ -18,6 +19,38 @@ function lineId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function roundHours(value: number) {
+  return value.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function computeOvertimeMinutes(input: {
+  attendance: Array<{
+    checkIn: Date | null;
+    checkOut: Date | null;
+    breaks: Array<{ breakStart: Date; breakEnd: Date | null }>;
+  }>;
+  standardDailyMinutes: number;
+  thresholdMinutes: number;
+}) {
+  let minutes = 0;
+  for (const row of input.attendance) {
+    if (!row.checkIn || !row.checkOut) continue;
+    const worked = Math.max(0, (row.checkOut.getTime() - row.checkIn.getTime()) / 60000);
+    const breakMinutes = row.breaks.reduce((sum, b) => {
+      if (!b.breakEnd) return sum;
+      return sum + Math.max(0, (b.breakEnd.getTime() - b.breakStart.getTime()) / 60000);
+    }, 0);
+    const tracked = Math.max(0, worked - breakMinutes);
+    const extra = tracked - input.standardDailyMinutes;
+    if (extra > input.thresholdMinutes) minutes += extra;
+  }
+  return { minutes, hours: round2(minutes / 60) };
+}
+
 function mapSettings(row: {
   holidayAllowanceEnabled: boolean;
   holidayAllowanceAmount: number;
@@ -27,6 +60,9 @@ function mapSettings(row: {
   taxRatePercent: number;
   workingDaysPerWeek?: number;
   proRataSalaryEnabled?: boolean;
+  overtimeEnabled?: boolean;
+  overtimeMultiplier?: number;
+  overtimeThresholdMinutes?: number;
 }): PayrollSettingsData {
   return {
     holidayAllowanceEnabled: row.holidayAllowanceEnabled,
@@ -37,6 +73,10 @@ function mapSettings(row: {
     taxRatePercent: row.taxRatePercent,
     workingDaysPerWeek: row.workingDaysPerWeek === 6 ? 6 : 5,
     proRataSalaryEnabled: row.proRataSalaryEnabled !== false,
+    overtimeEnabled: row.overtimeEnabled !== false,
+    overtimeMultiplier: row.overtimeMultiplier ?? defaultPayrollSettings.overtimeMultiplier,
+    overtimeThresholdMinutes:
+      row.overtimeThresholdMinutes ?? defaultPayrollSettings.overtimeThresholdMinutes,
   };
 }
 
@@ -135,6 +175,7 @@ export async function buildAutoPayrollBreakdown(input: {
         employeeId: input.employeeId,
         date: { gte: periodStart, lte: periodEnd },
       },
+      include: { breaks: true },
       orderBy: { date: "asc" },
     }),
     prisma.holiday.findMany({
@@ -222,6 +263,41 @@ export async function buildAutoPayrollBreakdown(input: {
     });
   }
 
+  let overtimeMinutes = 0;
+  let overtimeHours = 0;
+  let overtimePay = 0;
+  if (settings.overtimeEnabled) {
+    const attendanceSettings = await getAttendanceSettings(companyId);
+    const standardDailyMinutes =
+      (attendanceSettings.workEndHour * 60 + attendanceSettings.workEndMinute) -
+      (attendanceSettings.workStartHour * 60 + attendanceSettings.workStartMinute);
+    if (standardDailyMinutes > 0) {
+      const metrics = computeOvertimeMinutes({
+        attendance,
+        standardDailyMinutes,
+        thresholdMinutes: settings.overtimeThresholdMinutes,
+      });
+      overtimeMinutes = metrics.minutes;
+      overtimeHours = metrics.hours;
+      if (overtimeHours > 0 && daysWorked > 0) {
+        const hourlyRate =
+          earnedBase / (daysWorked * (standardDailyMinutes / 60));
+        overtimePay = roundMoney(
+          overtimeHours * hourlyRate * settings.overtimeMultiplier
+        );
+        items.push({
+          id: lineId("overtime"),
+          type: "EARNING",
+          category: "OVERTIME",
+          label: `Overtime — ${overtimeHours}h @ ${roundHours(hourlyRate)}/hr × ${settings.overtimeMultiplier}`,
+          amount: overtimePay,
+          auto: true,
+          editable: true,
+        });
+      }
+    }
+  }
+
   if (lateDays > 0) {
     const lateDates = formatShortDates(lateRows.map((row) => row.date));
     items.push({
@@ -289,6 +365,12 @@ export async function buildAutoPayrollBreakdown(input: {
       earnedBase,
       workingDaysPerWeek: settings.workingDaysPerWeek,
       proRataSalaryEnabled: settings.proRataSalaryEnabled,
+      overtimeEnabled: settings.overtimeEnabled,
+      overtimeMultiplier: settings.overtimeMultiplier,
+      overtimeThresholdMinutes: settings.overtimeThresholdMinutes,
+      overtimeMinutes,
+      overtimeHours,
+      overtimePay,
       pendingDeductionIds: pendingDeductions.map((row) => row.id),
     },
   };

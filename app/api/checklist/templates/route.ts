@@ -5,6 +5,7 @@ import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
 import { getCompanyScope, checklistCompanyWhere, requireOrgCompanyId } from "@/lib/company-scope";
 import { canManageTemplates } from "@/lib/checklist/access";
+import { audit } from "@/lib/audit";
 
 const STARTER_TASKS: Record<
   "ONBOARDING" | "OFFBOARDING",
@@ -123,6 +124,14 @@ export async function POST(request: NextRequest) {
   });
 
   broadcastAppEvent("checklist_updated", { id: template.id, action: "template_created" });
+  await audit({
+    actor: session,
+    module: "checklist",
+    action: "CREATE",
+    entityId: template.id,
+    entityLabel: template.name,
+    meta: { type, starterTasks: starters.length },
+  });
   revalidatePath("/checklist/settings");
   revalidatePath("/checklist/onboarding");
   revalidatePath("/checklist/offboarding");

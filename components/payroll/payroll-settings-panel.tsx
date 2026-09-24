@@ -118,6 +118,66 @@ export function PayrollSettingsPanel({
             )}
           </Card>
 
+          <Card className="p-4 bg-violet-50/40 border-violet-100">
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Overtime pay</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Calculate and add overtime earnings automatically from attendance when the
+                  employee works past their official hours.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={form.overtimeEnabled}
+                onChange={(e) =>
+                  setForm({ ...form, overtimeEnabled: e.target.checked })
+                }
+                className="w-5 h-5 accent-violet-600"
+              />
+            </label>
+            {form.overtimeEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">
+                    Hourly rate multiplier
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.25"
+                    className={`${inputClass} mt-1`}
+                    value={form.overtimeMultiplier}
+                    onChange={(e) =>
+                      setForm({ ...form, overtimeMultiplier: Number(e.target.value) || 1 })
+                    }
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    e.g. 1.5 = time-and-a-half, 2 = double time.
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">
+                    Minimum extra minutes / day
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="5"
+                    className={`${inputClass} mt-1`}
+                    value={form.overtimeThresholdMinutes}
+                    onChange={(e) =>
+                      setForm({ ...form, overtimeThresholdMinutes: Number(e.target.value) || 0 })
+                    }
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Only count days where overtime exceeds this many minutes.
+                  </p>
+                </div>
+              </div>
+            )}
+          </Card>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-500 uppercase">

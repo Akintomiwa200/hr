@@ -6,6 +6,7 @@ import { badRequest, isHr, requireSession, unauthorized } from "@/lib/api-auth";
 import { resolveRecruitmentCompanyId } from "@/lib/recruitment/data";
 import { resolveHiringTeamMembers } from "@/lib/recruitment/provision-staff";
 import type { HiringTeamMember } from "@/lib/recruitment/constants";
+import { audit } from "@/lib/audit";
 
 export async function GET() {
   const session = await requireSession();
@@ -87,6 +88,14 @@ export async function POST(request: NextRequest) {
   });
 
   broadcastAppEvent("job_updated", { id: job.id });
+  await audit({
+    actor: session,
+    module: "recruitment",
+    action: "CREATE",
+    entityId: job.id,
+    entityLabel: job.title,
+    meta: { departmentId, type, status },
+  });
   revalidatePath("/recruitment");
   revalidatePath("/careers");
   return NextResponse.json(job);

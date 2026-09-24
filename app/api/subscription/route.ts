@@ -10,6 +10,7 @@ import type { SubscriptionPlanId } from "@/lib/subscription-plans";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { isCompanyAdmin, isSuperAdmin, normalizeRole } from "@/lib/roles";
 import { notifyCompanyUsers } from "@/lib/notifications";
+import { audit } from "@/lib/audit";
 
 export async function GET() {
   const session = await getSession();
@@ -53,6 +54,14 @@ export async function PATCH(request: NextRequest) {
   try {
     await changeCompanyPlan(session.companyId, body.planId, {
       billingEmail: body.billingEmail,
+    });
+
+    await audit({
+      actor: session,
+      module: "subscription",
+      action: "SETTING",
+      entityLabel: "Company plan",
+      meta: { planId: body.planId, billingEmail: body.billingEmail ?? null },
     });
 
     broadcastAppEvent("subscription_updated", {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleHelp, ChevronsUpDown, LogOut, Settings, UserRound } from "lucide-react";
+import { CircleHelp, ChevronsUpDown, LogOut, Settings, UserRound, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@prisma/client";
 import {
@@ -84,6 +84,110 @@ function NavLink({
   );
 }
 
+
+function NavCollapsible({
+  item,
+  isActive,
+  collapsed,
+  activeId,
+  notificationCount,
+  pendingLeaveCount,
+  onNavigate,
+}: {
+  item: NavItem;
+  isActive: boolean;
+  collapsed?: boolean;
+  activeId: string | null;
+  notificationCount: number;
+  pendingLeaveCount: number;
+  onNavigate?: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(isActive);
+  const Icon = item.icon;
+
+  // Re-open if it becomes active from outside
+  useEffect(() => {
+    if (isActive) setIsOpen(true);
+  }, [isActive]);
+
+  if (collapsed) {
+    return (
+      <NavLink
+        item={item}
+        isActive={isActive}
+        collapsed={collapsed}
+        onNavigate={onNavigate}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-0.5">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "w-full flex items-center justify-between px-3 py-2 text-[13px] rounded-lg transition-colors",
+          isActive
+            ? "bg-violet-50 text-violet-700 font-medium"
+            : "text-gray-600 hover:bg-gray-50"
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <Icon
+            className={cn(
+              "w-[18px] h-[18px] shrink-0",
+              isActive ? "text-violet-600" : "text-gray-500"
+            )}
+          />
+          <span className="truncate flex-1 text-left">{item.label}</span>
+        </div>
+        <ChevronDown
+          className={cn(
+            "w-4 h-4 shrink-0 transition-transform duration-200",
+            isActive ? "text-violet-600" : "text-gray-400",
+            isOpen && "rotate-180"
+          )}
+        />
+      </button>
+
+      {isOpen && item.subItems && (
+        <div className="pl-9 pr-2 space-y-0.5 pt-0.5">
+          {item.subItems.map((subItem) => {
+            const isSubActive = activeId === subItem.id;
+            const badge =
+              subItem.id === "notifications"
+                ? notificationCount
+                : subItem.id === "leave" && pendingLeaveCount > 0
+                  ? pendingLeaveCount
+                  : undefined;
+
+            return (
+              <Link
+                key={subItem.id}
+                href={subItem.href}
+                onClick={onNavigate}
+                className={cn(
+                  "flex items-center justify-between px-3 py-1.5 text-[12.5px] rounded-md transition-colors",
+                  isSubActive
+                    ? "text-violet-700 font-medium bg-violet-50/50"
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                )}
+              >
+                <span className="truncate">{subItem.label}</span>
+                {badge != null && badge > 0 && (
+                  <span className="shrink-0 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-semibold rounded-full bg-gray-100 text-gray-600">
+                    {badge > 99 ? "99+" : badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NavSection({
   title,
   items,
@@ -114,23 +218,43 @@ function NavSection({
         </p>
       )}
       <div className="space-y-0.5">
-        {filtered.map((item) => (
-          <NavLink
-            key={item.id}
-            item={item}
-            isActive={activeId === item.id}
-            badge={
-              item.id === "notifications"
-                ? notificationCount
-                : item.id === "leave" && pendingLeaveCount > 0
-                  ? pendingLeaveCount
-                  : undefined
-            }
-            collapsed={collapsed}
-            onNavigate={onNavigate}
-          />
-        ))}
-      </div>
+        
+        {filtered.map((item) => {
+          const isItemActive = activeId === item.id || Boolean(item.subItems?.some((s) => activeId === s.id));
+          const badge =
+            item.id === "notifications"
+              ? notificationCount
+              : item.id === "leave" && pendingLeaveCount > 0
+                ? pendingLeaveCount
+                : undefined;
+
+          if (item.subItems && item.subItems.length > 0) {
+            return (
+              <NavCollapsible
+                key={item.id}
+                item={item}
+                isActive={isItemActive}
+                collapsed={collapsed}
+                activeId={activeId}
+                notificationCount={notificationCount}
+                pendingLeaveCount={pendingLeaveCount}
+                onNavigate={onNavigate}
+              />
+            );
+          }
+
+          return (
+            <NavLink
+              key={item.id}
+              item={item}
+              isActive={activeId === item.id}
+              badge={badge}
+              collapsed={collapsed}
+              onNavigate={onNavigate}
+            />
+          );
+        })}
+</div>
     </div>
   );
 }

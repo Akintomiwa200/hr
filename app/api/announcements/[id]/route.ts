@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageOrgContent } from "@/lib/roles";
+import { audit } from "@/lib/audit";
 
 export async function PATCH(
   request: NextRequest,
@@ -28,6 +29,13 @@ export async function PATCH(
   });
 
   broadcastAppEvent("announcement_created", { id });
+  await audit({
+    actor: session,
+    module: "announcements",
+    action: "UPDATE",
+    entityId: id,
+    entityLabel: existing.title,
+  });
   revalidatePath("/announcements");
   return NextResponse.json(announcement);
 }
@@ -44,6 +52,13 @@ export async function DELETE(
   if (!existing) return notFound();
 
   await prisma.announcement.delete({ where: { id } });
+  await audit({
+    actor: session,
+    module: "announcements",
+    action: "DELETE",
+    entityId: id,
+    entityLabel: existing.title,
+  });
   broadcastAppEvent("announcement_created", { id });
   revalidatePath("/announcements");
   return NextResponse.json({ success: true });

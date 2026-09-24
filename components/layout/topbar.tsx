@@ -8,6 +8,7 @@ import {
   ChevronsUpDown,
   CircleHelp,
   ClipboardList,
+  HandCoins,
   LogOut,
   Megaphone,
   Medal,
@@ -38,6 +39,7 @@ const notificationIcons: Record<NavNotification["type"], typeof Bell> = {
   integration: Bell,
   checklist: ClipboardList,
   general: Bell,
+  loan: HandCoins,
 };
 
 function NotificationsMenu() {

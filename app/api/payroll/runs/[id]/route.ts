@@ -11,6 +11,7 @@ import {
 import { canBulkPayroll, payrollRunListWhere } from "@/lib/payroll-access";
 import { refreshPayrollRunTotals } from "@/lib/payroll-bulk";
 import { createNotification } from "@/lib/notifications";
+import { audit } from "@/lib/audit";
 
 export async function GET(
   _request: NextRequest,
@@ -92,6 +93,19 @@ export async function PATCH(
   }
 
   broadcastAppEvent("payroll_updated", { runId: id });
+  await audit({
+    actor: session,
+    module: "payroll",
+    action:
+      status === "PROCESSED"
+        ? "APPROVE"
+        : status === "PAID"
+          ? "RUN"
+          : "UPDATE",
+    entityId: id,
+    entityLabel: existing.label ?? `Payroll ${existing.periodStart.toLocaleDateString()}`,
+    meta: { status: status ?? undefined, label: label ?? undefined },
+  });
   revalidatePath("/payroll");
   revalidatePath("/payroll/runs");
   revalidatePath(`/payroll/runs/${id}`);
@@ -116,6 +130,13 @@ export async function DELETE(
   await prisma.payrollRecord.deleteMany({ where: { payrollRunId: id } });
   await prisma.payrollRun.delete({ where: { id } });
 
+  await audit({
+    actor: session,
+    module: "payroll",
+    action: "DELETE",
+    entityId: id,
+    entityLabel: existing.label ?? `Payroll ${existing.periodStart.toLocaleDateString()}`,
+  });
   broadcastAppEvent("payroll_updated", { runId: id });
   revalidatePath("/payroll");
   revalidatePath("/payroll/runs");

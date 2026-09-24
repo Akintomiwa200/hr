@@ -5,6 +5,7 @@ import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageDepartments } from "@/lib/roles";
 import { getCompanyScope, departmentCompanyWhere, requireOrgCompanyId } from "@/lib/company-scope";
+import { audit } from "@/lib/audit";
 
 export async function GET() {
   const session = await requireSession();
@@ -41,6 +42,13 @@ export async function POST(request: NextRequest) {
   });
 
   broadcastAppEvent("department_updated", { id: department.id });
+  await audit({
+    actor: session,
+    module: "departments",
+    action: "CREATE",
+    entityId: department.id,
+    entityLabel: department.name,
+  });
   revalidatePath("/departments");
   revalidatePath("/departments/manage");
   revalidatePath("/teams");

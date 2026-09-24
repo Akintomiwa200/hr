@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { getCompanyScope, announcementCompanyWhere, requireOrgCompanyId } from "@/lib/company-scope";
 import { notifyCompanyUsers } from "@/lib/notifications";
+import { audit } from "@/lib/audit";
 
 export async function GET() {
   const session = await getSession();
@@ -52,6 +53,14 @@ export async function POST(request: NextRequest) {
   }
 
   broadcastAppEvent("announcement_created", { id: announcement.id });
+  await audit({
+    actor: session,
+    module: "announcements",
+    action: "CREATE",
+    entityId: announcement.id,
+    entityLabel: title,
+    meta: { priority },
+  });
   revalidatePath("/announcements");
   revalidatePath("/dashboard");
 

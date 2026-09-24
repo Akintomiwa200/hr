@@ -5,6 +5,7 @@ import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageOrgContent } from "@/lib/roles";
 import { isHolidayDbEnabled } from "@/lib/holidays-data";
+import { audit } from "@/lib/audit";
 
 export async function PATCH(
   request: NextRequest,
@@ -36,6 +37,13 @@ export async function PATCH(
   });
 
   broadcastAppEvent("holiday_updated", { id });
+  await audit({
+    actor: session,
+    module: "holidays",
+    action: "UPDATE",
+    entityId: id,
+    entityLabel: existing.name,
+  });
   revalidatePath("/holidays");
   return NextResponse.json(holiday);
 }
@@ -59,6 +67,13 @@ export async function DELETE(
   if (!existing) return notFound();
 
   await prisma.holiday.delete({ where: { id } });
+  await audit({
+    actor: session,
+    module: "holidays",
+    action: "DELETE",
+    entityId: id,
+    entityLabel: existing.name,
+  });
   broadcastAppEvent("holiday_updated", { id });
   revalidatePath("/holidays");
   return NextResponse.json({ success: true });

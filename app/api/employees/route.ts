@@ -12,6 +12,7 @@ import { parseLocalDate } from "@/lib/dates";
 import { parseEmployeeShiftFields } from "@/lib/employee-shift";
 import { replayUnprocessedPunchesForEmployee } from "@/lib/zkteco/service";
 import { celebrateNewEmployee } from "@/lib/birthdays";
+import { audit } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -177,6 +178,15 @@ export async function POST(request: NextRequest) {
     } catch {
       checklistStarted = false;
     }
+
+    void audit({
+      actor: session,
+      module: "employees",
+      action: "CREATE",
+      entityId: employee.id,
+      entityLabel: `${firstName} ${lastName}`.trim(),
+      meta: { jobTitle, departmentId, role: resolvedRole },
+    });
 
     return NextResponse.json({
       success: true,

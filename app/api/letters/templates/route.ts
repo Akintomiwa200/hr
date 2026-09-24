@@ -7,6 +7,7 @@ import { canManageLetters } from "@/lib/letters/access";
 import { STARTER_TEMPLATES } from "@/lib/letters/starters";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { LETTER_CATEGORIES, FORM_CATEGORIES, parseFieldsJson } from "@/lib/letters/fields";
+import { audit } from "@/lib/audit";
 
 function notReady() {
   return NextResponse.json(
@@ -70,6 +71,14 @@ export async function POST(request: NextRequest) {
   });
 
   broadcastAppEvent("letter_updated", { id: template.id, action: "created" });
+  await audit({
+    actor: session,
+    module: "letters",
+    action: "CREATE",
+    entityId: template.id,
+    entityLabel: template.title,
+    meta: { kind, category },
+  });
   revalidatePath("/letters");
   return NextResponse.json(template);
 }

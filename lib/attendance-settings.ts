@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 export type AttendanceSettingsData = {
   workStartHour: number;
   workStartMinute: number;
+  workEndHour: number;
+  workEndMinute: number;
   graceMinutes: number;
   breakTrackingEnabled: boolean;
   maxBreakMinutes: number;
@@ -14,6 +16,8 @@ export type AttendanceSettingsData = {
 export const defaultAttendanceSettings: AttendanceSettingsData = {
   workStartHour: 9,
   workStartMinute: 0,
+  workEndHour: 17,
+  workEndMinute: 0,
   graceMinutes: 15,
   breakTrackingEnabled: false,
   maxBreakMinutes: 60,
@@ -37,6 +41,8 @@ export async function getAttendanceSettings(
     id: row.id,
     workStartHour: row.workStartHour,
     workStartMinute: row.workStartMinute,
+    workEndHour: row.workEndHour,
+    workEndMinute: row.workEndMinute,
     graceMinutes: row.graceMinutes,
     breakTrackingEnabled: row.breakTrackingEnabled,
     maxBreakMinutes: row.maxBreakMinutes,
@@ -100,6 +106,10 @@ export async function updateAttendanceSettings(
       workStartMinute: clampMinute(
         data.workStartMinute ?? defaultAttendanceSettings.workStartMinute
       ),
+      workEndHour: clampHour(data.workEndHour ?? defaultAttendanceSettings.workEndHour),
+      workEndMinute: clampMinute(
+        data.workEndMinute ?? defaultAttendanceSettings.workEndMinute
+      ),
       graceMinutes: clampGrace(data.graceMinutes ?? defaultAttendanceSettings.graceMinutes),
       maxBreakMinutes: clampBreak(
         data.maxBreakMinutes ?? defaultAttendanceSettings.maxBreakMinutes
@@ -109,6 +119,10 @@ export async function updateAttendanceSettings(
       ...(data.workStartHour !== undefined && { workStartHour: clampHour(data.workStartHour) }),
       ...(data.workStartMinute !== undefined && {
         workStartMinute: clampMinute(data.workStartMinute),
+      }),
+      ...(data.workEndHour !== undefined && { workEndHour: clampHour(data.workEndHour) }),
+      ...(data.workEndMinute !== undefined && {
+        workEndMinute: clampMinute(data.workEndMinute),
       }),
       ...(data.graceMinutes !== undefined && { graceMinutes: clampGrace(data.graceMinutes) }),
       ...(data.breakTrackingEnabled !== undefined && {

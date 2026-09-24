@@ -16,6 +16,7 @@ import {
 } from "@/lib/payroll-deductions";
 import { canManagePayrollRecord } from "@/lib/payroll-access";
 import { periodMonthKey } from "@/lib/payroll-working-days";
+import { audit } from "@/lib/audit";
 
 function authorName(session: {
   firstName?: string;
@@ -75,6 +76,14 @@ export async function POST(request: NextRequest) {
   });
 
   broadcastAppEvent("payroll_updated", { action: "deduction_created" });
+  await audit({
+    actor: session,
+    module: "payroll",
+    action: "CREATE",
+    entityId: row.id,
+    entityLabel: String(reason).trim(),
+    meta: { amount: Number(amount), periodMonth: row.periodMonth },
+  });
   revalidatePath("/payroll/deductions");
   revalidatePath("/payroll");
   return NextResponse.json(row);
@@ -89,6 +98,13 @@ export async function DELETE(request: NextRequest) {
   if (!id) return badRequest("id is required");
 
   await cancelPayrollDeduction(id);
+  await audit({
+    actor: session,
+    module: "payroll",
+    action: "CANCEL",
+    entityId: id,
+    entityLabel: "Payroll deduction",
+  });
   broadcastAppEvent("payroll_updated", { action: "deduction_cancelled" });
   revalidatePath("/payroll/deductions");
   return NextResponse.json({ success: true });

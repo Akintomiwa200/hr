@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  CalendarCheck,
   CalendarDays,
   CalendarRange,
   CheckCircle2,
@@ -46,6 +47,7 @@ export function LeaveModule({
   showRequestForm,
   mode = isEmployee ? "self" : "org",
   currentEmployeeId,
+  myBalance,
 }: {
   leaves: LeaveRow[];
   canApprove: boolean;
@@ -53,6 +55,7 @@ export function LeaveModule({
   showRequestForm: boolean;
   mode?: "self" | "team" | "org" | "admin" | "directory";
   currentEmployeeId?: string | null;
+  myBalance?: { annual: number; sick: number } | null;
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -141,6 +144,13 @@ export function LeaveModule({
           value={stats.days}
           icon={CalendarRange}
         />
+        {myBalance && (mode === "self" || tab === "mine") && (
+          <StatCard
+            label="Leave balance (annual / sick)"
+            value={`${myBalance.annual} / ${myBalance.sick}`}
+            icon={CalendarCheck}
+          />
+        )}
       </div>
 
       {showRequestForm && (

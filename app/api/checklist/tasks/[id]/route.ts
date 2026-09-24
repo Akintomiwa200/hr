@@ -17,6 +17,7 @@ import {
   hydrateChecklistTasks,
   setTaskRequiredDocumentsById,
 } from "@/lib/checklist/document-store";
+import { audit } from "@/lib/audit";
 
 const VALID_STATUSES = ["PENDING", "IN_PROGRESS", "COMPLETED"] as const;
 const VALID_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
@@ -115,6 +116,14 @@ export async function PATCH(
 
     await markInstanceCompleteIfNeeded(existing.instanceId);
     broadcastAppEvent("checklist_updated", { id, action: "task_completed" });
+    await audit({
+      actor: session,
+      module: "checklist",
+      action: "UPDATE",
+      entityId: id,
+      entityLabel: existing.title,
+      meta: { status: "COMPLETED", instanceId: existing.instanceId },
+    });
     revalidatePath("/checklist/todos");
     revalidatePath("/checklist/onboarding");
     revalidatePath("/checklist/offboarding");
@@ -233,6 +242,14 @@ export async function PATCH(
   }
 
   broadcastAppEvent("checklist_updated", { id, action: "task_updated" });
+  await audit({
+    actor: session,
+    module: "checklist",
+    action: "UPDATE",
+    entityId: id,
+    entityLabel: task.title,
+    meta: { instanceId: task.instanceId, status: body.status ?? undefined },
+  });
   revalidatePath("/checklist/todos");
   return NextResponse.json(await serializeTask(task));
 }

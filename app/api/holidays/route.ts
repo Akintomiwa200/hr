@@ -6,6 +6,7 @@ import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageOrgContent } from "@/lib/roles";
 import { isHolidayDbEnabled } from "@/lib/holidays-data";
 import { getCompanyScope, holidayCompanyWhere, requireOrgCompanyId } from "@/lib/company-scope";
+import { audit } from "@/lib/audit";
 
 export async function GET() {
   const session = await requireSession();
@@ -48,6 +49,14 @@ export async function POST(request: NextRequest) {
   });
 
   broadcastAppEvent("holiday_updated", { id: holiday.id });
+  await audit({
+    actor: session,
+    module: "holidays",
+    action: "CREATE",
+    entityId: holiday.id,
+    entityLabel: name.trim(),
+    meta: { date, type },
+  });
   revalidatePath("/holidays");
   return NextResponse.json(holiday);
 }

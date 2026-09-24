@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageDepartments } from "@/lib/roles";
+import { audit } from "@/lib/audit";
 
 export async function GET(
   _request: NextRequest,
@@ -54,6 +55,13 @@ export async function PATCH(
   if (!department.name) return badRequest("Department name is required");
 
   broadcastAppEvent("department_updated", { id });
+  await audit({
+    actor: session,
+    module: "departments",
+    action: "UPDATE",
+    entityId: id,
+    entityLabel: existing.name,
+  });
   revalidatePath("/departments");
   revalidatePath("/departments/manage");
   revalidatePath("/teams");
@@ -80,6 +88,13 @@ export async function DELETE(
   }
 
   await prisma.department.delete({ where: { id } });
+  await audit({
+    actor: session,
+    module: "departments",
+    action: "DELETE",
+    entityId: id,
+    entityLabel: existing.name,
+  });
   broadcastAppEvent("department_updated", { id });
   revalidatePath("/departments");
   revalidatePath("/departments/manage");

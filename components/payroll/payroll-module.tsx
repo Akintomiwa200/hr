@@ -295,6 +295,14 @@ export function PayrollModule({
                 Deductions
               </Link>
             )}
+            {canOperate && (
+              <Link
+                href="/loans"
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50"
+              >
+                Loans
+              </Link>
+            )}
             {canOperate && workspaceMode === "org" && (
               <Button
                 onClick={() => {

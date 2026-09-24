@@ -12,7 +12,9 @@ export type NotificationType =
 
   | "checklist"
 
-  | "general";
+  | "general"
+
+  | "loan";
 export type NotificationRecord = {
   id: string;
   userId: string;
@@ -42,6 +44,7 @@ subscription: "announcements",
   integration: "announcements",
   checklist: "checklist",
   general: "announcements",
+  loan: "payroll",
 };
 
 export function parseUserPreferences(raw: string | null | undefined): Record<string, boolean> {

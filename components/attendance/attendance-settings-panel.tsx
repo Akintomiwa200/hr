@@ -87,6 +87,24 @@ export function AttendanceSettingsPanel({
               </div>
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase">
+                  Official end time
+                </label>
+                <input
+                  type="time"
+                  className={`${inputClass} mt-1`}
+                  value={formatTime(form.workEndHour, form.workEndMinute)}
+                  onChange={(e) => {
+                    const { hour, minute } = parseTime(e.target.value);
+                    setForm({ ...form, workEndHour: hour, workEndMinute: minute });
+                  }}
+                />
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Standard daily hours = start → end. Overtime is flagged when payroll
+                  overtime pay is enabled.
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase">
                   Grace period (minutes)
                 </label>
                 <input

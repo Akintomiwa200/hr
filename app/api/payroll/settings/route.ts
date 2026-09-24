@@ -8,6 +8,7 @@ import {
 import { canManagePayrollSettings } from "@/lib/payroll-access";
 import { ensurePayrollSettings, getPayrollSettings, updatePayrollSettings } from "@/lib/payroll-engine";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { audit } from "@/lib/audit";
 
 export async function GET() {
   const session = await requireSession();
@@ -51,9 +52,25 @@ export async function PATCH(request: NextRequest) {
     ...(body.proRataSalaryEnabled !== undefined && {
       proRataSalaryEnabled: Boolean(body.proRataSalaryEnabled),
     }),
+    ...(body.overtimeEnabled !== undefined && {
+      overtimeEnabled: Boolean(body.overtimeEnabled),
+    }),
+    ...(body.overtimeMultiplier !== undefined && {
+      overtimeMultiplier: Number(body.overtimeMultiplier),
+    }),
+    ...(body.overtimeThresholdMinutes !== undefined && {
+      overtimeThresholdMinutes: Number(body.overtimeThresholdMinutes),
+    }),
   });
 
   revalidatePath("/payroll");
   broadcastAppEvent("payroll_updated", { action: "settings_updated" });
+  await audit({
+    actor: session,
+    module: "payroll",
+    action: "SETTING",
+    entityLabel: "Payroll settings",
+    meta: Object.keys(body).length ? { fields: Object.keys(body).sort() } : undefined,
+  });
   return NextResponse.json(settings);
 }

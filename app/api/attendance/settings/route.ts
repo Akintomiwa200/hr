@@ -7,6 +7,7 @@ import {
   updateAttendanceSettings,
 } from "@/lib/attendance-settings";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { audit } from "@/lib/audit";
 
 export async function GET() {
   const session = await requireSession();
@@ -30,6 +31,10 @@ export async function PATCH(request: NextRequest) {
     ...(body.workStartMinute !== undefined && {
       workStartMinute: Number(body.workStartMinute),
     }),
+    ...(body.workEndHour !== undefined && { workEndHour: Number(body.workEndHour) }),
+    ...(body.workEndMinute !== undefined && {
+      workEndMinute: Number(body.workEndMinute),
+    }),
     ...(body.graceMinutes !== undefined && { graceMinutes: Number(body.graceMinutes) }),
     ...(body.breakTrackingEnabled !== undefined && {
       breakTrackingEnabled: Boolean(body.breakTrackingEnabled),
@@ -41,6 +46,13 @@ export async function PATCH(request: NextRequest) {
   });
 
   revalidatePath("/attendance");
+  await audit({
+    actor: session,
+    module: "attendance",
+    action: "SETTING",
+    entityLabel: "Attendance settings",
+    meta: Object.keys(body).length ? { fields: Object.keys(body).sort() } : undefined,
+  });
   broadcastAppEvent("attendance_updated", { action: "settings_updated" });
   return NextResponse.json(settings);
 }

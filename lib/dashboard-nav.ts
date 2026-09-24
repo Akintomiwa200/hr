@@ -21,7 +21,6 @@ import {
   CircleHelp,
   Settings,
   Activity,
-  Building2,
   Router,
   Plug2,
   CreditCard,
@@ -29,11 +28,13 @@ import {
   CheckSquare,
   ListTodo,
   UserMinus,
+  UserPlus,
   Trash2,
   BarChart3,
   PenLine,
   StickyNote,
   MessageSquare,
+  HandCoins,
 } from "lucide-react";
 import { CHECKLIST_ADMIN_ROLES, CHECKLIST_TEMPLATE_ROLES, CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
 import {
@@ -46,6 +47,7 @@ import {
   PAYROLL_ADMIN_ROLES,
   PAYROLL_OPERATIONS_ROLES,
   PAYROLL_VIEW_ROLES,
+  LOAN_VIEW_ROLES,
   PEOPLE_ADMIN_ROLES,
   PEOPLE_VIEW_ROLES,
   PERFORMANCE_VIEW_ROLES,
@@ -67,6 +69,7 @@ export type NavItem = {
   roles: Role[];
   badge?: number;
   match?: (pathname: string) => boolean;
+  subItems?: Omit<NavItem, "icon" | "subItems">[];
 };
 
 export type NavSection = {
@@ -76,7 +79,28 @@ export type NavSection = {
 
 export const dashboardNavSections: NavSection[] = [
   {
-    title: "Main",
+    title: "PINNED",
+    items: [
+      {
+        id: "department-updates",
+        href: "/announcements",
+        label: "Department updates",
+        pageTitle: "Department updates",
+        icon: Megaphone,
+        roles: ALL_STAFF,
+      },
+      {
+        id: "audit-reports",
+        href: "/reports/audit",
+        label: "Audit Reports",
+        pageTitle: "Audit Reports",
+        icon: FileText,
+        roles: REPORTS_VIEW_ROLES,
+      }
+    ]
+  },
+  {
+    title: "MAIN",
     items: [
       {
         id: "dashboard",
@@ -87,13 +111,218 @@ export const dashboardNavSections: NavSection[] = [
         roles: DASHBOARD_ROLES,
       },
       {
-        id: "companies",
-        href: "/admin/companies",
-        label: "Companies",
-        pageTitle: "Companies",
-        icon: Building2,
-        roles: SUPER_ADMIN_ONLY,
+        id: "hr-metrics",
+        href: "/reports",
+        label: "HR Metrics",
+        pageTitle: "HR Metrics",
+        icon: BarChart3,
+        roles: REPORTS_VIEW_ROLES,
+        match: (pathname) => pathname.startsWith("/reports") && !pathname.startsWith("/reports/audit"),
       },
+      {
+        id: "team-management",
+        href: "/teams",
+        label: "Team Management",
+        pageTitle: "Team Management",
+        icon: UsersRound,
+        roles: PEOPLE_VIEW_ROLES,
+      },
+      {
+        id: "logbook",
+        href: "/attendance",
+        label: "Logbook",
+        pageTitle: "Logbook",
+        icon: FileText,
+        roles: ALL_STAFF,
+        subItems: [
+          {
+            id: "attendance",
+            href: "/attendance",
+            label: "Attendance",
+            pageTitle: "Attendance",
+            roles: ALL_STAFF,
+            match: (pathname) =>
+              pathname === "/attendance" ||
+              (pathname.startsWith("/attendance/") &&
+                !pathname.startsWith("/attendance/devices")),
+          },
+          {
+            id: "leave",
+            href: "/leave",
+            label: "Leave",
+            pageTitle: "Leave",
+            roles: ALL_STAFF,
+          },
+          {
+            id: "summary-report",
+            href: "/reports/summary",
+            label: "Summary report",
+            pageTitle: "Summary report",
+            roles: REPORTS_VIEW_ROLES,
+          }
+        ]
+      },
+      {
+        id: "employees",
+        href: "/employees",
+        label: "Employees",
+        pageTitle: "Employees",
+        icon: Users,
+        roles: PEOPLE_VIEW_ROLES,
+        subItems: [
+          {
+            id: "employee-list",
+            href: "/employees",
+            label: "Employee List",
+            pageTitle: "Employees",
+            roles: PEOPLE_VIEW_ROLES,
+            match: (pathname) =>
+              pathname === "/employees" ||
+              (pathname.startsWith("/employees/") &&
+                !pathname.startsWith("/employees/new")),
+          },
+          {
+            id: "org-chart",
+            href: "/departments",
+            label: "Org Chart",
+            pageTitle: "Org Chart",
+            roles: ORG_CHART_ROLES,
+            match: (pathname) =>
+              (pathname === "/departments" || pathname.startsWith("/departments/")) &&
+              !pathname.startsWith("/departments/manage"),
+          },
+          {
+            id: "departments-manage",
+            href: "/departments/manage",
+            label: "Departments",
+            pageTitle: "Departments",
+            roles: PEOPLE_ADMIN_ROLES,
+            match: (pathname) => pathname.startsWith("/departments/manage"),
+          }
+        ]
+      },
+      {
+        id: "shift-scheduling",
+        href: "/holidays",
+        label: "Shift & Scheduling",
+        pageTitle: "Calendar",
+        icon: Calendar,
+        roles: ALL_STAFF,
+      },
+      {
+        id: "payroll-compensation",
+        href: "/payroll",
+        label: "Payroll & Compensation",
+        pageTitle: "Payroll & Compensation",
+        icon: Wallet,
+        roles: PAYROLL_VIEW_ROLES,
+        subItems: [
+          {
+            id: "payroll",
+            href: "/payroll",
+            label: "Payroll",
+            pageTitle: "Payroll",
+            roles: PAYROLL_VIEW_ROLES,
+            match: (pathname) =>
+              pathname === "/payroll" ||
+              (pathname.startsWith("/payroll/") &&
+                !pathname.startsWith("/payroll/deductions") &&
+                !pathname.startsWith("/payroll/runs")),
+          },
+          {
+            id: "payroll-runs",
+            href: "/payroll/runs",
+            label: "Payroll runs",
+            pageTitle: "Payroll runs",
+            roles: PAYROLL_OPERATIONS_ROLES,
+            match: (pathname) => pathname.startsWith("/payroll/runs"),
+          },
+          {
+            id: "payroll-deductions",
+            href: "/payroll/deductions",
+            label: "Deductions",
+            pageTitle: "Payroll Deductions",
+            roles: PAYROLL_ADMIN_ROLES,
+            match: (pathname) => pathname.startsWith("/payroll/deductions"),
+          },
+          {
+            id: "loans",
+            href: "/loans",
+            label: "Loans",
+            pageTitle: "Loans & repayment",
+            roles: LOAN_VIEW_ROLES,
+            match: (pathname) => pathname === "/loans" || pathname.startsWith("/loans/"),
+          }
+        ]
+      },
+      {
+        id: "recruitment",
+        href: "/recruitment",
+        label: "Recruitment",
+        pageTitle: "Recruitment",
+        icon: Briefcase,
+        roles: RECRUITMENT_ROLES,
+        subItems: [
+          {
+            id: "jobs",
+            href: "/recruitment",
+            label: "Jobs",
+            pageTitle: "Recruitment",
+            roles: RECRUITMENT_ROLES,
+            match: (pathname) =>
+              pathname === "/recruitment" ||
+              (/^\/recruitment\/[^/]+$/.test(pathname) &&
+                !pathname.startsWith("/recruitment/candidates") &&
+                !pathname.startsWith("/recruitment/interviews")),
+          },
+          {
+            id: "candidates",
+            href: "/recruitment/candidates",
+            label: "Candidates",
+            pageTitle: "Candidates",
+            roles: RECRUITMENT_ROLES,
+            match: (pathname) => pathname.startsWith("/recruitment/candidates"),
+          },
+          {
+            id: "interviews",
+            href: "/recruitment/interviews",
+            label: "Interviews",
+            pageTitle: "Interviews",
+            roles: RECRUITMENT_ROLES,
+          }
+        ]
+      },
+      {
+        id: "training-development",
+        href: "/performance",
+        label: "Training & Development",
+        pageTitle: "Performance",
+        icon: GraduationCap,
+        roles: PERFORMANCE_VIEW_ROLES,
+        match: (pathname) =>
+          pathname === "/performance" || pathname.startsWith("/performance/"),
+      },
+      {
+        id: "benefits-welfare",
+        href: "/benefits",
+        label: "Benefits & Welfare",
+        pageTitle: "Benefits",
+        icon: Medal,
+        roles: ALL_STAFF,
+      },
+      {
+        id: "documents",
+        href: "/documents",
+        label: "Documents",
+        pageTitle: "Documents",
+        icon: FileText,
+        roles: ALL_STAFF,
+      }
+    ]
+  },
+  {
+    title: "WORKSPACE",
+    items: [
       {
         id: "notifications",
         href: "/notifications",
@@ -103,72 +332,11 @@ export const dashboardNavSections: NavSection[] = [
         roles: ALL_STAFF,
       },
       {
-        id: "search",
-        href: "/search",
-        label: "Search",
-        pageTitle: "Search",
-        icon: Search,
-        roles: ALL_STAFF,
-      },
-      {
-        id: "calendar",
-        href: "/holidays",
-        label: "Calendar",
-        pageTitle: "Calendar",
-        icon: Calendar,
-        roles: ALL_STAFF,
-      },
-    ],
-  },
-  {
-    title: "People",
-    items: [
-      {
-        id: "employees",
-        href: "/employees",
-        label: "Employees",
-        pageTitle: "Employees",
-        icon: Users,
-        roles: PEOPLE_VIEW_ROLES,
-        match: (pathname) =>
-          pathname === "/employees" ||
-          (pathname.startsWith("/employees/") &&
-            !pathname.startsWith("/employees/new")),
-      },
-      {
-        id: "org-chart",
-        href: "/departments",
-        label: "Org Chart",
-        pageTitle: "Org Chart",
-        icon: Network,
-        roles: ORG_CHART_ROLES,
-        match: (pathname) =>
-          (pathname === "/departments" || pathname.startsWith("/departments/")) &&
-          !pathname.startsWith("/departments/manage"),
-      },
-      {
-        id: "departments-manage",
-        href: "/departments/manage",
-        label: "Departments",
-        pageTitle: "Departments",
-        icon: Building2,
-        roles: PEOPLE_ADMIN_ROLES,
-        match: (pathname) => pathname.startsWith("/departments/manage"),
-      },
-      {
-        id: "teams",
-        href: "/teams",
-        label: "Teams",
-        pageTitle: "Teams",
-        icon: UsersRound,
-        roles: PEOPLE_VIEW_ROLES,
-      },
-      {
         id: "checklist-onboarding",
         href: "/checklist/onboarding",
         label: "Onboarding",
         pageTitle: "Onboarding",
-        icon: GraduationCap,
+        icon: UserPlus,
         roles: CHECKLIST_ADMIN_ROLES,
         match: (pathname) =>
           pathname === "/checklist/onboarding" || pathname.startsWith("/checklist/onboarding/"),
@@ -193,182 +361,12 @@ export const dashboardNavSections: NavSection[] = [
         match: (pathname) => pathname === "/checklist/todos",
       },
       {
-        id: "checklist-templates",
-        href: "/checklist/settings",
-        label: "Templates",
-        pageTitle: "Onboarding & Offboarding Templates",
-        icon: CheckSquare,
-        roles: CHECKLIST_TEMPLATE_ROLES,
-        match: (pathname) => pathname.startsWith("/checklist/settings"),
-      },
-      {
         id: "offboarded-staff",
         href: "/offboarded-staff",
-        label: "Delete & Separations",
-        pageTitle: "Delete & Separations",
+        label: "Offboarded staff",
+        pageTitle: "Offboarded staff",
         icon: Trash2,
         roles: PEOPLE_ADMIN_ROLES,
-        match: (pathname) => pathname === "/offboarded-staff",
-      },
-    ],
-  },
-  {
-    title: "Time & Leave",
-    items: [
-      {
-        id: "leave",
-        href: "/leave",
-        label: "Leave",
-        pageTitle: "Leave",
-        icon: CalendarOff,
-        roles: ALL_STAFF,
-      },
-      {
-        id: "attendance",
-        href: "/attendance",
-        label: "Attendance",
-        pageTitle: "Attendance",
-        icon: Clock,
-        roles: ALL_STAFF,
-        match: (pathname) =>
-          pathname === "/attendance" ||
-          (pathname.startsWith("/attendance/") &&
-            !pathname.startsWith("/attendance/devices")),
-      },
-      {
-        id: "attendance-devices",
-        href: "/attendance/devices",
-        label: "Devices",
-        pageTitle: "Devices",
-        icon: Router,
-        roles: DEVICE_ADMIN_ROLES,
-      },
-      {
-        id: "payroll",
-        href: "/payroll",
-        label: "Payroll",
-        pageTitle: "Payroll",
-        icon: Wallet,
-        roles: PAYROLL_VIEW_ROLES,
-        match: (pathname) =>
-          pathname === "/payroll" ||
-          (pathname.startsWith("/payroll/") &&
-            !pathname.startsWith("/payroll/deductions") &&
-            !pathname.startsWith("/payroll/runs")),
-      },
-      {
-        id: "payroll-runs",
-        href: "/payroll/runs",
-        label: "Payroll runs",
-        pageTitle: "Payroll runs",
-        icon: Wallet,
-        roles: PAYROLL_OPERATIONS_ROLES,
-        match: (pathname) => pathname.startsWith("/payroll/runs"),
-      },
-      {
-        id: "payroll-deductions",
-        href: "/payroll/deductions",
-        label: "Deductions",
-        pageTitle: "Payroll Deductions",
-        icon: Wallet,
-        roles: PAYROLL_ADMIN_ROLES,
-        match: (pathname) => pathname.startsWith("/payroll/deductions"),
-      },
-    ],
-  },
-  {
-    title: "Talent",
-    items: [
-      {
-        id: "performance",
-        href: "/performance",
-        label: "Performance",
-        pageTitle: "Performance",
-        icon: Medal,
-        roles: PERFORMANCE_VIEW_ROLES,
-        match: (pathname) =>
-          pathname === "/performance" || pathname.startsWith("/performance/"),
-      },
-      {
-        id: "recruitment",
-        href: "/recruitment",
-        label: "Jobs",
-        pageTitle: "Recruitment",
-        icon: Briefcase,
-        roles: RECRUITMENT_ROLES,
-        match: (pathname) =>
-          pathname === "/recruitment" ||
-          (/^\/recruitment\/[^/]+$/.test(pathname) &&
-            !pathname.startsWith("/recruitment/candidates") &&
-            !pathname.startsWith("/recruitment/interviews")),
-      },
-      {
-        id: "candidates",
-        href: "/recruitment/candidates",
-        label: "Candidates",
-        pageTitle: "Candidates",
-        icon: UserSearch,
-        roles: RECRUITMENT_ROLES,
-        match: (pathname) => pathname.startsWith("/recruitment/candidates"),
-      },
-      {
-        id: "interviews",
-        href: "/recruitment/interviews",
-        label: "Interviews",
-        pageTitle: "Interviews",
-        icon: CalendarClock,
-        roles: RECRUITMENT_ROLES,
-      },
-    ],
-  },
-  {
-    title: "Insights",
-    items: [
-      {
-        id: "reports",
-        href: "/reports",
-        label: "Reports",
-        pageTitle: "Reports",
-        icon: BarChart3,
-        roles: REPORTS_VIEW_ROLES,
-        match: (pathname) => pathname.startsWith("/reports"),
-      },
-    ],
-  },
-  {
-    title: "More",
-    items: [
-      {
-        id: "bulk-messaging",
-        href: "/bulk-messaging",
-        label: "Bulk Messaging",
-        pageTitle: "Bulk Messaging",
-        icon: MessageSquare,
-        roles: ["COMPANY_ADMIN", "HR"],
-      },
-      {
-        id: "announcements",
-        href: "/announcements",
-        label: "Announcements",
-        pageTitle: "Announcements",
-        icon: Megaphone,
-        roles: ALL_STAFF,
-      },
-      {
-        id: "notes",
-        href: "/notes",
-        label: "Notes",
-        pageTitle: "Notes",
-        icon: StickyNote,
-        roles: ALL_ROLES,
-      },
-      {
-        id: "documents",
-        href: "/documents",
-        label: "Documents",
-        pageTitle: "Documents",
-        icon: FileText,
-        roles: ALL_STAFF,
       },
       {
         id: "letters",
@@ -380,14 +378,6 @@ export const dashboardNavSections: NavSection[] = [
         match: (pathname) => pathname === "/letters" || pathname.startsWith("/letters/"),
       },
       {
-        id: "help",
-        href: "/help",
-        label: "Help",
-        pageTitle: "Help Center",
-        icon: CircleHelp,
-        roles: CONTENT_ADMIN_ROLES,
-      },
-      {
         id: "integrations",
         href: "/settings/integrations",
         label: "Integrations",
@@ -396,23 +386,15 @@ export const dashboardNavSections: NavSection[] = [
         roles: INTEGRATION_ADMIN_ROLES,
       },
       {
-        id: "docs",
-        href: "/docs",
-        label: "Documentation",
-        pageTitle: "Documentation",
-        icon: BookOpen,
-        roles: [...INTEGRATION_ADMIN_ROLES, ...DEVICE_ADMIN_ROLES],
-      },
-      {
         id: "subscription",
         href: "/settings/subscription",
         label: "Subscription",
         pageTitle: "Subscription",
         icon: CreditCard,
         roles: [...SUBSCRIPTION_ADMIN_ROLES, "HR"],
-      },
-    ],
-  },
+      }
+    ]
+  }
 ];
 
 export const settingsNavItem: NavItem = {
@@ -491,6 +473,10 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
   {
     test: (p) => p.startsWith("/payroll/deductions"),
     title: "Payroll Deductions",
+  },
+  {
+    test: (p) => p.startsWith("/loans"),
+    title: "Loans & repayment",
   },
   {
     test: (p) => /^\/employees\/[^/]+$/.test(p),
@@ -581,6 +567,14 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
     title: "Folder Documents",
   },
   {
+    test: (p) => p === "/reports/audit" || p.startsWith("/reports/audit/"),
+    title: "Audit Reports",
+  },
+  {
+    test: (p) => p === "/reports/summary",
+    title: "Summary report",
+  },
+  {
     test: (p) => p.startsWith("/reports"),
     title: "Reports",
   },
@@ -607,6 +601,14 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
   {
     test: (p) => p.startsWith("/checklist/"),
     title: "Checklist",
+  },
+  {
+    test: (p) => p === "/offboarded-staff",
+    title: "Offboarded staff",
+  },
+  {
+    test: (p) => p === "/benefits",
+    title: "Benefits",
   },
   {
     test: (p) => p === "/docs",

@@ -57,6 +57,13 @@ export const LEAVE_APPROVER_ROLES: Role[] = [
   "SUPERVISOR",
 ];
 
+/** Can enable leave allocation and manage employee yearly balances. */
+export const LEAVE_ALLOCATION_ADMIN_ROLES: Role[] = [
+  "SUPER_ADMIN",
+  "COMPANY_ADMIN",
+  "HR",
+];
+
 export const PAYROLL_VIEW_ROLES: Role[] = [
   "COMPANY_ADMIN",
   "HR",
@@ -73,6 +80,25 @@ export const PAYROLL_OPERATIONS_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "ACCOUNT
 
 /** Download payroll register as CSV / Excel / PDF. */
 export const PAYROLL_EXPORT_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "ACCOUNT_OFFICER"];
+
+/** Can see/request loans (all staff; employees only see their own). */
+export const LOAN_VIEW_ROLES: Role[] = [
+  "COMPANY_ADMIN",
+  "HR",
+  "ACCOUNT_OFFICER",
+  "MANAGER",
+  "SUPERVISOR",
+  "EMPLOYEE",
+];
+
+/** Can approve/reject loan requests and see every company loan. */
+export const LOAN_APPROVER_ROLES: Role[] = [
+  "COMPANY_ADMIN",
+  "HR",
+  "ACCOUNT_OFFICER",
+  "MANAGER",
+  "SUPERVISOR",
+];
 
 /** Full recruitment module (jobs/candidates). */
 export const RECRUITMENT_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
@@ -160,6 +186,10 @@ export function canManagePayroll(role: Role) {
   return hasRole(role, PAYROLL_ADMIN_ROLES);
 }
 
+export function canApproveLoans(role: Role) {
+  return hasRole(role, LOAN_APPROVER_ROLES);
+}
+
 export function canOperatePayroll(role: Role) {
   return hasRole(role, PAYROLL_OPERATIONS_ROLES);
 }
@@ -174,6 +204,10 @@ export function isAccountOfficerRole(role: Role) {
 
 export function canApproveLeave(role: Role) {
   return hasRole(role, LEAVE_APPROVER_ROLES);
+}
+
+export function canManageLeaveAllocations(role: Role) {
+  return hasRole(role, LEAVE_ALLOCATION_ADMIN_ROLES);
 }
 
 export function canManageDevices(role: Role) {

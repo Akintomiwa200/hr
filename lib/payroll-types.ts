@@ -30,6 +30,9 @@ export type PayrollSettingsData = {
   taxRatePercent: number;
   workingDaysPerWeek: number;
   proRataSalaryEnabled: boolean;
+  overtimeEnabled: boolean;
+  overtimeMultiplier: number;
+  overtimeThresholdMinutes: number;
 };
 
 export const defaultPayrollSettings: PayrollSettingsData = {
@@ -41,6 +44,9 @@ export const defaultPayrollSettings: PayrollSettingsData = {
   taxRatePercent: 10,
   workingDaysPerWeek: 5,
   proRataSalaryEnabled: true,
+  overtimeEnabled: false,
+  overtimeMultiplier: 1.75,
+  overtimeThresholdMinutes: 30,
 };
 
 export function parseBreakdown(raw: string | null | undefined): PayrollLineItem[] {

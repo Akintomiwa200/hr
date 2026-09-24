@@ -14,6 +14,7 @@ import { buildMergeValues, renderLetterBody } from "@/lib/letters/render";
 import { getAppCurrencyCode } from "@/lib/currency-server";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { createNotification } from "@/lib/notifications";
+import { audit } from "@/lib/audit";
 
 export async function POST(request: NextRequest) {
   const session = await requireSession();
@@ -157,6 +158,14 @@ export async function POST(request: NextRequest) {
   }
 
   broadcastAppEvent("letter_updated", { templateId, action: "issued", count: created.length });
+  await audit({
+    actor: session,
+    module: "letters",
+    action: "CREATE",
+    entityId: template.id,
+    entityLabel: template.title,
+    meta: { action: "issued", count: created.length, employeeIds },
+  });
   revalidatePath("/letters");
   revalidatePath(`/letters/${templateId}`);
   return NextResponse.json({ created: created.length, ids: created.map((d) => d.id) });

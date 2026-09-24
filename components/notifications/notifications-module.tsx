@@ -8,6 +8,7 @@ import {
   CheckCheck,
   CheckCircle2,
   ClipboardList,
+  HandCoins,
   Mail,
   MailOpen,
   Megaphone,
@@ -29,6 +30,7 @@ const icons: Record<string, typeof Bell> = {
   integration: Bell,
   checklist: ClipboardList,
   general: Bell,
+  loan: HandCoins,
 };
 
 type Filter = "all" | "unread" | "read";

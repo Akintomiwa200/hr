@@ -23,6 +23,7 @@ import {
   serializeBreakdown,
 } from "@/lib/payroll-types";
 import { createNotification } from "@/lib/notifications";
+import { audit } from "@/lib/audit";
 
 export async function GET() {
   const session = await requireSession();
@@ -117,6 +118,14 @@ export async function POST(request: NextRequest) {
   }
 
   broadcastAppEvent("payroll_updated", { id: record.id });
+  await audit({
+    actor: session,
+    module: "payroll",
+    action: record.status === "PAID" || record.status === "PROCESSED" ? "RUN" : "CREATE",
+    entityId: record.id,
+    entityLabel: `${record.employee?.firstName ?? ""} ${record.employee?.lastName ?? ""}`.trim() || "Payroll record",
+    meta: { periodStart, periodEnd, netPay: record.netPay, status: record.status },
+  });
   revalidatePath("/payroll");
   revalidatePath(`/employees/${employeeId}/payroll`);
   return NextResponse.json(record);

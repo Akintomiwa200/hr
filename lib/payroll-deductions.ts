@@ -11,6 +11,8 @@ export type PayrollDeductionRow = {
   periodMonth: string | null;
   status: string;
   appliedPayrollId: string | null;
+  loanId: string | null;
+  loanInstallmentId: string | null;
   createdById: string | null;
   createdByName: string;
   createdAt: Date;
@@ -153,7 +155,6 @@ export async function markDeductionsApplied(deductionIds: string[], payrollId: s
         appliedAt: new Date(),
       },
     });
-    return;
   } catch {
     for (const id of deductionIds) {
       await prisma.$executeRaw`
@@ -163,11 +164,68 @@ export async function markDeductionsApplied(deductionIds: string[], payrollId: s
       `;
     }
   }
+  await settleLoanInstallments(deductionIds, payrollId);
+}
+
+async function settleLoanInstallments(deductionIds: string[], payrollId: string) {
+  const ids = [...new Set(deductionIds)];
+  if (ids.length === 0) return;
+  try {
+    const updated = await prisma.loanInstallment.updateMany({
+      where: { deductionId: { in: ids }, status: "SCHEDULED" },
+      data: { status: "PAID", appliedPayrollId: payrollId, paidAt: new Date() },
+    });
+    if (updated.count > 0) {
+      const rows = await prisma.loanInstallment.findMany({
+        where: { deductionId: { in: ids }, status: "PAID" },
+        select: { loanId: true },
+        distinct: ["loanId"],
+      });
+      await closeFullyRepaidLoans(rows.map((row) => row.loanId));
+    }
+    return;
+  } catch {
+    for (const id of ids) {
+      try {
+        await prisma.$executeRaw`
+          UPDATE "LoanInstallment"
+          SET "status" = 'PAID', "appliedPayrollId" = ${payrollId}, "paidAt" = CURRENT_TIMESTAMP
+          WHERE "deductionId" = ${id} AND "status" = 'SCHEDULED'
+        `;
+      } catch {
+        // ignore — installment table may not exist on partial deployments
+      }
+    }
+  }
+}
+
+async function closeFullyRepaidLoans(loanIds: string[]) {
+  if (loanIds.length === 0) return;
+  try {
+    const active = await prisma.loan.findMany({
+      where: { id: { in: loanIds }, status: "APPROVED" },
+      select: {
+        id: true,
+        installments: { select: { status: true } },
+      },
+    });
+    for (const loan of active) {
+      const relevant = loan.installments.filter((item) => item.status !== "CANCELLED");
+      if (relevant.length > 0 && relevant.every((item) => item.status === "PAID")) {
+        await prisma.loan.update({
+          where: { id: loan.id },
+          data: { status: "CLOSED", decisionNote: "Fully repaid" },
+        });
+      }
+    }
+  } catch {
+    // ignore — loans table may not exist on partial deployments
+  }
 }
 
 export async function cancelPayrollDeduction(id: string) {
   try {
-    return prisma.payrollDeduction.update({
+    await prisma.payrollDeduction.update({
       where: { id },
       data: { status: "CANCELLED" },
     });
@@ -175,7 +233,23 @@ export async function cancelPayrollDeduction(id: string) {
     await prisma.$executeRaw`
       UPDATE "PayrollDeduction" SET "status" = 'CANCELLED' WHERE "id" = ${id}
     `;
-    return null;
+  }
+
+  const deduction = await prisma.payrollDeduction
+    .findUnique({
+      where: { id },
+      select: { loanInstallmentId: true },
+    })
+    .catch(() => null);
+  if (deduction?.loanInstallmentId) {
+    try {
+      await prisma.loanInstallment.updateMany({
+        where: { id: deduction.loanInstallmentId, status: "SCHEDULED" },
+        data: { status: "CANCELLED" },
+      });
+    } catch {
+      // ignore — installment table may not exist on partial deployments
+    }
   }
 }
 
@@ -185,6 +259,8 @@ export async function createPayrollDeduction(data: {
   amount: number;
   reason: string;
   periodMonth?: string | null;
+  loanId?: string | null;
+  loanInstallmentId?: string | null;
   createdById?: string | null;
   createdByName: string;
 }) {
@@ -196,6 +272,8 @@ export async function createPayrollDeduction(data: {
         amount: data.amount,
         reason: data.reason.trim(),
         periodMonth: data.periodMonth ?? null,
+        loanId: data.loanId ?? null,
+        loanInstallmentId: data.loanInstallmentId ?? null,
         createdById: data.createdById ?? null,
         createdByName: data.createdByName,
       },
@@ -204,7 +282,7 @@ export async function createPayrollDeduction(data: {
     const id = randomUUID();
     await prisma.$executeRaw`
       INSERT INTO "PayrollDeduction"
-        ("id","companyId","employeeId","amount","reason","periodMonth","status","createdById","createdByName","createdAt")
+        ("id","companyId","employeeId","amount","reason","periodMonth","status","loanId","loanInstallmentId","createdById","createdByName","createdAt")
       VALUES (
         ${id},
         ${data.companyId ?? null},
@@ -213,6 +291,8 @@ export async function createPayrollDeduction(data: {
         ${data.reason.trim()},
         ${data.periodMonth ?? null},
         'PENDING',
+        ${data.loanId ?? null},
+        ${data.loanInstallmentId ?? null},
         ${data.createdById ?? null},
         ${data.createdByName},
         CURRENT_TIMESTAMP
