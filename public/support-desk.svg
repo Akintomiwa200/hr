@@ -1,0 +1,60 @@
+<svg width="480" height="300" viewBox="0 0 480 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="480" y2="300" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#EEEBFF"/>
+      <stop offset="1" stopColor="#FBF9FF"/>
+    </linearGradient>
+    <linearGradient id="shirtGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop stopColor="#7B61FF"/>
+      <stop offset="1" stopColor="#5B40E0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="480" height="300" rx="28" fill="url(#bgGrad)"/>
+  <circle cx="34" cy="34" r="110" fill="#E7E0FF" opacity="0.5"/>
+  <circle cx="446" cy="266" r="120" fill="#DCD4FF" opacity="0.45"/>
+
+  <g>
+    <path d="M34 92c0-16 13-29 29-29h92c16 0 29 13 29 29v34c0 16-13 29-29 29h-58l-19 21v-21h-15c-16 0-29-13-29-29V92z" fill="white" stroke="#DDD6FE" stroke-width="1.5"/>
+    <circle cx="52" cy="101" r="4.5" fill="#A5B4FC"/>
+    <circle cx="68" cy="101" r="4.5" fill="#C4B5FD"/>
+    <circle cx="84" cy="101" r="4.5" fill="#F9A8D4"/>
+    <rect x="48" y="118" width="86" height="8" rx="4" fill="#E5E7EB"/>
+    <rect x="48" y="133" width="56" height="8" rx="4" fill="#EDE9FE"/>
+  </g>
+
+  <g>
+    <path d="M306 40c0-13 11-24 24-24h10c13 0 24 11 24 24v2l-14 12h-20c-13 0-24-11-24-24z" fill="#7B61FF"/>
+    <path d="M336 44l-12 8v-8z" fill="#5B40E0"/>
+    <circle cx="322" cy="46" r="4" fill="#DDD6FE"/>
+    <circle cx="336" cy="46" r="4" fill="#FFFFFF"/>
+    <circle cx="350" cy="46" r="4" fill="#DDD6FE"/>
+    <rect x="316" y="62" width="48" height="7" rx="3.5" fill="#EDE9FE"/>
+    <rect x="316" y="75" width="32" height="7" rx="3.5" fill="#F5F3FF"/>
+  </g>
+
+  <ellipse cx="240" cy="252" rx="150" ry="10" fill="#D9D2F5" opacity="0.6"/>
+
+  <path d="M196 182h88l8 50h-104l8-50z" fill="#E3DCFF"/>
+  <path d="M198 196h84v8h-84z" fill="#D3C9FA"/>
+
+  <g>
+    <circle cx="240" cy="146" r="26" fill="#FFD9C2"/>
+    <path d="M214 146a26 26 0 0 1 52 0" stroke="#7B61FF" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <rect x="206" y="132" width="9" height="26" rx="4.5" fill="#7B61FF"/>
+    <rect x="265" y="132" width="9" height="26" rx="4.5" fill="#7B61FF"/>
+    <rect x="263" y="152" width="21" height="8" rx="4" fill="#7B61FF"/>
+    <circle cx="286" cy="156" r="4" fill="#5B40E0"/>
+    <path d="M228 154h6a6 6 0 0 0 0-12h-4" stroke="#E8906B" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <circle cx="218" cy="160" r="4" fill="#5B40E0"/>
+  </g>
+
+  <g>
+    <path d="M190 176c14-10 30-15 50-15s36 5 50 15l10 60c-12 4-60 4-120 0l10-60z" fill="url(#shirtGrad)"/>
+    <circle cx="226" cy="236" r="5" fill="#E3DCFF"/>
+    <circle cx="254" cy="236" r="5" fill="#E3DCFF"/>
+  </g>
+
+  <rect x="0" y="256" width="480" height="22" rx="11" fill="#C9BEF0"/>
+  <rect x="0" y="256" width="480" height="6" fill="#BEB2EC"/>
+</svg>

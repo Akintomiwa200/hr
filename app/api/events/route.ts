@@ -17,9 +17,15 @@ export async function GET() {
 
       const send = (event: RealtimeEvent) => {
         if (closed) return;
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
-        );
+        try {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
+          );
+        } catch {
+          closed = true;
+          unsubscribe?.();
+          if (heartbeat) clearInterval(heartbeat);
+        }
       };
 
       send({
@@ -32,7 +38,13 @@ export async function GET() {
 
       heartbeat = setInterval(() => {
         if (closed) return;
-        controller.enqueue(encoder.encode(": heartbeat\n\n"));
+        try {
+          controller.enqueue(encoder.encode(": heartbeat\n\n"));
+        } catch {
+          closed = true;
+          unsubscribe?.();
+          if (heartbeat) clearInterval(heartbeat);
+        }
       }, 25000);
     },
     cancel() {

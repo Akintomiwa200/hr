@@ -2,6 +2,7 @@ import type { Role } from "@prisma/client";
 import type { LucideIcon } from "lucide-react";
 import {
   Briefcase,
+  History,
   Timer,
   TrendingDown,
   TrendingUp,
@@ -109,6 +110,16 @@ export const reportCatalog: ReportCard[] = [
     roles: REPORTS_ADMIN_ROLES,
     scopes: ["org"],
     sortOrder: 8,
+  },
+  {
+    id: "audit",
+    title: "Audit Reports",
+    description: "A trail of actions taken across the HR system.",
+    href: "/reports/audit",
+    icon: History,
+    roles: REPORTS_ADMIN_ROLES,
+    scopes: ["org"],
+    sortOrder: 9,
   },
 ];
 

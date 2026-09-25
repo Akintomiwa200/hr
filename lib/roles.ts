@@ -125,6 +125,9 @@ export const PERFORMANCE_VIEW_ROLES: Role[] = [
 
 export const CONTENT_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
 
+/** Support desk participants: companies raise tickets, super admins are agents. */
+export const SUPPORT_ROLES: Role[] = ["SUPER_ADMIN", "COMPANY_ADMIN", "HR"];
+
 export const SETTINGS_ROLES: Role[] = ALL_ROLES;
 export const SUPER_ADMIN_ONLY: Role[] = ["SUPER_ADMIN"];
 export const SUPERVISOR_ROLES: Role[] = ["SUPERVISOR"];

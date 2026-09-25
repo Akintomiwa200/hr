@@ -23,6 +23,7 @@ export type RealtimeEventType =
   | "subscription_updated"
   | "notification_updated"
   | "notes_updated"
+  | "support_updated"
   | "bulk_message_created"
   | "bulk_message_updated"
   | "loan_updated";
@@ -46,7 +47,12 @@ class EventBus {
   publish(type: RealtimeEventType, data?: Record<string, unknown>) {
     const event: RealtimeEvent = { type, data, timestamp: Date.now() };
     for (const listener of this.listeners) {
-      listener(event);
+      try {
+        listener(event);
+      } catch {
+        // A broken listener (e.g. a dead SSE stream) must never take down a publisher
+        // — dropping one subscriber should not turn an otherwise valid API call into a 500.
+      }
     }
   }
 }

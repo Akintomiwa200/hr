@@ -539,6 +539,10 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
     title: "Contact Support",
   },
   {
+    test: (p) => p === "/support",
+    title: "Support Desk",
+  },
+  {
     test: (p) => p === "/help/guides",
     title: "All Guides",
   },

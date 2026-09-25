@@ -69,3 +69,11 @@ export function isBranchModelsReady() {
 export function isNoteModelReady() {
   return hasDelegate(getPrismaClient(), "note", "findMany");
 }
+
+export function isSupportModelReady() {
+  const client = getPrismaClient();
+  return (
+    hasDelegate(client, "supportTicket", "findMany") &&
+    hasDelegate(client, "supportMessage", "create")
+  );
+}

@@ -30,6 +30,7 @@ import {
   PenLine,
   ShieldCheck,
   StickyNote,
+  Headset,
 } from "lucide-react";
 import {
   ALL_STAFF,
@@ -48,6 +49,7 @@ import {
   SETTINGS_ROLES,
   SUBSCRIPTION_ADMIN_ROLES,
   SUPER_ADMIN_ONLY,
+  SUPPORT_ROLES,
   hasRole,
 } from "@/lib/roles";
 
@@ -330,6 +332,15 @@ export const appFeatures: AppFeature[] = [
     icon: Settings,
     roles: SETTINGS_ROLES,
     helpSlug: "settings",
+  },
+  {
+    id: "support",
+    label: "Support Desk",
+    description: "Real-time tickets and chat with the Smart HR support team",
+    href: "/support",
+    section: "Workspace",
+    icon: Headset,
+    roles: SUPPORT_ROLES,
   },
   {
     id: "help",
