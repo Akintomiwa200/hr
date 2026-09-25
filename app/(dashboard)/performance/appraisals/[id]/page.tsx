@@ -6,6 +6,8 @@ import {
   canEditSelfAppraisal,
   canViewAppraisal,
 } from "@/lib/performance/access";
+import { getPerformanceSettings } from "@/lib/performance/settings";
+import { getCompanyScope, requireOrgCompanyId } from "@/lib/company-scope";
 import { AppraisalDetailModule } from "@/components/performance/appraisal-detail-module";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
@@ -21,7 +23,7 @@ export default async function AppraisalDetailPage({
   const appraisal = await prisma.performanceAppraisal.findUnique({
     where: { id },
     include: {
-      cycle: true,
+      cycle: { include: { kpis: true } },
       employee: { include: { department: true } },
       manager: true,
       kpiScores: { include: { kpi: true } },
@@ -36,6 +38,8 @@ export default async function AppraisalDetailPage({
   const canEditManager = canEditManagerAppraisal(session, appraisal);
   const viewerIsEmployee = session.employeeId === appraisal.employeeId;
 
+  const settings = await getPerformanceSettings(requireOrgCompanyId(getCompanyScope(session)));
+
   return (
     <div>
       <PageLiveRefresh
@@ -47,6 +51,7 @@ export default async function AppraisalDetailPage({
         canEditSelf={canEditSelf}
         canEditManager={canEditManager}
         viewerIsEmployee={viewerIsEmployee}
+        ratingScaleMax={settings.ratingScaleMax}
       />
     </div>
   );
