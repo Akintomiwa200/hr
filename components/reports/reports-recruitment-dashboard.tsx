@@ -1,17 +1,5 @@
 "use client";
 
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
 import { Briefcase, Users, UserCheck, Inbox } from "lucide-react";
 import type { ChartSegment, BarPoint } from "@/lib/reports/data";
 
@@ -38,6 +26,114 @@ function StatCard({
         <p className="text-2xl font-bold text-gray-900">{value}</p>
       </div>
     </div>
+  );
+}
+
+function LineChartSvg({ data }: { data: BarPoint[] }) {
+  const W = 600;
+  const H = 240;
+  const PAD = { top: 10, right: 10, bottom: 24, left: 28 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  const values = data.map((d) => d.value);
+  const maxValue = Math.max(1, ...values);
+  const ticks = 4;
+  const gridLines = Array.from({ length: ticks + 1 }, (_, i) => {
+    const v = Math.round((maxValue / ticks) * i);
+    const y = PAD.top + plotH - (v / maxValue) * plotH;
+    return { v, y };
+  });
+
+  const points = data.map((d, i) => {
+    const x = PAD.left + (i / Math.max(1, data.length - 1)) * plotW;
+    const y = PAD.top + plotH - (d.value / maxValue) * plotH;
+    return { x, y, d };
+  });
+
+  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-full w-full">
+      {gridLines.slice(0, -1).map((g) => (
+        <line
+          key={g.v}
+          x1={PAD.left}
+          x2={W - PAD.right}
+          y1={g.y}
+          y2={g.y}
+          stroke="#e5e7eb"
+          strokeDasharray="3 3"
+        />
+      ))}
+      {gridLines.map((g) => (
+        <text
+          key={g.v}
+          x={PAD.left - 6}
+          y={g.y + 4}
+          textAnchor="end"
+          fontSize={12}
+          fill="#9ca3af"
+        >
+          {g.v}
+        </text>
+      ))}
+      {points.map((p) => (
+        <text
+          key={p.d.label}
+          x={p.x}
+          y={H - 6}
+          textAnchor="middle"
+          fontSize={12}
+          fill="#9ca3af"
+        >
+          {p.d.month ?? p.d.label}
+        </text>
+      ))}
+      <path d={linePath} fill="none" stroke="#6b51ef" strokeWidth={2.5} strokeLinejoin="round" />
+      {points.map((p) => (
+        <g key={p.d.label}>
+          <circle cx={p.x} cy={p.y} r={3} fill="#6b51ef" />
+          <title>{`${p.d.label}: ${p.d.value}`}</title>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function DoughnutChartSvg({ chart }: { chart: ChartSegment[] }) {
+  const R = 67.5;
+  const C = 2 * Math.PI * R;
+  const pad = (2 / 360) * C;
+  const total = chart.reduce((s, x) => s + x.value, 0);
+
+  let acc = -90;
+  const segments = chart.map((seg) => {
+    const f = seg.value / total;
+    const dash = f * C - pad;
+    const rotation = acc;
+    acc += f * 360;
+    return { seg, dash, rotation };
+  });
+
+  return (
+    <svg viewBox="0 0 200 200" className="h-full w-full">
+      {segments.map(({ seg, dash, rotation }) => (
+        <circle
+          key={seg.label}
+          cx="100"
+          cy="100"
+          r={R}
+          fill="none"
+          stroke={seg.color}
+          strokeWidth={25}
+          strokeDasharray={`${dash} ${C - dash}`}
+          transform={`rotate(${rotation} 100 100)`}
+        >
+          <title>{`${seg.label}: ${seg.value}`}</title>
+        </circle>
+      ))}
+    </svg>
   );
 }
 
@@ -94,40 +190,7 @@ export function ReportsRecruitmentDashboard({
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
           <h3 className="mb-4 text-sm font-semibold text-gray-900">Applications Trend</h3>
           <div className="h-[240px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={applicantsLine} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 12, fill: "#9ca3af" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  allowDecimals={false}
-                  tick={{ fontSize: 12, fill: "#9ca3af" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: "1px solid #e5e7eb",
-                    fontSize: 13,
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  name="Applications"
-                  stroke="#6b51ef"
-                  strokeWidth={2.5}
-                  dot={{ r: 3, fill: "#6b51ef" }}
-                  activeDot={{ r: 5 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <LineChartSvg data={applicantsLine} />
           </div>
         </div>
 
@@ -140,33 +203,7 @@ export function ReportsRecruitmentDashboard({
           ) : (
             <div className="flex items-center gap-4">
               <div className="h-[240px] w-1/2 shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chart}
-                      dataKey="value"
-                      nameKey="label"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      strokeWidth={2}
-                    >
-                      {chart.map((entry) => (
-                        <Cell key={entry.label} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: "1px solid #e5e7eb",
-                        fontSize: 13,
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <DoughnutChartSvg chart={chart} />
               </div>
               <div className="min-w-0 flex-1 space-y-2">
                 {chart.map((seg) => (
