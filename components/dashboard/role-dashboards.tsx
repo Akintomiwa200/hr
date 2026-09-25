@@ -1152,7 +1152,6 @@ export function CompanyAdminDashboard({
     totalEmployees,
     fulltime,
     freelance,
-    incomeChart,
     employees,
     openJobs,
     activeCandidates,
@@ -1254,10 +1253,7 @@ export function CompanyAdminDashboard({
         {/* Middle Column (Spending Status replacing Payroll pulse) */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-50 flex flex-col overflow-hidden">
           {(() => {
-            const totalSpent = incomeChart.reduce((acc, curr) => acc + curr.expense, 0) || 1456000;
-            const planned = totalSpent > 0 ? totalSpent * 1.25 : 1843000; 
-            const remaining = planned - totalSpent;
-            const spentPercent = Math.round((totalSpent / planned) * 100);
+            const { planned, remaining, spentPercent } = data.spending;
 
             const formatCompact = (num: number) => {
               if (num >= 1000000) return (num / 1000000).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 1});

@@ -118,6 +118,7 @@ export async function getHrDashboardData(
     upcomingInterviews,
     departmentCounts,
     payrollRecords,
+    payrollYtd,
     performanceReviews,
     attendanceByStatus,
     recentHires,
@@ -173,6 +174,17 @@ export async function getHrDashboardData(
         employee: orgEmp,
       },
       orderBy: { periodStart: "desc" },
+    }),
+    prisma.payrollRecord.aggregate({
+      _sum: { grossPay: true },
+      where: {
+        status: { in: ["PROCESSED", "PAID"] },
+        periodStart: {
+          gte: new Date(today.getFullYear(), 0, 1),
+          lte: today,
+        },
+        employee: orgEmp,
+      },
     }),
     prisma.performanceAppraisal.findMany({
       where: {
@@ -302,6 +314,13 @@ export async function getHrDashboardData(
     expense: monthlyPayroll[month]?.expense ?? 0,
   }));
 
+  const spent = payrollYtd._sum.grossPay ?? 0;
+  const monthsElapsed = Math.max(1, today.getMonth() + 1);
+  const planned = Math.round((spent / monthsElapsed) * 12);
+  const remaining = Math.max(0, planned - spent);
+  const spentPercent = planned > 0 ? Math.round((spent / planned) * 100) : 0;
+  const spending = { spent, planned, remaining, spentPercent };
+
   const currentMonth = monthKey(today);
   const highlightMonth =
     (monthlyPayroll[currentMonth]?.income ?? 0) > 0
@@ -358,6 +377,7 @@ export async function getHrDashboardData(
     performanceAppraisals: performanceReviews,
     avgPerformance,
     incomeChart,
+    spending,
     highlightMonth,
     chartYear,
     rangeKey,
