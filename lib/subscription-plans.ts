@@ -1,4 +1,17 @@
-export type SubscriptionPlanId = "trial" | "basic" | "pro" | "advanced" | "enterprise";
+export type SubscriptionPlanId =
+  | "free"
+  | "trial"
+  | "basic"
+  | "pro"
+  | "advanced"
+  | "enterprise";
+
+/** Plans that are purchased through the Selar checkout gateway. */
+export const SELAR_PAID_PLAN_IDS: SubscriptionPlanId[] = ["basic", "pro", "advanced"];
+
+export function isPaidPlan(planId: string): boolean {
+  return (SELAR_PAID_PLAN_IDS as string[]).includes(planId);
+}
 
 export type SubscriptionPlan = {
   id: SubscriptionPlanId;
@@ -14,6 +27,21 @@ export type SubscriptionPlan = {
 
 /** Single source of truth — marketing + in-app subscription stay in sync. */
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+  {
+    id: "free",
+    name: "Free",
+    description: "The free tier — core HR tools, no card required.",
+    priceMonthly: 0,
+    maxEmployees: 10,
+    cta: "Activate Free Plan",
+    features: [
+      "Core HR & payroll",
+      "Up to 10 employees",
+      "Attendance & leave tracking",
+      "Real-time updates",
+      "Email support",
+    ],
+  },
   {
     id: "trial",
     name: "Trial",
@@ -32,10 +60,10 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: "basic",
     name: "Basic",
     description: "Purchase our basic subscription and grow your business.",
-    priceMonthly: 29,
-    compareAtPrice: 50,
+    priceMonthly: 9000,
+    compareAtPrice: 18000,
     maxEmployees: 20,
-    cta: "Try 7 Days Free",
+    cta: "Choose Plan",
     features: [
       "Up to 20 employees",
       "HR & payroll management",
@@ -49,8 +77,8 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: "pro",
     name: "Pro",
     description: "Purchase our pro subscription and grow your business.",
-    priceMonthly: 59,
-    compareAtPrice: 99,
+    priceMonthly: 18000,
+    compareAtPrice: 35000,
     maxEmployees: 100,
     highlighted: true,
     cta: "Choose Plan",
@@ -67,8 +95,8 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: "advanced",
     name: "Advanced",
     description: "Purchase our advanced subscription and grow your business.",
-    priceMonthly: 79,
-    compareAtPrice: 150,
+    priceMonthly: 27000,
+    compareAtPrice: 50000,
     maxEmployees: 500,
     cta: "Choose Plan",
     features: [
@@ -113,19 +141,25 @@ export function planLabel(planId: string): string {
   return getPlan(planId).name;
 }
 
+export function formatNairaAmount(amount: number): string {
+  return amount.toLocaleString("en-NG", {
+    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+  });
+}
+
 export function formatPlanPrice(plan: SubscriptionPlan): string {
   if (plan.priceMonthly === 0 && plan.id === "enterprise") return "Custom";
   if (plan.priceMonthly === 0) return "Free";
-  return `$${plan.priceMonthly.toFixed(2)}/mo`;
+  return `₦${formatNairaAmount(plan.priceMonthly)}/mo`;
 }
 
 export function formatCompareAtPrice(plan: SubscriptionPlan): string | null {
   if (!plan.compareAtPrice) return null;
-  return `$${plan.compareAtPrice.toFixed(2)}`;
+  return `₦${formatNairaAmount(plan.compareAtPrice)}`;
 }
 
 export function formatPriceAmount(plan: SubscriptionPlan): string {
-  return plan.priceMonthly.toFixed(2);
+  return formatNairaAmount(plan.priceMonthly);
 }
 
 export function planSignupHref(planId: SubscriptionPlanId): string {

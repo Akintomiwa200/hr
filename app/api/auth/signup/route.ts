@@ -14,7 +14,7 @@ function slugFromEmail(email: string) {
 }
 
 function resolveSignupPlan(plan?: string): SubscriptionPlanId {
-  const valid = ["basic", "pro", "advanced", "trial"] as const;
+  const valid = ["free", "basic", "pro", "advanced", "trial"] as const;
   if (plan && valid.includes(plan as (typeof valid)[number])) {
     return plan as SubscriptionPlanId;
   }
@@ -55,7 +55,11 @@ export async function POST(request: NextRequest) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const trial = defaultTrialCompanyData();
+    const isFree = planId === "free";
+    // A free signup is instantly unlocked (free tier, no gateway). Every other
+    // signup starts locked until a subscription is tied to the account.
+    const isLocked = !isFree;
+    const trial = isFree ? null : defaultTrialCompanyData();
     const companyName =
       requestedCompanyName && requestedCompanyName.trim()
         ? requestedCompanyName.trim()
@@ -66,12 +70,14 @@ export async function POST(request: NextRequest) {
         data: {
           name: companyName,
           slug: slugFromEmail(normalizedEmail),
-          plan: planId === "trial" ? "trial" : planId,
-          subscriptionStatus: trial.subscriptionStatus,
-          trialEndsAt: trial.trialEndsAt,
-          currentPeriodEnd: trial.currentPeriodEnd,
+          plan: planId,
+          subscriptionStatus: isFree ? "ACTIVE" : trial!.subscriptionStatus,
+          trialEndsAt: isFree ? null : trial!.trialEndsAt,
+          currentPeriodEnd: isFree ? null : trial!.currentPeriodEnd,
           billingEmail: normalizedEmail,
           isActive: true,
+          subscriptionProvider: "manual",
+          isLocked,
         },
       });
 

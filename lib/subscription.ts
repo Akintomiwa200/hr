@@ -17,6 +17,12 @@ export type CompanySubscription = {
   currentPeriodEnd: string | null;
   billingEmail: string | null;
   isActive: boolean;
+  isLocked: boolean;
+  subscriptionProvider: string;
+  gatewayCheckoutUrl: string | null;
+  gatewayReference: string | null;
+  gatewayLinkedAt: string | null;
+  lockedAt: string | null;
   daysLeftInTrial: number | null;
   canAddEmployees: boolean;
 };
@@ -70,8 +76,14 @@ export async function getCompanySubscription(
     currentPeriodEnd: company.currentPeriodEnd?.toISOString() ?? null,
     billingEmail: company.billingEmail ?? null,
     isActive: company.isActive,
+    isLocked: company.isLocked,
+    subscriptionProvider: company.subscriptionProvider ?? "manual",
+    gatewayCheckoutUrl: company.gatewayCheckoutUrl ?? null,
+    gatewayReference: company.gatewayReference ?? null,
+    gatewayLinkedAt: company.gatewayLinkedAt?.toISOString() ?? null,
+    lockedAt: company.lockedAt?.toISOString() ?? null,
     daysLeftInTrial: status === "TRIAL" ? daysUntil(company.trialEndsAt) : null,
-    canAddEmployees: employeeCount < plan.maxEmployees && company.isActive,
+    canAddEmployees: employeeCount < plan.maxEmployees && company.isActive && !company.isLocked,
   };
 }
 
@@ -80,7 +92,6 @@ export async function changeCompanyPlan(
   planId: SubscriptionPlanId,
   options?: { billingEmail?: string; status?: SubscriptionStatus }
 ) {
-  const plan = getPlan(planId);
   const now = new Date();
 
   const data: {
@@ -89,6 +100,8 @@ export async function changeCompanyPlan(
     trialEndsAt?: Date | null;
     currentPeriodEnd?: Date | null;
     billingEmail?: string;
+    isLocked?: boolean;
+    lockedAt?: Date | null;
   } = {
     plan: planId,
     subscriptionStatus: options?.status ?? (planId === "trial" ? "TRIAL" : "ACTIVE"),
@@ -97,6 +110,11 @@ export async function changeCompanyPlan(
   if (planId === "trial") {
     data.trialEndsAt = addDays(now, TRIAL_DAYS);
     data.currentPeriodEnd = data.trialEndsAt;
+  } else if (planId === "free") {
+    data.trialEndsAt = null;
+    data.currentPeriodEnd = null;
+    data.isLocked = false;
+    data.lockedAt = null;
   } else {
     data.trialEndsAt = null;
     data.currentPeriodEnd = addDays(now, 30);
@@ -112,11 +130,45 @@ export async function changeCompanyPlan(
   });
 }
 
+/** Activate the free plan — unlocks the workspace instantly, no gateway involved. */
+export async function activateFreePlan(companyId: string) {
+  return prisma.company.update({
+    where: { id: companyId },
+    data: {
+      plan: "free",
+      subscriptionStatus: "ACTIVE",
+      subscriptionProvider: "manual",
+      gatewayReference: null,
+      gatewayCheckoutUrl: null,
+      gatewayLinkedAt: null,
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      isLocked: false,
+      lockedAt: null,
+    },
+  });
+}
+
+/** Flag a company as locked (used when a subscription is expected but not yet paid). */
+export async function setCompanyLocked(companyId: string, locked: boolean) {
+  return prisma.company.update({
+    where: { id: companyId },
+    data: {
+      isLocked: locked,
+      lockedAt: locked ? new Date() : null,
+    },
+  });
+}
+
 export async function assertCanAddEmployee(companyId: string | null | undefined) {
   if (!companyId) return;
 
   const sub = await getCompanySubscription(companyId);
   if (!sub) return;
+
+  if (sub.isLocked) {
+    throw new Error("SUBSCRIPTION_LOCKED");
+  }
 
   if (!sub.isActive) {
     throw new Error("SUBSCRIPTION_INACTIVE");
@@ -137,6 +189,8 @@ export async function assertCanAddEmployee(companyId: string | null | undefined)
 
 export function subscriptionErrorMessage(code: string): string {
   const messages: Record<string, string> = {
+    SUBSCRIPTION_LOCKED:
+      "Your workspace is locked until a subscription is tied to your account. Go to Settings → Subscription.",
     SUBSCRIPTION_INACTIVE: "Your organization subscription is inactive.",
     SUBSCRIPTION_EXPIRED: "Please renew your subscription to add employees.",
     TRIAL_EXPIRED: "Your trial has ended. Upgrade your plan to continue.",

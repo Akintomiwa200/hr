@@ -142,6 +142,12 @@ model Company {
   currentPeriodEnd   DateTime?
   billingEmail       String?
   isActive           Boolean            @default(true)
+  subscriptionProvider String           @default("manual")
+  gatewayReference   String?
+  gatewayCheckoutUrl String?
+  gatewayLinkedAt    DateTime?
+  isLocked           Boolean            @default(false)
+  lockedAt           DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 

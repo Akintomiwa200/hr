@@ -93,7 +93,7 @@ function PricingCardShell({
           <span
             className={`text-lg font-semibold ${highlighted ? "text-white" : "text-gray-900"}`}
           >
-            $
+            ₦
           </span>
           <span
             className={`text-[42px] font-bold leading-none ${

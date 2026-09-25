@@ -4,9 +4,11 @@ import { prisma } from "@/lib/prisma";
 import {
   changeCompanyPlan,
   getCompanySubscription,
+  setCompanyLocked,
   subscriptionErrorMessage,
 } from "@/lib/subscription";
-import type { SubscriptionPlanId } from "@/lib/subscription-plans";
+import { getPlan, isPaidPlan, type SubscriptionPlanId } from "@/lib/subscription-plans";
+import { selarConfigured } from "@/lib/selar";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { isCompanyAdmin, isSuperAdmin, normalizeRole } from "@/lib/roles";
 import { notifyCompanyUsers } from "@/lib/notifications";
@@ -51,10 +53,30 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "planId is required" }, { status: 400 });
   }
 
+  const paidPlan = isPaidPlan(body.planId);
+  if (paidPlan && selarConfigured()) {
+    return NextResponse.json(
+      {
+        error: `${getPlan(body.planId).name} is billed through the Selar checkout. Use the secure checkout link instead.`,
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     await changeCompanyPlan(session.companyId, body.planId, {
       billingEmail: body.billingEmail,
     });
+
+    // Manual assignment (selected plan via admin console or gateway not configured):
+    // the workspace is not gated, so make sure it stays unlocked + provider manual.
+    if (!paidPlan || !selarConfigured()) {
+      await prisma.company.update({
+        where: { id: session.companyId },
+        data: { subscriptionProvider: "manual" },
+      });
+      await setCompanyLocked(session.companyId, false);
+    }
 
     await audit({
       actor: session,

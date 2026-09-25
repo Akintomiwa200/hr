@@ -17,6 +17,8 @@ export interface SessionUser {
   employeeId?: string;
   firstName?: string;
   lastName?: string;
+  /** True when the company is locked pending a subscription (real-time gate). */
+  locked?: boolean;
 }
 
 const secret = new TextEncoder().encode(
@@ -76,12 +78,14 @@ export async function getSession(): Promise<SessionUser | null> {
     if (!dbUser) return null;
 
     let companyId = dbUser.companyId;
+    let locked = false;
     if (companyId) {
       const company = await prisma.company.findUnique({
         where: { id: companyId },
-        select: { id: true },
+        select: { id: true, isLocked: true },
       });
       if (!company) companyId = null;
+      else locked = !!company.isLocked;
     }
 
     return {
@@ -89,6 +93,7 @@ export async function getSession(): Promise<SessionUser | null> {
       email: dbUser.email,
       role: normalizeRole(dbUser.role),
       companyId,
+      locked,
       employeeId: dbUser.employee?.id,
       firstName: dbUser.employee?.firstName,
       lastName: dbUser.employee?.lastName,

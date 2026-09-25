@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { NavProvider } from "@/components/layout/nav-provider";
 import { CurrencyProvider } from "@/components/providers/currency-provider";
+import { LockGate } from "@/components/subscription/lock-gate";
+import { PlanFeatureGate } from "@/components/gates/plan-feature-gate";
 import { prisma } from "@/lib/prisma";
 import { getNavSummary } from "@/lib/nav-summary";
 import { getAppCurrencyCode } from "@/lib/currency-server";
@@ -23,10 +25,25 @@ export default async function DashboardLayout({
     session.companyId
       ? prisma.company.findUnique({
           where: { id: session.companyId },
-          select: { name: true, logo: true, updatedAt: true },
+          select: { name: true, logo: true, updatedAt: true, isLocked: true, plan: true },
         })
       : Promise.resolve(null),
   ]);
+
+  const companyLocked = session.companyId ? !!company?.isLocked : false;
+  const companyPlan = company?.plan ?? null;
+
+  // Locked workspaces only expose the subscription setup screen until a plan
+  // is tied to the account — the gate unlocks in real time via SSE.
+  if (companyLocked) {
+    return (
+      <CurrencyProvider currencyCode={currencyCode}>
+        <NavProvider initialSummary={navSummary}>
+          <LockGate initiallyLocked>{children}</LockGate>
+        </NavProvider>
+      </CurrencyProvider>
+    );
+  }
 
   // Cache-bust the logo URL so a re-uploaded image is fetched, not a cached copy.
   const companyLogo = company?.logo
@@ -54,7 +71,9 @@ export default async function DashboardLayout({
           companyName={company?.name}
           companyLogo={companyLogo}
         >
-          {children}
+          <PlanFeatureGate planId={session.companyId ? companyPlan : null}>
+            {children}
+          </PlanFeatureGate>
         </DashboardShell>
       </NavProvider>
     </CurrencyProvider>
