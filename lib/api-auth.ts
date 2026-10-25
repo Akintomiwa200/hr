@@ -22,10 +22,11 @@ export function notFound() {
 export async function requireSession() {
   const session = await getSession();
   if (!session) return null;
+  // DEMO MODE: payment lock disabled — see comment.md to re-enable.
   // Locked companies cannot use business APIs until a subscription is tied.
   // The subscription/events/auth endpoints use getSession() directly, so they
   // keep working so the workspace can be unlocked in real time.
-  if (session.locked) return null;
+  // if (session.locked) return null;
   return session;
 }
 

@@ -163,28 +163,29 @@ export async function setCompanyLocked(companyId: string, locked: boolean) {
 export async function assertCanAddEmployee(companyId: string | null | undefined) {
   if (!companyId) return;
 
-  const sub = await getCompanySubscription(companyId);
-  if (!sub) return;
-
-  if (sub.isLocked) {
-    throw new Error("SUBSCRIPTION_LOCKED");
-  }
-
-  if (!sub.isActive) {
-    throw new Error("SUBSCRIPTION_INACTIVE");
-  }
-
-  if (sub.status === "CANCELLED" || sub.status === "PAST_DUE") {
-    throw new Error("SUBSCRIPTION_EXPIRED");
-  }
-
-  if (sub.status === "TRIAL" && sub.daysLeftInTrial === 0) {
-    throw new Error("TRIAL_EXPIRED");
-  }
-
-  if (!sub.canAddEmployees) {
-    throw new Error("EMPLOYEE_LIMIT");
-  }
+  // DEMO MODE: subscription/employee limits disabled — see comment.md to re-enable.
+  // const sub = await getCompanySubscription(companyId);
+  // if (!sub) return;
+  //
+  // if (sub.isLocked) {
+  //   throw new Error("SUBSCRIPTION_LOCKED");
+  // }
+  //
+  // if (!sub.isActive) {
+  //   throw new Error("SUBSCRIPTION_INACTIVE");
+  // }
+  //
+  // if (sub.status === "CANCELLED" || sub.status === "PAST_DUE") {
+  //   throw new Error("SUBSCRIPTION_EXPIRED");
+  // }
+  //
+  // if (sub.status === "TRIAL" && sub.daysLeftInTrial === 0) {
+  //   throw new Error("TRIAL_EXPIRED");
+  // }
+  //
+  // if (!sub.canAddEmployees) {
+  //   throw new Error("EMPLOYEE_LIMIT");
+  // }
 }
 
 export function subscriptionErrorMessage(code: string): string {

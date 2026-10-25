@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getSession } from "@/lib/auth";
-import { canManageEmployees, ALL_ROLES, roleLabel } from "@/lib/roles";
+import { canManageEmployees, ORG_ROLES, roleLabel } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { getCompanyScope } from "@/lib/company-scope";
 import { roleDefinitionCompanyWhere } from "@/lib/roles-catalog";
@@ -27,7 +27,7 @@ export default async function RolesPage() {
     orderBy: { createdAt: "asc" },
   })) as ManagedRole[];
 
-  const builtinRoles = ALL_ROLES.map((role) => ({ role, label: roleLabel(role) }));
+  const builtinRoles = ORG_ROLES.map((role) => ({ role, label: roleLabel(role) }));
 
   return (
     <div className="max-w-6xl">
@@ -45,6 +45,7 @@ export default async function RolesPage() {
       <RolesModule
         roles={customRoles}
         builtinRoles={builtinRoles}
+        baseOptions={ORG_ROLES}
         canManage
       />
     </div>

@@ -3,8 +3,9 @@ import { getSession } from "@/lib/auth";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { NavProvider } from "@/components/layout/nav-provider";
 import { CurrencyProvider } from "@/components/providers/currency-provider";
-import { LockGate } from "@/components/subscription/lock-gate";
-import { PlanFeatureGate } from "@/components/gates/plan-feature-gate";
+// DEMO MODE: payment gates disabled — see comment.md to re-enable.
+// import { LockGate } from "@/components/subscription/lock-gate";
+// import { PlanFeatureGate } from "@/components/gates/plan-feature-gate";
 import { prisma } from "@/lib/prisma";
 import { getNavSummary } from "@/lib/nav-summary";
 import { getAppCurrencyCode } from "@/lib/currency-server";
@@ -30,20 +31,22 @@ export default async function DashboardLayout({
       : Promise.resolve(null),
   ]);
 
-  const companyLocked = session.companyId ? !!company?.isLocked : false;
-  const companyPlan = company?.plan ?? null;
+// DEMO MODE: payment gates disabled — see comment.md to re-enable.
+// const companyLocked = session.companyId ? !!company?.isLocked : false;
+// const companyPlan = company?.plan ?? null;
 
-  // Locked workspaces only expose the subscription setup screen until a plan
-  // is tied to the account — the gate unlocks in real time via SSE.
-  if (companyLocked) {
-    return (
-      <CurrencyProvider currencyCode={currencyCode}>
-        <NavProvider initialSummary={navSummary}>
-          <LockGate initiallyLocked>{children}</LockGate>
-        </NavProvider>
-      </CurrencyProvider>
-    );
-  }
+// DEMO MODE: locked-workspace screen disabled — see comment.md to re-enable.
+// Locked workspaces only expose the subscription setup screen until a plan
+// is tied to the account — the gate unlocks in real time via SSE.
+// if (companyLocked) {
+//   return (
+//     <CurrencyProvider currencyCode={currencyCode}>
+//       <NavProvider initialSummary={navSummary}>
+//         <LockGate initiallyLocked>{children}</LockGate>
+//       </NavProvider>
+//     </CurrencyProvider>
+//   );
+// }
 
   // Cache-bust the logo URL so a re-uploaded image is fetched, not a cached copy.
   const companyLogo = company?.logo
@@ -71,9 +74,10 @@ export default async function DashboardLayout({
           companyName={company?.name}
           companyLogo={companyLogo}
         >
-          <PlanFeatureGate planId={session.companyId ? companyPlan : null}>
-            {children}
-          </PlanFeatureGate>
+          {/* DEMO MODE: plan/feature gate disabled — see comment.md to re-enable. */}
+          {/* <PlanFeatureGate planId={session.companyId ? companyPlan : null}> */}
+          {children}
+          {/* </PlanFeatureGate> */}
         </DashboardShell>
       </NavProvider>
     </CurrencyProvider>
