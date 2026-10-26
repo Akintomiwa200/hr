@@ -74,6 +74,7 @@ export async function PATCH(
   }
 
   const {
+    employeeCode,
     firstName,
     lastName,
     email,
@@ -117,6 +118,39 @@ export async function PATCH(
       ? employmentType
       : undefined;
 
+  const normalizedEmployeeCode =
+    employeeCode === undefined ? undefined : String(employeeCode ?? "").trim();
+
+  if (normalizedEmployeeCode !== undefined) {
+    if (!normalizedEmployeeCode) {
+      return NextResponse.json(
+        { error: "Employee code is required" },
+        { status: 400 }
+      );
+    }
+    if (normalizedEmployeeCode.length > 50) {
+      return NextResponse.json(
+        { error: "Employee code must be 50 characters or fewer" },
+        { status: 400 }
+      );
+    }
+    if (normalizedEmployeeCode !== existing.employeeCode) {
+      const codeTaken = await prisma.employee.findFirst({
+        where: {
+          employeeCode: normalizedEmployeeCode,
+          id: { not: id },
+        },
+        select: { id: true },
+      });
+      if (codeTaken) {
+        return NextResponse.json(
+          { error: "Employee code already exists" },
+          { status: 409 }
+        );
+      }
+    }
+  }
+
   const shiftFields =
     isShiftWorker !== undefined || shiftStartTime !== undefined
       ? parseEmployeeShiftFields({ isShiftWorker, shiftStartTime })
@@ -125,6 +159,9 @@ export async function PATCH(
   const employee = await prisma.employee.update({
     where: { id },
     data: {
+      ...(normalizedEmployeeCode !== undefined && {
+        employeeCode: normalizedEmployeeCode,
+      }),
       ...(firstName !== undefined && { firstName }),
       ...(lastName !== undefined && { lastName }),
       ...(email !== undefined && { email }),

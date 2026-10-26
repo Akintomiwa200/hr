@@ -13,6 +13,7 @@ export type BranchOption = { id: string; name: string; location?: string };
 export type ManagerOption = { id: string; firstName: string; lastName: string };
 
 export type EmployeeFormData = {
+  employeeCode: string;
   firstName: string;
   lastName: string;
   email: string;

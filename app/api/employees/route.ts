@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const {
+    employeeCode,
     firstName,
     lastName,
     email,
@@ -91,6 +92,15 @@ export async function POST(request: NextRequest) {
 
   if (!firstName || !lastName || !email || !jobTitle || !departmentId) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  const normalizedEmployeeCode =
+    typeof employeeCode === "string" ? employeeCode.trim() : "";
+  if (normalizedEmployeeCode.length > 50) {
+    return NextResponse.json(
+      { error: "Employee code must be 50 characters or fewer" },
+      { status: 400 }
+    );
   }
 
   const resolvedRoleValue = normalizeRole(String(role || "EMPLOYEE"));
@@ -141,6 +151,7 @@ export async function POST(request: NextRequest) {
       companyId: session.companyId,
       hireDate,
       dateOfBirth,
+      employeeCode: normalizedEmployeeCode || null,
     });
 
     const shiftFields = parseEmployeeShiftFields(body);
@@ -200,6 +211,12 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     if (err instanceof Error && err.message === "EMAIL_EXISTS") {
       return NextResponse.json({ error: "Email already exists" }, { status: 409 });
+    }
+    if (err instanceof Error && err.message === "EMPLOYEE_CODE_EXISTS") {
+      return NextResponse.json(
+        { error: "Employee code already exists" },
+        { status: 409 }
+      );
     }
     if (
       err instanceof Error &&

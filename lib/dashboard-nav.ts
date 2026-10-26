@@ -35,6 +35,9 @@ import {
   StickyNote,
   MessageSquare,
   HandCoins,
+  Building2,
+  Headset,
+  ScrollText,
 } from "lucide-react";
 import { CHECKLIST_ADMIN_ROLES, CHECKLIST_TEMPLATE_ROLES, CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
 import {
@@ -58,6 +61,7 @@ import {
   SUPER_ADMIN_ONLY,
   REPORTS_VIEW_ROLES,
   hasRole,
+  isSuperAdmin,
 } from "@/lib/roles";
 
 export type NavItem = {
@@ -397,6 +401,79 @@ export const dashboardNavSections: NavSection[] = [
   }
 ];
 
+/**
+ * Super Admin works on the platform, not inside a single company, so the
+ * sidebar swaps the company workspace for platform-owner tools.
+ */
+export const superAdminNavSections: NavSection[] = [
+  {
+    title: "PLATFORM",
+    items: [
+      {
+        id: "platform-overview",
+        href: "/dashboard",
+        label: "Overview",
+        pageTitle: "Platform overview",
+        icon: LayoutDashboard,
+        roles: SUPER_ADMIN_ONLY,
+      },
+      {
+        id: "platform-companies",
+        href: "/admin/companies",
+        label: "Companies",
+        pageTitle: "Companies",
+        icon: Building2,
+        roles: SUPER_ADMIN_ONLY,
+      },
+      {
+        id: "platform-users",
+        href: "/admin/users",
+        label: "Platform users",
+        pageTitle: "Platform users",
+        icon: Users,
+        roles: SUPER_ADMIN_ONLY,
+      },
+      {
+        id: "platform-billing",
+        href: "/admin/billing",
+        label: "Billing & plans",
+        pageTitle: "Billing & plans",
+        icon: CreditCard,
+        roles: SUPER_ADMIN_ONLY,
+      },
+      {
+        id: "platform-activity",
+        href: "/admin/activity",
+        label: "Activity log",
+        pageTitle: "Activity log",
+        icon: ScrollText,
+        roles: SUPER_ADMIN_ONLY,
+      },
+      {
+        id: "platform-support",
+        href: "/support",
+        label: "Support desk",
+        pageTitle: "Support Desk",
+        icon: Headset,
+        roles: SUPER_ADMIN_ONLY,
+      },
+    ],
+  },
+  {
+    title: "PLATFORM SETTINGS",
+    items: [
+      {
+        id: "platform-settings",
+        href: "/admin/settings",
+        label: "Platform settings",
+        pageTitle: "Platform settings",
+        icon: Settings,
+        roles: SUPER_ADMIN_ONLY,
+      },
+    ],
+  },
+];
+
 export const settingsNavItem: NavItem = {
   id: "settings",
   href: "/settings",
@@ -408,10 +485,20 @@ export const settingsNavItem: NavItem = {
 
 export const brandIcon = Activity;
 
+export function getNavSections(role: Role): NavSection[] {
+  return isSuperAdmin(role) ? superAdminNavSections : dashboardNavSections;
+}
+
+/** Platform admins get their settings entry from the PLATFORM SETTINGS section. */
+export function getSettingsNavItem(role: Role): NavItem | null {
+  return isSuperAdmin(role) ? null : settingsNavItem;
+}
+
 export function getAllNavItems(role: Role): NavItem[] {
+  const settingsItem = getSettingsNavItem(role);
   return [
-    ...dashboardNavSections.flatMap((s) => s.items),
-    settingsNavItem,
+    ...getNavSections(role).flatMap((s) => s.items),
+    ...(settingsItem ? [settingsItem] : []),
   ].filter((item) => hasRole(role, item.roles));
 }
 
@@ -449,6 +536,22 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
   {
     test: (p) => p === "/admin/companies",
     title: "Companies",
+  },
+  {
+    test: (p) => p === "/admin/users",
+    title: "Platform users",
+  },
+  {
+    test: (p) => p === "/admin/billing",
+    title: "Billing & plans",
+  },
+  {
+    test: (p) => p === "/admin/activity",
+    title: "Activity log",
+  },
+  {
+    test: (p) => p === "/admin/settings",
+    title: "Platform settings",
   },
   {
     test: (p) => p === "/employees/new" || p === "/checklist/onboarding",

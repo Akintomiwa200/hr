@@ -12,6 +12,7 @@ const inputClass =
 const labelClass = "block text-[13px] font-medium text-gray-700 mb-1.5";
 
 export function employeeToFormData(employee: {
+  employeeCode: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -34,6 +35,7 @@ export function employeeToFormData(employee: {
   user?: { role: Role } | null;
 }): EmployeeFormData {
   return {
+    employeeCode: employee.employeeCode,
     firstName: employee.firstName,
     lastName: employee.lastName,
     email: employee.email,
@@ -129,14 +131,31 @@ export function EmployeeFormFields({
         </div>
       </div>
 
-      <div>
-        <label className={labelClass}>Job title</label>
-        <input
-          value={data.jobTitle}
-          onChange={(e) => set("jobTitle", e.target.value)}
-          required
-          className={inputClass}
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className={labelClass}>Employee code</label>
+          <input
+            value={data.employeeCode}
+            onChange={(e) => set("employeeCode", e.target.value)}
+            className={inputClass}
+            placeholder={isEdit ? undefined : "Auto-generated (EMP001)"}
+            maxLength={50}
+          />
+          <p className="mt-1 text-[11px] text-gray-400">
+            {isEdit
+              ? "Must be unique across all companies."
+              : "Leave blank to auto-generate the next code."}
+          </p>
+        </div>
+        <div>
+          <label className={labelClass}>Job title</label>
+          <input
+            value={data.jobTitle}
+            onChange={(e) => set("jobTitle", e.target.value)}
+            required
+            className={inputClass}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -333,6 +352,7 @@ export function EmployeeFormFields({
 export const emptyEmployeeForm = (
   departments: DepartmentOption[]
 ): EmployeeFormData => ({
+  employeeCode: "",
   firstName: "",
   lastName: "",
   email: "",

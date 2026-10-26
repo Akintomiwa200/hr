@@ -1581,6 +1581,20 @@ export function SuperAdminDashboard({
         controls={
           <HeroControls>
             <Link
+              href="/admin/users"
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-[13px] font-semibold bg-white/15 text-white rounded-xl hover:bg-white/25 border border-white/20"
+            >
+              <Users className="w-4 h-4" />
+              Platform users
+            </Link>
+            <Link
+              href="/admin/billing"
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-[13px] font-semibold bg-white/15 text-white rounded-xl hover:bg-white/25 border border-white/20"
+            >
+              <Wallet className="w-4 h-4" />
+              Billing
+            </Link>
+            <Link
               href="/admin/companies"
               className="inline-flex items-center gap-2 px-4 py-2.5 text-[13px] font-semibold bg-white text-[#7B61FF] rounded-xl hover:bg-violet-50 shadow-sm"
             >

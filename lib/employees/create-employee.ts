@@ -177,6 +177,15 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
   });
 
   const employeeCode = (input.employeeCode?.trim() || (await nextEmployeeCode()));
+  if (input.employeeCode?.trim()) {
+    const codeTaken = await prisma.employee.findUnique({
+      where: { employeeCode },
+      select: { id: true },
+    });
+    if (codeTaken) {
+      throw new Error("EMPLOYEE_CODE_EXISTS");
+    }
+  }
   const passwordHash = await bcrypt.hash(DEFAULT_EMPLOYEE_PASSWORD, 10);
   const biometricPin =
     (typeof input.biometricPin === "string" && input.biometricPin.trim()) ||

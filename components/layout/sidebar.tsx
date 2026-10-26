@@ -7,10 +7,10 @@ import { cn } from "@/lib/utils";
 import type { Role } from "@prisma/client";
 import {
   brandIcon,
-  dashboardNavSections,
   getActiveNavId,
   getAllNavItems,
-  settingsNavItem,
+  getNavSections,
+  getSettingsNavItem,
   type NavItem,
 } from "@/lib/dashboard-nav";
 import { roleWorkspaceLabel, roleLabel, canManageOrgContent, hasRole } from "@/lib/roles";
@@ -301,6 +301,8 @@ export function Sidebar({
 
   const visibleItems = getAllNavItems(role);
   const activeId = getActiveNavId(pathname, visibleItems);
+  const navSections = getNavSections(role);
+  const settingsItem = getSettingsNavItem(role);
   const BrandIcon = brandIcon;
   const profileHref = employeeId ? `/employees/${employeeId}` : "/settings";
 
@@ -350,7 +352,7 @@ export function Sidebar({
           navScroll.className
         )}
       >
-        {dashboardNavSections.map((section) => (
+        {navSections.map((section) => (
           <NavSection
             key={section.title}
             title={section.title}
@@ -366,14 +368,16 @@ export function Sidebar({
       </nav>
 
       <div className={cn("shrink-0 pb-3", collapsed ? "px-2" : "px-3")}>
-        <div className={cn("border-t border-gray-100 pt-3 mb-3", collapsed && "pt-2 mb-2")}>
-          <NavLink
-            item={settingsNavItem}
-            isActive={activeId === settingsNavItem.id}
-            collapsed={collapsed}
-            onNavigate={onCloseMobile}
-          />
-        </div>
+        {settingsItem && (
+          <div className={cn("border-t border-gray-100 pt-3 mb-3", collapsed && "pt-2 mb-2")}>
+            <NavLink
+              item={settingsItem}
+              isActive={activeId === settingsItem.id}
+              collapsed={collapsed}
+              onNavigate={onCloseMobile}
+            />
+          </div>
+        )}
 
         <div className="relative">
           <button
