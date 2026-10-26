@@ -9,6 +9,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { Badge, Button, Card, CardHeader } from "@/components/ui";
+import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
 
 type ArchiveRow = {
@@ -66,6 +67,8 @@ export function AttendanceArchivePanel() {
   const [archiveMonth, setArchiveMonth] = useState<number>(prev.getUTCMonth() + 1);
   const [busy, setBusy] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [restoreId, setRestoreId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -125,18 +128,21 @@ export function AttendanceArchivePanel() {
     }
   };
 
-  const restore = async (id: string) => {
-    if (!window.confirm("Restore this month back into the database? Live records for the same day may be merged.")) {
-      return;
-    }
-    setBusyId(id);
+  const restore = (id: string) => {
+    setRestoreId(id);
+  };
+
+  const confirmRestore = async () => {
+    if (!restoreId) return;
+    setBusyId(restoreId);
     try {
-      const res = await fetch(`/api/attendance/archive/${id}`, { method: "POST" });
+      const res = await fetch(`/api/attendance/archive/${restoreId}`, { method: "POST" });
       if (!res.ok) {
         notify.error(await readApiError(res, "Failed to restore month"));
         return;
       }
       notify.success("Attendance restored to the database");
+      setRestoreId(null);
       await load();
     } catch {
       notify.error("Failed to restore month");
@@ -145,18 +151,21 @@ export function AttendanceArchivePanel() {
     }
   };
 
-  const remove = async (id: string) => {
-    if (!window.confirm("Delete this archive? The Cloudinary file will also be removed.")) {
-      return;
-    }
-    setBusyId(id);
+  const remove = (id: string) => {
+    setDeleteId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setBusyId(deleteId);
     try {
-      const res = await fetch(`/api/attendance/archive/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/attendance/archive/${deleteId}`, { method: "DELETE" });
       if (!res.ok) {
         notify.error(await readApiError(res, "Failed to delete archive"));
         return;
       }
       notify.success("Archive deleted");
+      setDeleteId(null);
       await load();
     } catch {
       notify.error("Failed to delete archive");
@@ -297,6 +306,40 @@ export function AttendanceArchivePanel() {
           </ul>
         )}
       </Card>
+
+      <Dialog
+        open={restoreId !== null}
+        onClose={() => setRestoreId(null)}
+        title="Restore attendance archive"
+        description="Restore this month back into the database? Live records for the same day may be merged."
+        size="sm"
+      >
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setRestoreId(null)}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="sm" loading={busyId === restoreId} onClick={() => void confirmRestore()}>
+            Restore
+          </Button>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        title="Delete attendance archive"
+        description="Delete this archive? The Cloudinary file will also be removed."
+        size="sm"
+      >
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setDeleteId(null)}>
+            Cancel
+          </Button>
+          <Button variant="danger" size="sm" loading={busyId === deleteId} onClick={() => void confirmDelete()}>
+            Delete
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

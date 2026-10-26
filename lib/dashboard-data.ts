@@ -596,7 +596,43 @@ export async function getEmployeeDashboardData(
 }
 
 export async function getSuperAdminDashboardData() {
-  const [companies, totalUsers, totalEmployees, activeCompanies] = await Promise.all([
+  const today = startOfDay();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const prevMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const prevMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
+  const heatmapStart = new Date(today);
+  heatmapStart.setDate(heatmapStart.getDate() - 27);
+  const fourMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+  const nextPayout = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+  const [
+    companies,
+    totalUsers,
+    totalEmployees,
+    activeCompanies,
+    activeEmployees,
+    employeesLastMonth,
+    recentEmployees,
+    pendingApprovals,
+    onLeaveToday,
+    openJobs,
+    activeCandidates,
+    hiredApps,
+    rejectedApps,
+    offeredApps,
+    screeningCount,
+    interviewCount,
+    priorityJobs,
+    hiredForAvg,
+    departmentCounts,
+    primaryBranch,
+    latestPayrollRun,
+    attendanceToday,
+    attendanceHeatRows,
+    recentHires,
+    thisMonthAttendanceRate,
+    lastMonthAttendanceRate,
+  ] = await Promise.all([
     prisma.company.findMany({
       include: { _count: { select: { users: true } } },
       orderBy: { createdAt: "desc" },
@@ -604,13 +640,221 @@ export async function getSuperAdminDashboardData() {
     prisma.user.count({ where: { role: { not: "SUPER_ADMIN" } } }),
     prisma.employee.count(),
     prisma.company.count({ where: { isActive: true } }),
+    prisma.employee.count({ where: { status: "ACTIVE" } }),
+    prisma.employee.count({
+      where: { status: "ACTIVE", createdAt: { lt: monthStart } },
+    }),
+    prisma.employee.findMany({
+      where: { status: "ACTIVE" },
+      select: { id: true, firstName: true, lastName: true, avatar: true },
+      orderBy: { hireDate: "desc" },
+      take: 5,
+    }),
+    prisma.leaveRequest.count({ where: { status: "PENDING" } }),
+    prisma.leaveRequest.count({
+      where: {
+        status: "APPROVED",
+        startDate: { lte: today },
+        endDate: { gte: today },
+      },
+    }),
+    prisma.job.count({ where: { status: "OPEN" } }),
+    prisma.jobApplication.count({
+      where: { status: { in: ["APPLIED", "SCREENING", "INTERVIEW", "OFFER"] } },
+    }),
+    prisma.jobApplication.count({ where: { status: "HIRED" } }),
+    prisma.jobApplication.count({ where: { status: "REJECTED" } }),
+    prisma.jobApplication.count({ where: { status: "OFFER" } }),
+    prisma.jobApplication.count({ where: { status: "SCREENING" } }),
+    prisma.jobApplication.count({ where: { status: "INTERVIEW" } }),
+    prisma.job.findMany({
+      where: { status: "OPEN" },
+      select: {
+        id: true,
+        title: true,
+        location: true,
+        _count: { select: { applications: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 4,
+    }),
+    prisma.jobApplication.findMany({
+      where: { status: "HIRED" },
+      select: { appliedAt: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+      take: 40,
+    }),
+    prisma.department.findMany({
+      include: { _count: { select: { employees: true } } },
+      orderBy: { name: "asc" },
+    }),
+    prisma.branch.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: "asc" },
+      select: { name: true, location: true },
+    }),
+    prisma.payrollRun.findFirst({
+      orderBy: { periodEnd: "desc" },
+      select: {
+        id: true,
+        status: true,
+        periodEnd: true,
+        label: true,
+        employeeCount: true,
+      },
+    }),
+    prisma.attendance.groupBy({
+      by: ["status"],
+      _count: { status: true },
+      where: { date: { gte: today } },
+    }),
+    prisma.attendance.findMany({
+      where: {
+        date: { gte: heatmapStart, lte: today },
+        status: { in: ["PRESENT", "REMOTE", "LATE", "HALF_DAY"] },
+      },
+      select: { date: true },
+    }),
+    prisma.employee.findMany({
+      where: { hireDate: { gte: fourMonthsAgo } },
+      select: { hireDate: true },
+    }),
+    getAttendanceRateForRange(monthStart, today),
+    getAttendanceRateForRange(prevMonthStart, prevMonthEnd),
   ]);
+
+  const headcountGrowth =
+    employeesLastMonth > 0
+      ? Math.round(((activeEmployees - employeesLastMonth) / employeesLastMonth) * 100)
+      : activeEmployees > 0
+        ? 100
+        : 0;
+
+  const decided = hiredApps + rejectedApps;
+  const acceptanceRate = decided > 0 ? Math.round((hiredApps / decided) * 100) : 0;
+
+  const hireDurations = hiredForAvg
+    .map((app) => {
+      const ms = new Date(app.updatedAt).getTime() - new Date(app.appliedAt).getTime();
+      return Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24)));
+    })
+    .filter((d) => d > 0);
+  const avgHireDays =
+    hireDurations.length > 0
+      ? Math.round(hireDurations.reduce((a, b) => a + b, 0) / hireDurations.length)
+      : 0;
+
+  const dayCounts = new Map<string, number>();
+  for (let i = 0; i < 28; i++) {
+    const d = new Date(heatmapStart);
+    d.setDate(heatmapStart.getDate() + i);
+    dayCounts.set(d.toISOString().slice(0, 10), 0);
+  }
+  for (const row of attendanceHeatRows) {
+    const key = startOfDay(row.date).toISOString().slice(0, 10);
+    if (dayCounts.has(key)) dayCounts.set(key, (dayCounts.get(key) ?? 0) + 1);
+  }
+  const heatValues = [...dayCounts.values()];
+  const heatMax = Math.max(1, ...heatValues);
+  const attendanceHeatmap = heatValues.map((v) => Math.round((v / heatMax) * 100));
+
+  const presentToday =
+    (attendanceToday.find((s) => s.status === "PRESENT")?._count.status ?? 0) +
+    (attendanceToday.find((s) => s.status === "HALF_DAY")?._count.status ?? 0);
+  const remoteToday =
+    attendanceToday.find((s) => s.status === "REMOTE")?._count.status ?? 0;
+  const lateToday =
+    attendanceToday.find((s) => s.status === "LATE")?._count.status ?? 0;
+  const absentToday =
+    attendanceToday.find((s) => s.status === "ABSENT")?._count.status ?? 0;
+  const energyTotal = Math.max(1, presentToday + remoteToday + lateToday + absentToday);
+  const teamEnergy = {
+    energetic: Math.round((presentToday / energyTotal) * 100),
+    balanced: Math.round((remoteToday / energyTotal) * 100),
+    muted: Math.round(((lateToday + absentToday) / energyTotal) * 100),
+  };
+
+  const expectedToday = Math.max(activeEmployees, 1);
+  const todayAttendanceRate = Math.min(
+    100,
+    Math.round(((presentToday + remoteToday + lateToday) / expectedToday) * 1000) / 10
+  );
+  const attendanceTrend = Math.round((thisMonthAttendanceRate - lastMonthAttendanceRate) * 10) / 10;
+
+  const performanceBars = [0, 1, 2, 3].map((offset) => {
+    const start = new Date(today.getFullYear(), today.getMonth() - (3 - offset), 1);
+    const end = new Date(today.getFullYear(), today.getMonth() - (2 - offset), 0, 23, 59, 59, 999);
+    const count = recentHires.filter((e) => {
+      if (!e.hireDate) return false;
+      const d = new Date(e.hireDate);
+      return d >= start && d <= end;
+    }).length;
+    return {
+      label: start.toLocaleString("en-US", { month: "short" }),
+      value: count,
+    };
+  });
+  const perfMax = Math.max(1, ...performanceBars.map((b) => b.value));
+
+  const deptSorted = [...departmentCounts]
+    .map((d) => ({ id: d.id, name: d.name, count: d._count.employees }))
+    .filter((d) => d.count > 0)
+    .sort((a, b) => b.count - a.count);
+  const deptTotal = deptSorted.reduce((s, d) => s + d.count, 0) || 1;
+  const departmentSplit = deptSorted.slice(0, 3).map((d) => ({
+    name: d.name,
+    count: d.count,
+    percent: Math.round((d.count / deptTotal) * 100),
+  }));
+
+  const daysInMonth = nextPayout.getDate();
+  const cycleComplete = Math.min(100, Math.round((today.getDate() / daysInMonth) * 100));
+
+  const hqLabel = primaryBranch
+    ? primaryBranch.name.toLowerCase().includes("hq")
+      ? primaryBranch.name
+      : `HQ ${primaryBranch.location || primaryBranch.name}`
+    : companies[0]?.name
+      ? `HQ ${companies[0].name}`
+      : "Platform HQ";
 
   return {
     companies,
     totalUsers,
-    totalEmployees,
+    totalEmployees: activeEmployees,
     activeCompanies,
+    pendingApprovals,
+    onLeaveToday,
+    openJobs,
+    activeCandidates,
+    screeningCount,
+    interviewCount,
+    acceptanceRate,
+    offeredApps,
+    avgHireDays,
+    headcountGrowth,
+    recentEmployees,
+    priorityJobs,
+    departmentSplit,
+    hqLabel,
+    hqOpen: activeCompanies > 0,
+    payroll: {
+      nextPayout: nextPayout.toISOString(),
+      cycleComplete,
+      status: latestPayrollRun?.status ?? "DRAFT",
+      label: latestPayrollRun?.label ?? null,
+      employeeCount: latestPayrollRun?.employeeCount ?? 0,
+    },
+    attendance: {
+      rate: todayAttendanceRate,
+      trend: attendanceTrend,
+      heatmap: attendanceHeatmap,
+    },
+    performanceBars: performanceBars.map((b) => ({
+      ...b,
+      height: Math.round((b.value / perfMax) * 100),
+    })),
+    teamEnergy,
   };
 }
 

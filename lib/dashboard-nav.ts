@@ -538,6 +538,26 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
     title: "Companies",
   },
   {
+    test: (p) => /^\/admin\/companies\/[^/]+\/users$/.test(p),
+    title: "Company Users",
+  },
+  {
+    test: (p) => /^\/admin\/companies\/[^/]+\/employees$/.test(p),
+    title: "Company Employees",
+  },
+  {
+    test: (p) => /^\/admin\/companies\/[^/]+\/billing$/.test(p),
+    title: "Company Billing",
+  },
+  {
+    test: (p) => /^\/admin\/companies\/[^/]+\/activity$/.test(p),
+    title: "Company Activity",
+  },
+  {
+    test: (p) => /^\/admin\/companies\/[^/]+$/.test(p),
+    title: "Company Details",
+  },
+  {
     test: (p) => p === "/admin/users",
     title: "Platform users",
   },
