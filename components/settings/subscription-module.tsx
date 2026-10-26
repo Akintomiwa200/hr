@@ -219,7 +219,11 @@ export function SubscriptionModule({
   const paidPlans = (["basic", "pro", "advanced"] as const).map((id) => getPlan(id));
   const freePlan = getPlan("free");
 
-  if (subscription.isLocked) {
+  // DEMO MODE: locked "finish payment" screen disabled — see comment.md to re-enable.
+  // To restore, delete the next line and change the condition back to
+  // `if (subscription.isLocked) {`.
+  const showLockedSetup = false;
+  if (showLockedSetup && subscription.isLocked) {
     return (
       <div className="w-full">
         <LockedSetup

@@ -109,6 +109,30 @@ Uncomment the body to restore plan limits.
 
 ---
 
+## 4. `components/settings/subscription-module.tsx` — locked settings screen
+
+The Settings → Subscription page still showed the "finish payment" screen for
+locked workspaces (e.g. the `Blackson` company, which is `isLocked: true` in the
+DB). The guard is now a demo flag:
+
+```tsx
+// DEMO MODE: locked "finish payment" screen disabled — see comment.md to re-enable.
+// To restore, delete the next line and change the condition back to
+// `if (subscription.isLocked) {`.
+const showLockedSetup = false;
+if (showLockedSetup && subscription.isLocked) {
+```
+
+Restore to:
+
+```tsx
+if (subscription.isLocked) {
+```
+
+(Delete the `const showLockedSetup = false;` line.)
+
+---
+
 ## What is left in place (not blocking)
 
 - `components/subscription/lock-gate.tsx` and
@@ -132,6 +156,9 @@ Uncomment the body to restore plan limits.
 1. `app/(dashboard)/layout.tsx` — uncomment (a), (b) and restore the wrapper in (c).
 2. `lib/api-auth.ts` — uncomment `if (session.locked) return null;`.
 3. `lib/subscription.ts` — uncomment the `assertCanAddEmployee` body.
-4. Make sure each company has a valid plan (`Settings → Subscription`, or the
+4. `components/settings/subscription-module.tsx` — delete `const showLockedSetup = false;` and restore `if (subscription.isLocked) {`.
+5. Make sure each company has a valid plan (`Settings → Subscription`, or the
    admin Companies page) and `isLocked = false` unless you want it locked.
-5. Restart the dev server (env/compile changes) if needed.
+   Note: the `Blackson` company is currently `isLocked = true` in the DB, so it
+   will show the lock screen again once gating is restored.
+6. Restart the dev server (env/compile changes) if needed.
