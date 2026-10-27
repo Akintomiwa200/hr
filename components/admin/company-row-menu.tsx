@@ -45,11 +45,19 @@ export function CompanyRowMenu({
 }) {
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
+  const [menuPos, setMenuPos] = useState<{
+    top?: number;
+    bottom?: number;
+    left?: number;
+    right?: number;
+    maxHeight?: number;
+    placement?: "up" | "down";
+  } | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -59,20 +67,63 @@ export function CompanyRowMenu({
     const update = () => {
       if (!ref.current) return;
       const rect = ref.current.getBoundingClientRect();
-      if (align === "right") {
-        setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+      const menuHeight = menuRef.current?.offsetHeight || 260;
+      const menuWidth = menuRef.current?.offsetWidth || 224;
+      const margin = 8;
+      const gap = 4;
+
+      const spaceBelow = window.innerHeight - rect.bottom - gap - margin;
+      const spaceAbove = rect.top - gap - margin;
+
+      // Flip direction to open upward if space below is tight and more room above (like a tooltip)
+      const flipUp = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+
+      let top: number | undefined;
+      let bottom: number | undefined;
+      let maxHeight: number;
+
+      if (flipUp) {
+        bottom = window.innerHeight - rect.top + gap;
+        maxHeight = Math.max(120, spaceAbove);
       } else {
-        setMenuPos({ top: rect.bottom + 4, left: rect.left });
+        top = rect.bottom + gap;
+        maxHeight = Math.max(120, spaceBelow);
       }
+
+      let left: number | undefined;
+      let right: number | undefined;
+
+      if (align === "right") {
+        const rawRight = window.innerWidth - rect.right;
+        const maxRight = window.innerWidth - menuWidth - margin;
+        right = Math.max(margin, Math.min(rawRight, maxRight));
+      } else {
+        const rawLeft = rect.left;
+        const maxLeft = window.innerWidth - menuWidth - margin;
+        left = Math.max(margin, Math.min(rawLeft, maxLeft));
+      }
+
+      setMenuPos({
+        top,
+        bottom,
+        left,
+        right,
+        maxHeight,
+        placement: flipUp ? "up" : "down",
+      });
     };
+
     update();
+    const raf = requestAnimationFrame(update);
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
   }, [open, align]);
+
   const [form, setForm] = useState({
     name: company.name,
     email: company.email ?? "",
@@ -82,14 +133,29 @@ export function CompanyRowMenu({
   });
 
   useEffect(() => {
+    if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        ref.current &&
+        !ref.current.contains(target) &&
+        (!menuRef.current || !menuRef.current.contains(target))
+      ) {
+        setOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
         setOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (editOpen) {
@@ -206,11 +272,17 @@ export function CompanyRowMenu({
 
         {open && (
           <div
-            className="fixed z-[10000] w-56 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl"
+            ref={menuRef}
+            className={cn(
+              "fixed z-[10000] w-56 overflow-y-auto rounded-xl border border-gray-100 bg-white shadow-xl transition-all",
+              menuPos?.placement === "up" ? "origin-bottom" : "origin-top"
+            )}
             style={{
-              top: menuPos?.top ?? 0,
+              top: menuPos?.top,
+              bottom: menuPos?.bottom,
               left: menuPos?.left,
               right: menuPos?.right,
+              maxHeight: menuPos?.maxHeight,
             }}
             onClick={(e) => e.stopPropagation()}
           >

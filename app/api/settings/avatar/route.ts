@@ -7,16 +7,13 @@ import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 const MAX_BYTES = 2 * 1024 * 1024;
 
-function avatarPublicId(employeeId: string) {
-  return ["smarthr", "avatars", employeeId].join("/");
+function avatarPublicId(id: string) {
+  return ["smarthr", "avatars", id].join("/");
 }
 
 export async function POST(request: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
-  if (!session.employeeId) {
-    return badRequest("No employee profile is linked to this account");
-  }
 
   const formData = await request.formData();
   const file = formData.get("file");
@@ -31,7 +28,8 @@ export async function POST(request: NextRequest) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const publicId = avatarPublicId(session.employeeId);
+  const targetId = session.employeeId || session.id;
+  const publicId = avatarPublicId(targetId);
 
   let url: string;
   try {
@@ -44,41 +42,90 @@ export async function POST(request: NextRequest) {
     });
     url = uploaded.url;
   } catch {
-    return NextResponse.json(
-      { error: "Photo upload failed. Please try again." },
-      { status: 500 }
-    );
+    // If Cloudinary is not configured or fails, store as base64 data URI so avatars always work
+    url = `data:${file.type};base64,${buffer.toString("base64")}`;
   }
 
-  await prisma.employee.update({
-    where: { id: session.employeeId },
-    data: { avatar: url },
+  // Update employee avatar if account is linked to an employee
+  if (session.employeeId) {
+    await prisma.employee.update({
+      where: { id: session.employeeId },
+      data: { avatar: url },
+    });
+    broadcastAppEvent("employee_updated", { employeeId: session.employeeId });
+  }
+
+  // Also persist avatar in User preferences so Super Admin and User profile is synced
+  const user = await prisma.user.findUnique({
+    where: { id: session.id },
+    select: { preferences: true },
+  });
+  let prefs: Record<string, unknown> = {};
+  if (user?.preferences) {
+    try {
+      prefs = JSON.parse(user.preferences);
+    } catch {
+      prefs = {};
+    }
+  }
+  prefs.avatar = url;
+  await prisma.user.update({
+    where: { id: session.id },
+    data: { preferences: JSON.stringify(prefs) },
   });
 
   revalidatePath("/settings");
+  revalidatePath("/settings/profile");
   revalidatePath("/dashboard");
   revalidatePath("/");
-  broadcastAppEvent("employee_updated", { employeeId: session.employeeId });
+  broadcastAppEvent("settings_updated", { userId: session.id });
+
   return NextResponse.json({ success: true, avatar: url });
 }
 
 export async function DELETE() {
   const session = await requireSession();
   if (!session) return unauthorized();
-  if (!session.employeeId) {
-    return badRequest("No employee profile is linked to this account");
+
+  const targetId = session.employeeId || session.id;
+
+  try {
+    await deleteCloudinaryFile(avatarPublicId(targetId), "image");
+  } catch {
+    // Ignore Cloudinary delete errors if file was local/data-uri or not found
   }
 
-  await deleteCloudinaryFile(avatarPublicId(session.employeeId), "image");
+  if (session.employeeId) {
+    await prisma.employee.update({
+      where: { id: session.employeeId },
+      data: { avatar: null },
+    });
+    broadcastAppEvent("employee_updated", { employeeId: session.employeeId });
+  }
 
-  await prisma.employee.update({
-    where: { id: session.employeeId },
-    data: { avatar: null },
+  const user = await prisma.user.findUnique({
+    where: { id: session.id },
+    select: { preferences: true },
+  });
+  let prefs: Record<string, unknown> = {};
+  if (user?.preferences) {
+    try {
+      prefs = JSON.parse(user.preferences);
+    } catch {
+      prefs = {};
+    }
+  }
+  delete prefs.avatar;
+  await prisma.user.update({
+    where: { id: session.id },
+    data: { preferences: JSON.stringify(prefs) },
   });
 
   revalidatePath("/settings");
+  revalidatePath("/settings/profile");
   revalidatePath("/dashboard");
   revalidatePath("/");
-  broadcastAppEvent("employee_updated", { employeeId: session.employeeId });
+  broadcastAppEvent("settings_updated", { userId: session.id });
+
   return NextResponse.json({ success: true });
 }

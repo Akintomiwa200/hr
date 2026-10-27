@@ -119,7 +119,12 @@ export function EmployeesModule({
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
-  const [menuRect, setMenuRect] = useState<{ top: number; left: number } | null>(null);
+  const [menuRect, setMenuRect] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    maxHeight?: number;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -858,7 +863,18 @@ export function EmployeesModule({
                                 return;
                               }
                               const r = e.currentTarget.getBoundingClientRect();
-                              setMenuRect({ top: r.bottom + 4, left: Math.max(8, r.right - 176) });
+                              const menuHeight = 220;
+                              const spaceBelow = window.innerHeight - r.bottom - 12;
+                              const spaceAbove = r.top - 12;
+                              const flipUp = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+                              const top = flipUp ? undefined : r.bottom + 4;
+                              const bottom = flipUp ? window.innerHeight - r.top + 4 : undefined;
+                              setMenuRect({
+                                top,
+                                bottom,
+                                left: Math.max(8, Math.min(r.right - 176, window.innerWidth - 184)),
+                                maxHeight: Math.max(120, flipUp ? spaceAbove : spaceBelow),
+                              });
                               setMenuOpen(emp.id);
                             }}
                             className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg"
@@ -1392,8 +1408,13 @@ export function EmployeesModule({
                 aria-label="Close menu"
               />
               <div
-                className="fixed z-[100] w-44 bg-white border border-gray-100 rounded-xl shadow-lg py-1"
-                style={{ top: menuRect.top, left: menuRect.left }}
+                className="fixed z-[100] w-44 bg-white border border-gray-100 rounded-xl shadow-lg py-1 overflow-y-auto"
+                style={{
+                  top: menuRect.top,
+                  bottom: menuRect.bottom,
+                  left: menuRect.left,
+                  maxHeight: menuRect.maxHeight,
+                }}
               >
                 <button
                   type="button"

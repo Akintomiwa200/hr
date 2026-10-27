@@ -286,7 +286,7 @@ function UserAccountMenu({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const displayName = fullName(firstName, lastName);
-  const profileHref = employeeId ? `/employees/${employeeId}` : "/settings";
+  const profileHref = employeeId ? `/employees/${employeeId}` : "/settings/profile";
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {

@@ -304,7 +304,7 @@ export function Sidebar({
   const navSections = getNavSections(role);
   const settingsItem = getSettingsNavItem(role);
   const BrandIcon = brandIcon;
-  const profileHref = employeeId ? `/employees/${employeeId}` : "/settings";
+  const profileHref = employeeId ? `/employees/${employeeId}` : "/settings/profile";
 
   return (
     <aside

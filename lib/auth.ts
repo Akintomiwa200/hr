@@ -63,6 +63,7 @@ export async function getSession(): Promise<SessionUser | null> {
         email: true,
         role: true,
         companyId: true,
+        preferences: true,
         employee: {
           select: {
             id: true,
@@ -88,6 +89,18 @@ export async function getSession(): Promise<SessionUser | null> {
       else locked = !!company.isLocked;
     }
 
+    let userPrefs: Record<string, string> = {};
+    if (dbUser.preferences) {
+      try {
+        userPrefs = JSON.parse(dbUser.preferences);
+      } catch {
+        userPrefs = {};
+      }
+    }
+
+    const defaultFirst = dbUser.role === Role.SUPER_ADMIN ? "Super" : undefined;
+    const defaultLast = dbUser.role === Role.SUPER_ADMIN ? "Admin" : undefined;
+
     return {
       id: dbUser.id,
       email: dbUser.email,
@@ -95,8 +108,8 @@ export async function getSession(): Promise<SessionUser | null> {
       companyId,
       locked,
       employeeId: dbUser.employee?.id,
-      firstName: dbUser.employee?.firstName,
-      lastName: dbUser.employee?.lastName,
+      firstName: dbUser.employee?.firstName || userPrefs.firstName || defaultFirst,
+      lastName: dbUser.employee?.lastName || userPrefs.lastName || defaultLast,
     };
   } catch {
     return null;
