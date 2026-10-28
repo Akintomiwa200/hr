@@ -43,6 +43,7 @@ export default async function EmployeesPage() {
         department: true,
         branch: { select: { id: true, name: true, location: true } },
         manager: { select: { id: true, firstName: true, lastName: true } },
+        managers: { select: { id: true, firstName: true, lastName: true } },
         user: { select: { role: true } },
       },
       orderBy: { firstName: "asc" },

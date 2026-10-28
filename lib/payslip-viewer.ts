@@ -27,12 +27,23 @@ export type PayslipViewerContext = {
 
 export function getPayslipViewerContext(
   session: SessionUser,
-  record: { employee: { id: string; firstName: string; lastName: string } },
+  record: {
+    employee: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      middleName?: string | null;
+    };
+  },
   canManage: boolean
 ): PayslipViewerContext {
   const role = normalizeRole(session.role);
   const isOwnPayslip = session.employeeId === record.employee.id;
-  const employeeName = fullName(record.employee.firstName, record.employee.lastName);
+  const employeeName = fullName(
+    record.employee.firstName,
+    record.employee.lastName,
+    record.employee.middleName
+  );
   const isPayrollAdmin =
     canManagePayroll(role) || isSuperAdmin(role) || isCompanyAdmin(role) || isHrRole(role);
 

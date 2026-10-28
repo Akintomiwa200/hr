@@ -92,7 +92,7 @@ export async function getHeadcountReport(session: SessionUser, filters: ReportFi
     firstName: emp.firstName,
     lastName: emp.lastName,
     avatar: emp.avatar,
-    name: fullName(emp.firstName, emp.lastName),
+    name: fullName(emp.firstName, emp.lastName, emp.middleName),
     email: emp.email,
     employeeCode: emp.employeeCode,
     department: emp.department.name,
@@ -123,7 +123,7 @@ export async function getAgeProfileReport(session: SessionUser, filters: ReportF
     }));
   const rows = employees.map((emp) => ({
     id: emp.id,
-    name: fullName(emp.firstName, emp.lastName),
+    name: fullName(emp.firstName, emp.lastName, emp.middleName),
     employeeCode: emp.employeeCode,
     department: emp.department.name,
     jobTitle: emp.jobTitle,
@@ -148,7 +148,7 @@ export async function getGenderProfileReport(session: SessionUser, filters: Repo
   }));
   const rows = employees.map((emp) => ({
     id: emp.id,
-    name: fullName(emp.firstName, emp.lastName),
+    name: fullName(emp.firstName, emp.lastName, emp.middleName),
     employeeCode: emp.employeeCode,
     department: emp.department.name,
     jobTitle: emp.jobTitle,
@@ -164,7 +164,7 @@ export async function getBirthdayReport(session: SessionUser, filters: ReportFil
     .filter((e) => e.dateOfBirth)
     .map((emp) => ({
       id: emp.id,
-      name: fullName(emp.firstName, emp.lastName),
+      name: fullName(emp.firstName, emp.lastName, emp.middleName),
       employeeCode: emp.employeeCode,
       department: emp.department.name,
       jobTitle: emp.jobTitle,
@@ -183,7 +183,7 @@ export async function getTenureReport(session: SessionUser, filters: ReportFilte
   const employees = await loadEmployees(session, filters);
   const rows = employees.map((emp) => ({
     id: emp.id,
-    name: fullName(emp.firstName, emp.lastName),
+    name: fullName(emp.firstName, emp.lastName, emp.middleName),
     employeeCode: emp.employeeCode,
     department: emp.department.name,
     jobTitle: emp.jobTitle,
@@ -224,7 +224,7 @@ export async function getTurnoverReport(session: SessionUser, filters: ReportFil
   const resigned = employees.filter((e) => e.endDate || e.status === "INACTIVE");
   const rows = resigned.map((emp) => ({
     id: emp.id,
-    name: fullName(emp.firstName, emp.lastName),
+    name: fullName(emp.firstName, emp.lastName, emp.middleName),
     employeeCode: emp.employeeCode,
     department: emp.department.name,
     jobTitle: emp.jobTitle,
@@ -263,7 +263,7 @@ export async function getOnboardingReport(session: SessionUser, filters: ReportF
 
   const rows = employees.map((employee) => ({
     id: employee.id,
-    name: fullName(employee.firstName, employee.lastName),
+    name: fullName(employee.firstName, employee.lastName, employee.middleName),
     employeeCode: employee.employeeCode,
     department: employee.department.name,
     jobTitle: employee.jobTitle,
@@ -301,7 +301,7 @@ export async function getOffboardingReport(session: SessionUser, filters: Report
 
   const rows = employees.map((employee) => ({
     id: employee.id,
-    name: fullName(employee.firstName, employee.lastName),
+    name: fullName(employee.firstName, employee.lastName, employee.middleName),
     employeeCode: employee.employeeCode,
     department: employee.department.name,
     jobTitle: employee.jobTitle,
@@ -335,7 +335,7 @@ export async function getTimeOffBalanceReport(session: SessionUser, filters: Rep
       const requested = pending.reduce((sum, lr) => sum + daysBetween(lr.startDate, lr.endDate), 0);
       return {
         id: emp.id,
-        name: fullName(emp.firstName, emp.lastName),
+        name: fullName(emp.firstName, emp.lastName, emp.middleName),
         employeeCode: emp.employeeCode,
         department: emp.department.name,
         jobTitle: emp.jobTitle,
@@ -370,7 +370,7 @@ export async function getTimeOffScheduleReport(session: SessionUser, filters: Re
 
   const rows = leaves.map((lr) => ({
     id: lr.id,
-    name: fullName(lr.employee.firstName, lr.employee.lastName),
+    name: fullName(lr.employee.firstName, lr.employee.lastName, lr.employee.middleName),
     employeeCode: lr.employee.employeeCode,
     jobTitle: lr.employee.jobTitle,
     from: lr.startDate.toISOString(),

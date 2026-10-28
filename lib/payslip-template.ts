@@ -9,6 +9,7 @@ export type PayslipDocumentData = {
   currencyCode?: string;
   employee: {
     firstName: string;
+    middleName?: string | null;
     lastName: string;
     employeeCode: string;
     jobTitle: string;
@@ -64,7 +65,11 @@ export function renderPayslipHtml(data: PayslipDocumentData) {
   const { earnings, deductions } = payslipTotals(data.items);
   const invoiceNo = payslipNumber(data.id);
   const issueDate = data.paidAt ?? data.createdAt ?? new Date();
-  const employeeName = fullName(data.employee.firstName, data.employee.lastName);
+  const employeeName = fullName(
+    data.employee.firstName,
+    data.employee.lastName,
+    data.employee.middleName
+  );
   const payeeName = data.payeeLabel || employeeName;
   const payeeTitle = data.isOwnPayslip ? "Pay to (You)" : "Pay to (Employee)";
   const periodLabel = new Intl.DateTimeFormat("en-US", {

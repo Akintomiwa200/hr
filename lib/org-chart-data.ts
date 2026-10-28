@@ -41,6 +41,7 @@ export type OrgChartData = {
 type EmployeeRow = {
   id: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   jobTitle: string;
   avatar: string | null;
@@ -62,7 +63,7 @@ function roleRank(role: string) {
 function toNode(emp: EmployeeRow): OrgChartNode {
   return {
     id: emp.id,
-    name: fullName(emp.firstName, emp.lastName),
+    name: fullName(emp.firstName, emp.lastName, emp.middleName),
     jobTitle: emp.jobTitle,
     avatar: emp.avatar,
     departmentId: emp.department.id,

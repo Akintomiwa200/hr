@@ -13,6 +13,7 @@ import type { Role } from "@prisma/client";
 type EmployeeProfile = {
   id: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   employeeCode: string;
   phone: string | null;
@@ -236,7 +237,7 @@ export function ProfileSettingsModule({
             <>
               <div className="flex justify-between py-3 border-b border-gray-100">
                 <dt className="text-gray-500">Full name</dt>
-                <dd className="font-medium text-gray-900">{fullName(employee.firstName, employee.lastName)}</dd>
+                <dd className="font-medium text-gray-900">{fullName(employee.firstName, employee.lastName, employee.middleName)}</dd>
               </div>
               <div className="flex justify-between py-3 border-b border-gray-100">
                 <dt className="text-gray-500">Job title</dt>

@@ -66,6 +66,8 @@ export async function getSession(): Promise<SessionUser | null> {
         role: true,
         companyId: true,
         preferences: true,
+        isActive: true,
+        archivedAt: true,
         employee: {
           select: {
             id: true,
@@ -77,8 +79,9 @@ export async function getSession(): Promise<SessionUser | null> {
       },
     });
 
-    // Stale JWT after re-seed / role change — force re-login.
-    if (!dbUser) return null;
+    // Stale JWT after re-seed / role change, or an account that has been
+    // deactivated/archived — force re-login.
+    if (!dbUser || !dbUser.isActive || dbUser.archivedAt) return null;
 
     let companyId = dbUser.companyId;
     let locked = false;

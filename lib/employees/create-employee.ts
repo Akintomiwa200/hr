@@ -9,6 +9,7 @@ import { parseLocalDate } from "@/lib/dates";
 
 export type CreateEmployeeInput = {
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   email: string;
   phone?: string | null;
@@ -230,6 +231,7 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
         create: {
           employeeCode,
           firstName: input.firstName.trim(),
+          middleName: input.middleName?.trim() || null,
           lastName: input.lastName.trim(),
           email: normalizedEmail,
           phone: input.phone || null,

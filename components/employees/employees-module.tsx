@@ -168,7 +168,7 @@ export function EmployeesModule({
 
   const filtered = useMemo(() => {
     return employees.filter((emp) => {
-      const name = fullName(emp.firstName, emp.lastName).toLowerCase();
+      const name = fullName(emp.firstName, emp.lastName, emp.middleName).toLowerCase();
       const q = search.toLowerCase();
       const matchesSearch =
         !q ||
@@ -467,10 +467,10 @@ export function EmployeesModule({
         method: "DELETE",
       });
       if (!res.ok) {
-        notify.error(await readApiError(res, "Failed to deactivate employee"));
+        notify.error(await readApiError(res, "Failed to delete employee"));
         return;
       }
-      notify.success("Employee deactivated");
+      notify.success("Employee permanently deleted");
       setDeleteEmployee(null);
       setSelected((prev) => {
         const next = new Set(prev);
@@ -813,7 +813,7 @@ export function EmployeesModule({
                       >
                         <Avatar firstName={emp.firstName} lastName={emp.lastName} src={emp.avatar} size="sm" />
                         <span className="font-medium text-[13px] text-gray-900 group-hover:text-violet-600 whitespace-nowrap">
-                          {fullName(emp.firstName, emp.lastName)}
+                          {fullName(emp.firstName, emp.lastName, emp.middleName)}
                         </span>
                       </button>
                     </td>
@@ -958,7 +958,7 @@ export function EmployeesModule({
       <Dialog
         open={!!viewEmployee}
         onClose={() => setViewEmployee(null)}
-        title={viewEmployee ? fullName(viewEmployee.firstName, viewEmployee.lastName) : ""}
+        title={viewEmployee ? fullName(viewEmployee.firstName, viewEmployee.lastName, viewEmployee.middleName) : ""}
         description={viewEmployee ? `${viewEmployee.jobTitle} · ${viewEmployee.department.name}` : ""}
         size="lg"
       >
@@ -1086,7 +1086,7 @@ export function EmployeesModule({
         title="Edit Employee"
         description={
           editEmployee
-            ? fullName(editEmployee.firstName, editEmployee.lastName)
+            ? fullName(editEmployee.firstName, editEmployee.lastName, editEmployee.middleName)
             : undefined
         }
         size="lg"
@@ -1133,7 +1133,7 @@ export function EmployeesModule({
             <p className="text-sm text-gray-600">
               Deactivate{" "}
               <strong>
-                {fullName(deleteEmployee.firstName, deleteEmployee.lastName)}
+                {fullName(deleteEmployee.firstName, deleteEmployee.lastName, deleteEmployee.middleName)}
               </strong>
               ?
             </p>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, UserMinus } from "lucide-react";
-import { Badge, Button, Card } from "@/components/ui";
+import { Avatar, Badge, Button, Card } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { notify, readApiError } from "@/lib/toast";
@@ -18,6 +18,7 @@ type EmployeeOption = {
   email: string;
   jobTitle: string;
   status: string;
+  avatar?: string | null;
   department?: { name: string } | null;
 };
 
@@ -32,6 +33,7 @@ type ProgressRow = {
     lastName: string;
     email: string;
     jobTitle: string;
+    avatar?: string | null;
     department?: { name: string } | null;
   };
   progress: { completed: number; total: number; percent: number };
@@ -176,14 +178,22 @@ export function OffboardingPeopleModule({
                   key={emp.id}
                   className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50/80"
                 >
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {fullName(emp.firstName, emp.lastName)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {emp.jobTitle}
-                      {emp.department?.name ? ` · ${emp.department.name}` : ""} · {emp.email}
-                    </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Avatar
+                      firstName={emp.firstName}
+                      lastName={emp.lastName}
+                      src={emp.avatar}
+                      size="sm"
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {fullName(emp.firstName, emp.lastName)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {emp.jobTitle}
+                        {emp.department?.name ? ` · ${emp.department.name}` : ""} · {emp.email}
+                      </p>
+                    </div>
                   </div>
                   <Button
                     size="sm"
@@ -222,9 +232,17 @@ export function OffboardingPeopleModule({
               <Card key={row.id} className="p-5">
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="flex-1 min-w-[200px]">
-                    <p className="font-semibold text-gray-900">
-                      {fullName(row.employee.firstName, row.employee.lastName)}
-                    </p>
+                    <div className="flex items-center gap-2.5">
+                      <Avatar
+                        firstName={row.employee.firstName}
+                        lastName={row.employee.lastName}
+                        src={row.employee.avatar}
+                        size="sm"
+                      />
+                      <p className="font-semibold text-gray-900">
+                        {fullName(row.employee.firstName, row.employee.lastName)}
+                      </p>
+                    </div>
                     <p className="text-xs text-gray-500">
                       {row.employee.jobTitle}
                       {row.employee.department?.name ? ` · ${row.employee.department.name}` : ""}

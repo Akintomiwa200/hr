@@ -66,7 +66,7 @@ export default async function EmployeeAttendancePage({
       />
       <EmployeeAttendanceModule
         employeeId={id}
-        employeeName={fullName(employee.firstName, employee.lastName)}
+        employeeName={fullName(employee.firstName, employee.lastName, employee.middleName)}
         records={records}
         todayRecord={todayRecord}
         showCheckIn={session.employeeId === id}

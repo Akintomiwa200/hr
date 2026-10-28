@@ -30,7 +30,9 @@ export default async function DashboardPage({
 
   const { range } = await searchParams;
   const rangeKey = parseDashboardRangeKey(range);
-  const userName = session.firstName || "User";
+  // Greet people by their first name only, even if a legacy/imported record
+  // stored more than one name in the firstName column.
+  const userName = session.firstName?.trim().split(/\s+/)[0] || "User";
 
   const sessionContext = {
     role: session.role,

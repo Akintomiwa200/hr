@@ -138,7 +138,7 @@ export function EmployeeDetailContent({
             />
             <div>
               <h1 className="text-[22px] font-bold text-gray-900 tracking-tight">
-                {fullName(employee.firstName, employee.lastName)}
+                {fullName(employee.firstName, employee.lastName, employee.middleName)}
               </h1>
               <p className="text-[14px] text-gray-500 mt-0.5">
                 {employee.jobTitle} · {employee.department.name}
@@ -302,7 +302,7 @@ export function EmployeeDetailContent({
                     <Avatar firstName={report.firstName} lastName={report.lastName} src={report.avatar} size="sm" />
                     <div className="min-w-0">
                       <p className="text-[13px] font-medium text-gray-900 truncate">
-                        {fullName(report.firstName, report.lastName)}
+                        {fullName(report.firstName, report.lastName, report.middleName)}
                       </p>
                       <p className="text-[11px] text-gray-500 truncate">{report.jobTitle}</p>
                     </div>

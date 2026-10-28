@@ -6,6 +6,7 @@ export type EmployeeRow = Employee & {
   branch?: { id: string; name: string; location?: string | null } | null;
   user?: { role: Role } | null;
   manager?: { id: string; firstName: string; lastName: string } | null;
+  managers?: { id: string; firstName: string; lastName: string }[];
 };
 
 export type DepartmentOption = { id: string; name: string };
@@ -15,6 +16,7 @@ export type ManagerOption = { id: string; firstName: string; lastName: string };
 export type EmployeeFormData = {
   employeeCode: string;
   firstName: string;
+  middleName: string;
   lastName: string;
   email: string;
   phone: string;
@@ -25,6 +27,7 @@ export type EmployeeFormData = {
   isShiftWorker: boolean;
   shiftStartTime: string;
   managerId: string;
+  managerIds: string[];
   employmentType: "FULL_TIME" | "FREELANCE";
   role: Role;
   salary: string;

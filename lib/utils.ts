@@ -36,8 +36,15 @@ export function getInitials(firstName: string, lastName: string) {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
-export function fullName(firstName: string, lastName: string) {
-  return `${firstName} ${lastName}`;
+export function fullName(
+  firstName: string,
+  lastName: string,
+  middleName?: string | null
+) {
+  return [firstName, middleName, lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function formatRelativeTime(date: Date | string) {

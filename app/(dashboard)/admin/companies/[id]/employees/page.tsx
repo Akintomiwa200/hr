@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { fullName } from "@/lib/utils";
 import { roleLabel } from "@/lib/roles";
-import { Badge } from "@/components/ui";
+import { Avatar, Badge } from "@/components/ui";
 
 function formatDate(value: Date) {
   return new Date(value).toLocaleDateString("en-NG", {
@@ -32,6 +32,7 @@ export default async function CompanyEmployeesPage({
       firstName: true,
       lastName: true,
       email: true,
+      avatar: true,
       jobTitle: true,
       status: true,
       hireDate: true,
@@ -73,10 +74,20 @@ export default async function CompanyEmployeesPage({
                   {employee.employeeCode}
                 </td>
                 <td className="px-5 py-3">
-                  <p className="text-[12.5px] font-medium text-gray-900">
-                    {fullName(employee.firstName, employee.lastName)}
-                  </p>
-                  <p className="text-[11px] text-gray-500">{employee.email}</p>
+                  <div className="flex items-center gap-3">
+                    <Avatar
+                      firstName={employee.firstName}
+                      lastName={employee.lastName}
+                      src={employee.avatar}
+                      size="sm"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-[12.5px] font-medium text-gray-900">
+                        {fullName(employee.firstName, employee.lastName)}
+                      </p>
+                      <p className="text-[11px] text-gray-500">{employee.email}</p>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-5 py-3 text-[12.5px] text-gray-700">
                   {employee.jobTitle}

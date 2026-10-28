@@ -42,7 +42,13 @@ export async function listPayrollDeductions(input: {
       where,
       include: {
         employee: {
-          select: { id: true, firstName: true, lastName: true, employeeCode: true },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            employeeCode: true,
+          },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -56,10 +62,11 @@ export async function listPayrollDeductions(input: {
           firstName: string;
           lastName: string;
           employeeCode: string;
+          avatar: string | null;
         }
       >
     >`
-      SELECT d.*, e."firstName", e."lastName", e."employeeCode"
+      SELECT d.*, e."firstName", e."lastName", e."employeeCode", e."avatar"
       FROM "PayrollDeduction" d
       JOIN "Employee" e ON e."id" = d."employeeId"
       WHERE (${status}::text IS NULL OR d."status" = ${status})
@@ -85,6 +92,7 @@ export async function listPayrollDeductions(input: {
         firstName: row.firstName,
         lastName: row.lastName,
         employeeCode: row.employeeCode,
+        avatar: row.avatar,
       },
     }));
   }

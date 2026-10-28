@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       ["Employee ID", "Name", "Email", "Job Title", "Department", "Employment", "Role", "Status"],
       ...employees.map((emp) => [
         emp.employeeCode,
-        fullName(emp.firstName, emp.lastName),
+        fullName(emp.firstName, emp.lastName, emp.middleName),
         emp.email,
         emp.jobTitle,
         emp.department.name,
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
     const csv = toCsv([
       ["Employee", "Job Title", "Date", "Clock In", "Clock Out", "Status", "Schedule In", "Schedule Out"],
       ...records.map((record) => [
-        fullName(record.employee.firstName, record.employee.lastName),
+        fullName(record.employee.firstName, record.employee.lastName, record.employee.middleName),
         record.employee.jobTitle,
         record.date.toISOString().slice(0, 10),
         record.checkIn

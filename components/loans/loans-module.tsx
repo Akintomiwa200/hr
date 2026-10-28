@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, HandCoins, Plus, XCircle } from "lucide-react";
-import { Button, Card, EmptyState } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, formatMonthLabel, fullName, cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ type EmployeeOption = {
   id: string;
   firstName: string;
   lastName: string;
+  avatar?: string | null;
   employeeCode?: string;
 };
 
@@ -330,9 +331,17 @@ export function LoansModule({
               <Card key={loan.id} className="p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-[220px]">
-                    <p className="font-semibold text-gray-900">
-                      {fullName(loan.employee.firstName, loan.employee.lastName)}
-                    </p>
+                    <div className="flex items-center gap-2.5">
+                      <Avatar
+                        firstName={loan.employee.firstName}
+                        lastName={loan.employee.lastName}
+                        src={loan.employee.avatar}
+                        size="sm"
+                      />
+                      <p className="font-semibold text-gray-900">
+                        {fullName(loan.employee.firstName, loan.employee.lastName)}
+                      </p>
+                    </div>
                     <p className="text-xs text-gray-500 mt-0.5">
                       {loan.employee.employeeCode ? `${loan.employee.employeeCode} · ` : ""}
                       {loan.purpose?.trim() || "Staff loan"}

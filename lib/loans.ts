@@ -90,7 +90,13 @@ export async function listLoans(input: {
     where,
     include: {
       employee: {
-        select: { id: true, firstName: true, lastName: true, employeeCode: true },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          employeeCode: true,
+          avatar: true,
+        },
       },
       installments: { orderBy: { seq: "asc" } },
     },
@@ -114,7 +120,13 @@ export async function getLoanById(id: string) {
     where: { id },
     include: {
       employee: {
-        select: { id: true, firstName: true, lastName: true, employeeCode: true },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          employeeCode: true,
+          avatar: true,
+        },
       },
       installments: { orderBy: { seq: "asc" } },
     },

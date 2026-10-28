@@ -24,6 +24,7 @@ import type { AppCurrency } from "@/lib/currency";
 type EmployeeProfile = {
   id: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   employeeCode: string;
   phone: string | null;
@@ -167,7 +168,7 @@ export function SettingsModule({
                 <div className="flex justify-between py-3 border-b border-gray-100">
                   <dt className="text-gray-500">Full name</dt>
                   <dd className="font-medium text-gray-900">
-                    {fullName(employee.firstName, employee.lastName)}
+                    {fullName(employee.firstName, employee.lastName, employee.middleName)}
                   </dd>
                 </div>
                 <div className="flex justify-between py-3 border-b border-gray-100">

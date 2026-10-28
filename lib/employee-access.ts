@@ -57,7 +57,7 @@ export async function canViewEmployee(
     const report = await prisma.employee.findFirst({
       where: {
         id: employeeId,
-        OR: [{ id: session.employeeId }, { managerId: session.employeeId }],
+        OR: [{ id: session.employeeId }, { managerId: session.employeeId }, { managers: { some: { id: session.employeeId } } }],
       },
       select: { id: true },
     });
@@ -93,7 +93,7 @@ export async function canViewEmployeeTimeData(
     const report = await prisma.employee.findFirst({
       where: {
         id: employeeId,
-        OR: [{ id: session.employeeId }, { managerId: session.employeeId }],
+        OR: [{ id: session.employeeId }, { managerId: session.employeeId }, { managers: { some: { id: session.employeeId } } }],
       },
       select: { id: true },
     });
@@ -114,7 +114,7 @@ export async function canApproveEmployeeLeave(
 
   if (isTeamLeadRole(role)) {
     const report = await prisma.employee.findFirst({
-      where: { id: employeeId, managerId: session.employeeId },
+      where: { id: employeeId, OR: [{ managerId: session.employeeId }, { managers: { some: { id: session.employeeId } } }] },
       select: { id: true },
     });
     return !!report;
@@ -129,7 +129,7 @@ export function teamScopedEmployeeWhere(
   if (!isTeamLeadRole(session.role)) return undefined;
   if (!session.employeeId) return { id: "__none__" };
   return {
-    OR: [{ id: session.employeeId }, { managerId: session.employeeId }],
+    OR: [{ id: session.employeeId }, { managerId: session.employeeId }, { managers: { some: { id: session.employeeId } } }],
   };
 }
 
@@ -153,7 +153,7 @@ export async function peopleDirectoryEmployeeWhere(
   if (!session.employeeId) return { id: "__none__" };
 
   return {
-    OR: [{ id: session.employeeId }, { managerId: session.employeeId }],
+    OR: [{ id: session.employeeId }, { managerId: session.employeeId }, { managers: { some: { id: session.employeeId } } }],
   };
 }
 

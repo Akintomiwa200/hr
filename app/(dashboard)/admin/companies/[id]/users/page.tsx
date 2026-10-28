@@ -2,7 +2,19 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { fullName } from "@/lib/utils";
 import { roleLabel } from "@/lib/roles";
-import { Badge } from "@/components/ui";
+import { Avatar, Badge } from "@/components/ui";
+
+function parsePreferences(value: string | null): Record<string, unknown> {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
 
 function formatDate(value: Date) {
   return new Date(value).toLocaleDateString("en-NG", {
@@ -31,8 +43,14 @@ export default async function CompanyUsersPage({
       email: true,
       role: true,
       createdAt: true,
+      preferences: true,
       employee: {
-        select: { firstName: true, lastName: true, status: true },
+        select: {
+          firstName: true,
+          lastName: true,
+          avatar: true,
+          status: true,
+        },
       },
     },
     orderBy: { createdAt: "desc" },
@@ -60,35 +78,52 @@ export default async function CompanyUsersPage({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50/60">
-                <td className="px-5 py-3">
-                  <p className="text-[12.5px] font-medium text-gray-900">
-                    {user.employee
-                      ? fullName(user.employee.firstName, user.employee.lastName)
-                      : user.email.split("@")[0]}
-                  </p>
-                  <p className="text-[11px] text-gray-500">{user.email}</p>
-                </td>
-                <td className="px-5 py-3">
-                  <span className="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700">
-                    {roleLabel(user.role)}
-                  </span>
-                </td>
-                <td className="px-5 py-3">
-                  {user.employee ? (
-                    <Badge variant={user.employee.status === "ACTIVE" ? "success" : "neutral"}>
-                      {user.employee.status === "ACTIVE" ? "Active" : "Inactive"}
-                    </Badge>
-                  ) : (
-                    <span className="text-[12px] text-gray-400">No employee record</span>
-                  )}
-                </td>
-                <td className="px-5 py-3 text-[12px] text-gray-500">
-                  {formatDate(user.createdAt)}
-                </td>
-              </tr>
-            ))}
+            {users.map((user) => {
+              const preferences = parsePreferences(user.preferences);
+              const name = user.employee
+                ? fullName(user.employee.firstName, user.employee.lastName)
+                : user.email.split("@")[0];
+              const avatar =
+                user.employee?.avatar ??
+                (typeof preferences.avatar === "string" && preferences.avatar.trim()
+                  ? preferences.avatar
+                  : null);
+              return (
+                <tr key={user.id} className="hover:bg-gray-50/60">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        firstName={user.employee?.firstName ?? name}
+                        lastName={user.employee?.lastName ?? ""}
+                        src={avatar}
+                        size="sm"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-[12.5px] font-medium text-gray-900">{name}</p>
+                        <p className="text-[11px] text-gray-500">{user.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700">
+                      {roleLabel(user.role)}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    {user.employee ? (
+                      <Badge variant={user.employee.status === "ACTIVE" ? "success" : "neutral"}>
+                        {user.employee.status === "ACTIVE" ? "Active" : "Inactive"}
+                      </Badge>
+                    ) : (
+                      <span className="text-[12px] text-gray-400">No employee record</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3 text-[12px] text-gray-500">
+                    {formatDate(user.createdAt)}
+                  </td>
+                </tr>
+              );
+            })}
             {users.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-5 py-10 text-center text-sm text-gray-500">

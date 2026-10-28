@@ -12,6 +12,7 @@ export function EmployeeSubpageHeader({
   employee: {
     id: string;
     firstName: string;
+    middleName?: string | null;
     lastName: string;
     jobTitle: string;
     avatar: string | null;
@@ -28,7 +29,7 @@ export function EmployeeSubpageHeader({
         className="inline-flex items-center gap-1.5 text-[13px] text-gray-500 hover:text-[#7B61FF] transition-colors mb-4"
       >
         <ArrowLeft className="w-4 h-4" />
-        Back to {fullName(employee.firstName, employee.lastName)}
+        Back to {fullName(employee.firstName, employee.lastName, employee.middleName)}
       </Link>
 
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -42,7 +43,7 @@ export function EmployeeSubpageHeader({
           <div>
             <h1 className="text-[22px] font-bold text-gray-900 tracking-tight">{title}</h1>
             <p className="text-[14px] text-gray-500 mt-0.5">
-              {fullName(employee.firstName, employee.lastName)} · {employee.jobTitle} ·{" "}
+              {fullName(employee.firstName, employee.lastName, employee.middleName)} · {employee.jobTitle} ·{" "}
               {employee.department.name}
             </p>
             {description && (

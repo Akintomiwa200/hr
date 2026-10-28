@@ -18,6 +18,7 @@ import {
   FileText,
   Fingerprint,
   Headset,
+  NotebookPen,
   Star,
   Timer,
   TrendingDown,
@@ -505,6 +506,27 @@ export function ManagerDashboard({
         </span>
         Manager leadership view — team leave, appraisals, and people who report to you.
       </div>
+
+      <Link
+        href="/daily-reporting"
+        className="group flex items-center gap-4 rounded-2xl border border-violet-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md"
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-violet-400 text-white shadow-sm">
+          <NotebookPen className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+            Daily reporting
+            <ChevronRight className="h-4 w-4 text-violet-400 transition-transform group-hover:translate-x-0.5" />
+          </span>
+          <span className="mt-0.5 block text-xs text-gray-500">
+            Start from a blank page or template, then revisit every report you have written.
+          </span>
+        </span>
+        <span className="hidden rounded-lg bg-violet-50 px-3 py-1.5 text-[11px] font-semibold text-violet-700 sm:inline-flex">
+          Open workspace
+        </span>
+      </Link>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
         <StatCard label="Team Members" icon={Users} tone="violet" value={data.teamSize} />

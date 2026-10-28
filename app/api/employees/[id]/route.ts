@@ -32,6 +32,7 @@ export async function GET(
     include: {
       department: true,
       manager: { select: { id: true, firstName: true, lastName: true } },
+      managers: { select: { id: true, firstName: true, lastName: true } },
       user: { select: { role: true } },
       branch: { select: { id: true, name: true, location: true } },
     },
@@ -76,6 +77,7 @@ export async function PATCH(
   const {
     employeeCode,
     firstName,
+    middleName,
     lastName,
     email,
     phone,
@@ -87,6 +89,7 @@ export async function PATCH(
     isShiftWorker,
     shiftStartTime,
     managerId,
+    managerIds,
     employmentType,
     role,
     salary,
@@ -163,6 +166,9 @@ export async function PATCH(
         employeeCode: normalizedEmployeeCode,
       }),
       ...(firstName !== undefined && { firstName }),
+      ...(middleName !== undefined && {
+        middleName: middleName ? String(middleName).trim() || null : null,
+      }),
       ...(lastName !== undefined && { lastName }),
       ...(email !== undefined && { email }),
       ...(phone !== undefined && { phone: phone || null }),
@@ -178,6 +184,9 @@ export async function PATCH(
       }),
       ...(shiftFields && shiftFields),
       ...(managerId !== undefined && { managerId: managerId || null }),
+      ...(managerIds !== undefined && Array.isArray(managerIds) && {
+        managers: { set: managerIds.filter((managerEmployeeId: string) => managerEmployeeId !== id && managerEmployeeId !== (managerId || existing.managerId)).map((managerEmployeeId: string) => ({ id: managerEmployeeId })) },
+      }),
       ...(salary !== undefined && { salary: Number(salary) || 0 }),
       ...(status !== undefined && { status }),
       ...(hireDate !== undefined && {
@@ -255,12 +264,21 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await prisma.employee.update({
-    where: { id },
-    data: {
-      status: "INACTIVE",
-      ...(existing.endDate ? {} : { endDate: new Date() }),
-    },
+  // Clear reporting-line references before removing the account so the employee
+  // row can be physically deleted without leaving dangling manager assignments.
+  await prisma.$transaction(async (tx) => {
+    await tx.employee.updateMany({ where: { managerId: id }, data: { managerId: null } });
+    const reports = await tx.employee.findMany({
+      where: { managers: { some: { id } } },
+      select: { id: true },
+    });
+    for (const report of reports) {
+      await tx.employee.update({
+        where: { id: report.id },
+        data: { managers: { disconnect: { id } } },
+      });
+    }
+    await tx.user.delete({ where: { id: existing.userId } });
   });
 
   notifyEmployeeChange(id, "deleted");

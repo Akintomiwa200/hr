@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { MinusCircle, Plus, Trash2 } from "lucide-react";
-import { Button, Card, EmptyState } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName } from "@/lib/utils";
@@ -15,6 +15,7 @@ type EmployeeOption = {
   id: string;
   firstName: string;
   lastName: string;
+  avatar?: string | null;
   employeeCode?: string;
 };
 
@@ -165,9 +166,17 @@ export function PayrollDeductionsModule({
             <Card key={row.id} className="p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-[220px]">
-                  <p className="font-semibold text-gray-900">
-                    {fullName(row.employee.firstName, row.employee.lastName)}
-                  </p>
+                  <div className="flex items-center gap-2.5">
+                    <Avatar
+                      firstName={row.employee.firstName}
+                      lastName={row.employee.lastName}
+                      src={row.employee.avatar}
+                      size="sm"
+                    />
+                    <p className="font-semibold text-gray-900">
+                      {fullName(row.employee.firstName, row.employee.lastName)}
+                    </p>
+                  </div>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {row.employee.employeeCode ? `${row.employee.employeeCode} · ` : ""}
                     {row.periodMonth ? `Period ${row.periodMonth}` : "Any upcoming payroll"}

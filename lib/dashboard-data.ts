@@ -408,7 +408,7 @@ export async function getManagerDashboardData(
   // If this manager has no reports yet, adopt unmanaged employees in their department.
   if (manager && (manager.user.role === "MANAGER" || manager.user.role === "SUPERVISOR")) {
     const existingReports = await prisma.employee.count({
-      where: { managerId: managerEmployeeId, status: "ACTIVE" },
+      where: { OR: [{ managerId: managerEmployeeId }, { managers: { some: { id: managerEmployeeId } } }], status: "ACTIVE" },
     });
     if (existingReports === 0) {
       await prisma.employee.updateMany({
@@ -431,13 +431,13 @@ export async function getManagerDashboardData(
 
   const [team, pendingLeaves, teamReviews, teamAttendance] = await Promise.all([
     prisma.employee.findMany({
-      where: { managerId: managerEmployeeId, status: "ACTIVE" },
+      where: { OR: [{ managerId: managerEmployeeId }, { managers: { some: { id: managerEmployeeId } } }], status: "ACTIVE" },
       include: { department: true, user: { select: { role: true } } },
     }),
     prisma.leaveRequest.findMany({
       where: {
         status: "PENDING",
-        employee: { managerId: managerEmployeeId },
+        employee: { OR: [{ managerId: managerEmployeeId }, { managers: { some: { id: managerEmployeeId } } }] },
       },
       include: { employee: true },
       take: 5,
@@ -453,7 +453,7 @@ export async function getManagerDashboardData(
       where: {
         date: { gte: today },
         status: { in: ["PRESENT", "REMOTE", "LATE"] },
-        employee: { managerId: managerEmployeeId },
+        employee: { OR: [{ managerId: managerEmployeeId }, { managers: { some: { id: managerEmployeeId } } }] },
       },
     }),
   ]);
@@ -638,7 +638,7 @@ export async function getSuperAdminDashboardData() {
       orderBy: { createdAt: "desc" },
     }),
     prisma.user.count({ where: { role: { not: "SUPER_ADMIN" } } }),
-    prisma.employee.count(),
+    prisma.employee.count({ where: { status: "ACTIVE" } }),
     prisma.company.count({ where: { isActive: true } }),
     prisma.employee.count({ where: { status: "ACTIVE" } }),
     prisma.employee.count({

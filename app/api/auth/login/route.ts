@@ -36,6 +36,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!user.isActive || user.archivedAt) {
+      return NextResponse.json(
+        {
+          error: user.archivedAt
+            ? "This account has been archived. Contact your platform administrator."
+            : "This account has been deactivated. Contact your platform administrator.",
+        },
+        { status: 403 }
+      );
+    }
+
     await createSession({
       id: user.id,
       email: user.email,

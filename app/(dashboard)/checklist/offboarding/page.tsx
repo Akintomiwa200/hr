@@ -26,6 +26,7 @@ export default async function ChecklistOffboardingPage() {
       email: true,
       jobTitle: true,
       status: true,
+      avatar: true,
       department: { select: { name: true } },
     },
     orderBy: { firstName: "asc" },

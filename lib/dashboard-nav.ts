@@ -38,6 +38,7 @@ import {
   Building2,
   Headset,
   ScrollText,
+  NotebookPen,
 } from "lucide-react";
 import { CHECKLIST_ADMIN_ROLES, CHECKLIST_TEMPLATE_ROLES, CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
 import {
@@ -55,6 +56,7 @@ import {
   PEOPLE_VIEW_ROLES,
   PERFORMANCE_VIEW_ROLES,
   CONTENT_ADMIN_ROLES,
+  DAILY_REPORTING_ROLES,
   RECRUITMENT_ROLES,
   SETTINGS_ROLES,
   SUBSCRIPTION_ADMIN_ROLES,
@@ -336,6 +338,14 @@ export const dashboardNavSections: NavSection[] = [
         roles: ALL_STAFF,
       },
       {
+        id: "daily-reporting",
+        href: "/daily-reporting",
+        label: "Daily reporting",
+        pageTitle: "Daily reporting",
+        icon: NotebookPen,
+        roles: DAILY_REPORTING_ROLES,
+      },
+      {
         id: "checklist-onboarding",
         href: "/checklist/onboarding",
         label: "Onboarding",
@@ -534,6 +544,14 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
     title: "Notifications",
   },
   {
+    test: (p) => p === "/daily-reporting/new",
+    title: "New daily report",
+  },
+  {
+    test: (p) => /^\/daily-reporting\/[^/]+$/.test(p),
+    title: "Daily report",
+  },
+  {
     test: (p) => p === "/admin/companies",
     title: "Companies",
   },
@@ -556,6 +574,10 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
   {
     test: (p) => /^\/admin\/companies\/[^/]+$/.test(p),
     title: "Company Details",
+  },
+  {
+    test: (p) => /^\/admin\/users\/[^/]+$/.test(p),
+    title: "User profile",
   },
   {
     test: (p) => p === "/admin/users",

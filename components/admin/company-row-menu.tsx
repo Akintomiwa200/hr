@@ -9,12 +9,10 @@ import {
   CreditCard,
   Pencil,
   Power,
-  Trash2,
   UserRound,
   Users,
 } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
-import { Button } from "@/components/ui";
 import { notify, readApiError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +46,6 @@ export function CompanyRowMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [menuPos, setMenuPos] = useState<{
     top?: number;
@@ -200,31 +197,6 @@ export function CompanyRowMenu({
     );
   }
 
-  async function handleDelete() {
-    setOpen(false);
-    setDeleteOpen(true);
-  }
-
-  async function confirmDelete() {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/companies/${company.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        notify.error(await readApiError(res, "Delete failed"));
-        return;
-      }
-      notify.success("Company deleted");
-      setDeleteOpen(false);
-      router.refresh();
-    } catch {
-      notify.error("Delete failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleSaveEdit() {
     if (!form.name.trim()) {
       notify.error("Company name is required");
@@ -336,36 +308,9 @@ export function CompanyRowMenu({
               <Users className="h-4 w-4" />
               Manage users
             </Link>
-
-            <button
-              type="button"
-              disabled={busy}
-              onClick={handleDelete}
-              className="flex w-full items-center gap-2.5 border-t border-gray-50 px-3 py-2.5 text-[13px] text-red-600 hover:bg-red-50"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </button>
           </div>
         )}
       </div>
-
-      <Dialog
-        open={deleteOpen}
-        onClose={() => !busy && setDeleteOpen(false)}
-        title="Delete company"
-        description={`Delete "${company.name}"? Users will be detached from this tenant. This cannot be undone.`}
-        size="sm"
-      >
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" size="sm" disabled={busy} onClick={() => setDeleteOpen(false)}>
-            Cancel
-          </Button>
-          <Button variant="danger" size="sm" loading={busy} onClick={() => void confirmDelete()}>
-            Delete
-          </Button>
-        </div>
-      </Dialog>
 
       <Dialog
         open={editOpen}

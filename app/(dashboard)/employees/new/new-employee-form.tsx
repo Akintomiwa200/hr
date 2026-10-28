@@ -92,10 +92,14 @@ export function NewEmployeeForm({
 
       <section className="space-y-4">
         <SectionTitle>Personal details</SectionTitle>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <div>
             <label className={labelClass}>First name</label>
             <input name="firstName" required className={inputClass} placeholder="Alex" />
+          </div>
+          <div>
+            <label className={labelClass}>Middle name</label>
+            <input name="middleName" className={inputClass} placeholder="Optional" />
           </div>
           <div>
             <label className={labelClass}>Last name</label>

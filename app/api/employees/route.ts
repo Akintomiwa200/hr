@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
               {
                 OR: [
                   { firstName: { contains: search } },
+                  { middleName: { contains: search } },
                   { lastName: { contains: search } },
                   { email: { contains: search } },
                   { employeeCode: { contains: search } },
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
     include: {
       department: true,
       manager: { select: { id: true, firstName: true, lastName: true } },
+      managers: { select: { id: true, firstName: true, lastName: true } },
       user: { select: { role: true } },
       branch: { select: { id: true, name: true, location: true } },
     },
@@ -73,6 +75,7 @@ export async function POST(request: NextRequest) {
   const {
     employeeCode,
     firstName,
+    middleName,
     lastName,
     email,
     phone,
@@ -82,6 +85,7 @@ export async function POST(request: NextRequest) {
     branchId,
     biometricPin,
     managerId,
+    managerIds = [],
     employmentType = "FULL_TIME",
     role = "EMPLOYEE",
     salary = 0,
@@ -134,6 +138,7 @@ export async function POST(request: NextRequest) {
 
     const { employee, email: emailResult } = await createEmployeeAccount({
       firstName,
+      middleName: middleName || null,
       lastName,
       email,
       phone,
@@ -153,6 +158,13 @@ export async function POST(request: NextRequest) {
       dateOfBirth,
       employeeCode: normalizedEmployeeCode || null,
     });
+
+    if (Array.isArray(managerIds) && managerIds.length) {
+      await prisma.employee.update({
+        where: { id: employee.id },
+        data: { managers: { connect: managerIds.filter((managerEmployeeId: string) => managerEmployeeId !== managerId).map((id: string) => ({ id })) } },
+      });
+    }
 
     const shiftFields = parseEmployeeShiftFields(body);
     if (shiftFields.isShiftWorker) {
@@ -195,7 +207,7 @@ export async function POST(request: NextRequest) {
       module: "employees",
       action: "CREATE",
       entityId: employee.id,
-      entityLabel: `${firstName} ${lastName}`.trim(),
+      entityLabel: `${firstName} ${middleName ? `${middleName} ` : ""}${lastName}`.trim(),
       meta: { jobTitle, departmentId, role: resolvedRole },
     });
 

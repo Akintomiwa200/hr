@@ -14,6 +14,7 @@ const labelClass = "block text-[13px] font-medium text-gray-700 mb-1.5";
 export function employeeToFormData(employee: {
   employeeCode: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   email: string;
   phone?: string | null;
@@ -26,6 +27,7 @@ export function employeeToFormData(employee: {
   shiftStartHour?: number | null;
   shiftStartMinute?: number | null;
   managerId?: string | null;
+  managers?: { id: string }[];
   salary: number;
   status: string;
   address?: string | null;
@@ -37,6 +39,7 @@ export function employeeToFormData(employee: {
   return {
     employeeCode: employee.employeeCode,
     firstName: employee.firstName,
+    middleName: employee.middleName ?? "",
     lastName: employee.lastName,
     email: employee.email,
     phone: employee.phone ?? "",
@@ -50,6 +53,7 @@ export function employeeToFormData(employee: {
         ? `${String(employee.shiftStartHour).padStart(2, "0")}:${String(employee.shiftStartMinute).padStart(2, "0")}`
         : "09:00",
     managerId: employee.managerId ?? "",
+    managerIds: employee.managers?.map((manager) => manager.id) ?? [],
     employmentType:
       employee.employmentType === "FREELANCE" ? "FREELANCE" : "FULL_TIME",
     role: employee.user?.role ?? "EMPLOYEE",
@@ -80,7 +84,7 @@ export function EmployeeFormFields({
   allowedRoles?: Role[];
 }) {
   const { currency } = useCurrency();
-  function set(field: keyof EmployeeFormData, value: string | boolean) {
+  function set(field: keyof EmployeeFormData, value: string | boolean | string[]) {
     onChange({ ...data, [field]: value });
   }
 
@@ -88,13 +92,22 @@ export function EmployeeFormFields({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label className={labelClass}>First name</label>
           <input
             value={data.firstName}
             onChange={(e) => set("firstName", e.target.value)}
             required
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Middle name</label>
+          <input
+            value={data.middleName}
+            onChange={(e) => set("middleName", e.target.value)}
+            placeholder="Optional"
             className={inputClass}
           />
         </div>
@@ -175,7 +188,7 @@ export function EmployeeFormFields({
           </select>
         </div>
         <div>
-          <label className={labelClass}>Manager</label>
+          <label className={labelClass}>Primary manager</label>
           <select
             value={data.managerId}
             onChange={(e) => set("managerId", e.target.value)}
@@ -188,6 +201,18 @@ export function EmployeeFormFields({
               </option>
             ))}
           </select>
+          <label className={`${labelClass} mt-3`}>Additional managers</label>
+          <select
+            multiple
+            value={data.managerIds}
+            onChange={(event) => set("managerIds", Array.from(event.target.selectedOptions, (option) => option.value))}
+            className={`${inputClass} min-h-24`}
+          >
+            {managers.filter((manager) => manager.id !== data.managerId).map((manager) => (
+              <option key={manager.id} value={manager.id}>{manager.firstName} {manager.lastName}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-[11px] text-gray-400">Hold Ctrl (Windows) or Command (Mac) to select more than one.</p>
         </div>
       </div>
 
@@ -354,6 +379,7 @@ export const emptyEmployeeForm = (
 ): EmployeeFormData => ({
   employeeCode: "",
   firstName: "",
+  middleName: "",
   lastName: "",
   email: "",
   phone: "",
@@ -364,6 +390,7 @@ export const emptyEmployeeForm = (
   isShiftWorker: false,
   shiftStartTime: "09:00",
   managerId: "",
+  managerIds: [],
   employmentType: "FULL_TIME",
   role: "EMPLOYEE",
   salary: "",

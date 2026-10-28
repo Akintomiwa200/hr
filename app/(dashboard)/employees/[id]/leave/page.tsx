@@ -47,7 +47,7 @@ export default async function EmployeeLeavePage({
       />
       <EmployeeLeaveModule
         employeeId={id}
-        employeeName={fullName(employee.firstName, employee.lastName)}
+        employeeName={fullName(employee.firstName, employee.lastName, employee.middleName)}
         leaves={leaves}
         showRequestForm={session.employeeId === id}
         canApprove={canApprove}

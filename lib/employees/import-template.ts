@@ -12,6 +12,7 @@ import {
 export const EMPLOYEE_IMPORT_COLUMNS = [
   { key: "employeeCode", header: "Employee code", width: 18 },
   { key: "firstName", header: "First name", width: 16 },
+  { key: "middleName", header: "Middle name", width: 16 },
   { key: "lastName", header: "Last name", width: 16 },
   { key: "email", header: "Work email", width: 24 },
   { key: "jobTitle", header: "Job title", width: 20 },
@@ -29,6 +30,7 @@ export const EMPLOYEE_IMPORT_COLUMNS = [
 export type EmployeeImportRow = {
   employeeCode: string;
   firstName: string;
+  middleName: string;
   lastName: string;
   email: string;
   phone: string;
@@ -80,12 +82,47 @@ function rowReader(row: Record<string, unknown>) {
   };
 }
 
-function splitFullName(fullName: string): { firstName: string; lastName: string } {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return { firstName: "", lastName: "" };
-  if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+/**
+ * Split a single "Name" cell into first / middle / last name.
+ * Supports "John Doe", "Mary Jane Okoro", and "Okoro, Mary Jane".
+ */
+export function splitFullName(fullName: string): {
+  firstName: string;
+  middleName: string;
+  lastName: string;
+} {
+  const value = fullName.trim();
+  if (!value) return { firstName: "", middleName: "", lastName: "" };
+
+  // "Last, First Middle" (common in exported/legacy spreadsheets)
+  const commaIndex = value.indexOf(",");
+  if (commaIndex > 0) {
+    const last = value.slice(0, commaIndex).trim();
+    const rest = value
+      .slice(commaIndex + 1)
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (rest.length === 0) {
+      return { firstName: last, middleName: "", lastName: "" };
+    }
+    return {
+      firstName: rest[0],
+      middleName: rest.slice(1).join(" "),
+      lastName: last,
+    };
+  }
+
+  const parts = value.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return { firstName: parts[0], middleName: "", lastName: "" };
+  }
+  if (parts.length === 2) {
+    return { firstName: parts[0], middleName: "", lastName: parts[1] };
+  }
   return {
-    firstName: parts.slice(0, -1).join(" "),
+    firstName: parts[0],
+    middleName: parts.slice(1, -1).join(" "),
     lastName: parts[parts.length - 1],
   };
 }
@@ -94,6 +131,7 @@ const HEADER_WORDS = new Set([
   "name",
   "fullname",
   "firstname",
+  "middlename",
   "lastname",
   "email",
   "workemail",
@@ -101,8 +139,13 @@ const HEADER_WORDS = new Set([
   "employeecode",
 ]);
 
-function looksLikeHeaderRow(firstName: string, lastName: string, email: string) {
-  return [firstName, lastName, email].some((value) =>
+function looksLikeHeaderRow(
+  firstName: string,
+  middleName: string,
+  lastName: string,
+  email: string
+) {
+  return [firstName, middleName, lastName, email].some((value) =>
     HEADER_WORDS.has(normalizeHeader(value))
   );
 }
@@ -176,7 +219,12 @@ export async function buildEmployeeImportWorkbook(
     properties: { defaultRowHeight: 20 },
   });
 
-  sheet.columns = [...EMPLOYEE_IMPORT_COLUMNS];
+  // Keep the column definitions for widths/keys but write the header row
+  // explicitly below so it is not duplicated by ExcelJS.
+  sheet.columns = EMPLOYEE_IMPORT_COLUMNS.map((c) => ({
+    key: c.key,
+    width: c.width,
+  }));
 
   const headerRow = sheet.addRow(EMPLOYEE_IMPORT_COLUMNS.map((c) => c.header));
   headerRow.height = 22;
@@ -197,6 +245,7 @@ export async function buildEmployeeImportWorkbook(
   const example = sheet.addRow([
     "",
     "Alex",
+    "",
     "Johnson",
     "alex@company.com",
     "IT manager",
@@ -287,13 +336,13 @@ export async function buildEmployeeImportWorkbook(
     });
   };
 
-  setList("F", deptOptionRange);
-  setList("G", branchOptionRange);
-  setList("H", mgrOptionRange);
-  setList("I", empOptionRange);
-  setList("J", roleOptionRange);
+  setList("G", deptOptionRange);
+  setList("H", branchOptionRange);
+  setList("I", mgrOptionRange);
+  setList("J", empOptionRange);
+  setList("K", roleOptionRange);
 
-  sheet.autoFilter = { from: "A1", to: "M1" };
+  sheet.autoFilter = { from: "A1", to: "O1" };
   sheet.views = [{ state: "frozen", ySplit: 2 }];
 
   const buffer = await workbook.xlsx.writeBuffer();
@@ -316,21 +365,24 @@ export function parseEmployeeImportWorkbook(buffer: Buffer): EmployeeImportRow[]
       const email = get("Work email", "Email", "Email address", "E-mail");
       const fullName = get("Name", "Full name", "Employee name", "Staff name");
       let firstName = get("First name", "Firstname", "Given name");
+      let middleName = get("Middle name", "Middlename", "Middle names", "Other name");
       let lastName = get("Last name", "Lastname", "Surname", "Family name");
 
-      // A single "Name" column is accepted — split it into first/last name.
+      // A single "Name" column is accepted — split it into first/middle/last.
       if (!firstName && !lastName && fullName) {
         const split = splitFullName(fullName);
         firstName = split.firstName;
+        middleName = middleName || split.middleName;
         lastName = split.lastName;
       }
 
       if (!firstName && !lastName && !email) continue;
-      if (looksLikeHeaderRow(firstName, lastName, email)) continue;
+      if (looksLikeHeaderRow(firstName, middleName, lastName, email)) continue;
 
       rows.push({
         employeeCode: get("Employee code", "Employee ID", "Staff ID", "Employee No"),
         firstName,
+        middleName,
         lastName,
         email,
         phone: get("Phone", "Phone number", "Mobile", "Mobile number"),
@@ -428,7 +480,9 @@ export async function importEmployeesFromTemplate(
   );
 
   for (const row of rows) {
-    const name = `${row.firstName} ${row.lastName}`.trim() || row.email;
+    const name =
+      `${row.firstName} ${row.middleName} ${row.lastName}`.replace(/\s+/g, " ").trim() ||
+      row.email;
 
     // Resolve or auto-create the department so rows aren't dropped for a missing match.
     const deptName = row.department.trim();
@@ -495,6 +549,7 @@ export async function importEmployeesFromTemplate(
 
     const input: CreateEmployeeInput = {
       firstName: row.firstName,
+      middleName: row.middleName || null,
       lastName: row.lastName,
       email: row.email,
       phone: row.phone || null,
@@ -552,6 +607,7 @@ async function updateImportedEmployee(employeeId: string, input: CreateEmployeeI
     where: { id: employeeId },
     data: {
       firstName: input.firstName.trim(),
+      ...(input.middleName?.trim() ? { middleName: input.middleName.trim() } : {}),
       lastName: input.lastName.trim(),
       ...(input.phone?.trim() ? { phone: input.phone.trim() } : {}),
       jobTitle: input.jobTitle.trim(),

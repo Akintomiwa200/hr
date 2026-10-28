@@ -4,16 +4,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Briefcase, CalendarDays, FileText, Megaphone, Search, Users } from "lucide-react";
-import { Card, EmptyState } from "@/components/ui";
+import { Card, EmptyState, Avatar } from "@/components/ui";
 import { formatDate, fullName } from "@/lib/utils";
 
 type SearchResults = {
   employees: {
     id: string;
     firstName: string;
+    middleName?: string | null;
     lastName: string;
     email: string;
     jobTitle: string;
+    avatar?: string | null;
     department: { name: string };
   }[];
   documents: {
@@ -130,9 +132,19 @@ export function SearchModule({ initialQuery = "" }: { initialQuery?: string }) {
                     href={`/employees/${emp.id}`}
                     className="block p-4 bg-white border border-gray-100 rounded-xl hover:border-violet-200 hover:shadow-sm transition-all"
                   >
-                    <p className="text-sm font-medium text-gray-900">{fullName(emp.firstName, emp.lastName)}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{emp.jobTitle} · {emp.department.name}</p>
-                    <p className="text-xs text-gray-400 mt-1">{emp.email}</p>
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        firstName={emp.firstName}
+                        lastName={emp.lastName}
+                        src={emp.avatar}
+                        size="sm"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{fullName(emp.firstName, emp.lastName, emp.middleName)}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{emp.jobTitle} · {emp.department.name}</p>
+                        <p className="text-xs text-gray-400 mt-1">{emp.email}</p>
+                      </div>
+                    </div>
                   </Link>
                 ))}
               </div>

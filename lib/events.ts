@@ -23,6 +23,7 @@ export type RealtimeEventType =
   | "subscription_updated"
   | "notification_updated"
   | "notes_updated"
+  | "daily_report_updated"
   | "support_updated"
   | "bulk_message_created"
   | "bulk_message_updated"

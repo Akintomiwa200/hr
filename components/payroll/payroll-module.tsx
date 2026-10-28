@@ -15,7 +15,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { Button, EmptyState, StatCard, statusBadge } from "@/components/ui";
+import { Avatar, Button, EmptyState, StatCard, statusBadge } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { PayrollSettingsPanel } from "@/components/payroll/payroll-settings-panel";
 import { notify, readApiError } from "@/lib/toast";
@@ -35,7 +35,7 @@ type PayrollRow = {
   grossPay: number;
   netPay: number;
   status: string;
-  employee: { id: string; firstName: string; lastName: string };
+  employee: { id: string; firstName: string; lastName: string; avatar?: string | null };
 };
 
 type EmployeeOption = { id: string; firstName: string; lastName: string; salary?: number };
@@ -364,12 +364,20 @@ export function PayrollModule({
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="min-w-0">
                       {showEmployeeColumn && (
-                        <Link
-                          href={`/employees/${record.employee.id}/payroll`}
-                          className="text-sm font-semibold text-gray-900 hover:text-brand-600"
-                        >
-                          {fullName(record.employee.firstName, record.employee.lastName)}
-                        </Link>
+                        <div className="flex items-center gap-2.5">
+                          <Avatar
+                            firstName={record.employee.firstName}
+                            lastName={record.employee.lastName}
+                            src={record.employee.avatar}
+                            size="sm"
+                          />
+                          <Link
+                            href={`/employees/${record.employee.id}/payroll`}
+                            className="text-sm font-semibold text-gray-900 hover:text-brand-600"
+                          >
+                            {fullName(record.employee.firstName, record.employee.lastName)}
+                          </Link>
+                        </div>
                       )}
                       <p className={cn("text-sm text-gray-600", showEmployeeColumn && "mt-0.5")}>
                         {formatDate(record.periodStart)} – {formatDate(record.periodEnd)}

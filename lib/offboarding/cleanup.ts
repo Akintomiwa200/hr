@@ -78,6 +78,7 @@ export async function listOffboardedEmployees(companyId?: string | null) {
       department: e.department?.name ?? null,
       branch: e.branch?.name ?? null,
       role: e.user?.role ?? null,
+      avatar: e.avatar,
       endDate: e.endDate!.toISOString(),
       deleteAt: new Date(deleteAt).toISOString(),
       daysLeft: Math.max(0, Math.ceil((deleteAt - now) / 86_400_000)),

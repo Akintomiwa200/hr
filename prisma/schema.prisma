@@ -178,6 +178,7 @@ model Company {
   portalDocuments   PortalDocument[]
   roleDefinitions   RoleDefinition[]
   notes             Note[]
+  dailyReports      DailyReport[]
   supportTickets    SupportTicket[]
   bulkMessages      BulkMessage[]
   loans             Loan[]
@@ -263,6 +264,10 @@ model User {
   passwordHash String
   role         Role     @default(EMPLOYEE)
   companyId    String?
+  /** False when a platform admin has deactivated the account. */
+  isActive     Boolean  @default(true)
+  /** Set when the account is archived (hidden from the active roster). */
+  archivedAt   DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -271,6 +276,7 @@ model User {
   preferences     String?
   notifications   Notification[]
   notes           Note[]
+  dailyReports    DailyReport[]
   supportTicketsCreated  SupportTicket[]   @relation("SupportTicketsAuthored")
   supportTicketsAssigned SupportTicket[]   @relation("SupportTicketsAssigned")
   supportMessages        SupportMessage[]
@@ -354,6 +360,7 @@ model Employee {
   userId       String    @unique
   employeeCode String    @unique
   firstName    String
+  middleName   String?
   lastName     String
   email        String    @unique
   phone        String?
@@ -384,6 +391,8 @@ model Employee {
   roleDefinition    RoleDefinition?    @relation(fields: [roleId], references: [id])
   manager           Employee?          @relation("EmployeeManager", fields: [managerId], references: [id])
   directReports     Employee[]         @relation("EmployeeManager")
+  managers          Employee[]         @relation("EmployeeAdditionalManagers")
+  additionalReports Employee[]         @relation("EmployeeAdditionalManagers")
   leaveRequests     LeaveRequest[]
   approvedLeaves    LeaveRequest[]     @relation("LeaveApprover")
   leaveAllocations  LeaveAllocation[]
@@ -405,6 +414,7 @@ model Employee {
   completedChecklistTasks ChecklistTask[] @relation("ChecklistTaskCompleter")
   portalDocuments      PortalDocument[]
   notes                Note[]
+  dailyReports         DailyReport[]
   loans                Loan[]
 
   @@index([branchId])
@@ -1345,6 +1355,33 @@ model Note {
   @@index([userId, scope])
   @@index([companyId, scope])
   @@index([pinned])
+}
+
+/**
+ * Manager-authored daily report. Like a Google Doc: created from a blank page
+ * or a starter template, then edited with rich text. Reports are private to
+ * the manager who wrote them. Status: DRAFT | SUBMITTED.
+ */
+model DailyReport {
+  id         String   @id @default(cuid())
+  companyId  String?
+  userId     String
+  employeeId String?
+  title      String
+  content    String   @default("")
+  template   String   @default("blank")
+  status     String   @default("DRAFT")
+  reportDate DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, reportDate])
+  @@index([userId, updatedAt])
+  @@index([companyId, status])
 }
 
 /**

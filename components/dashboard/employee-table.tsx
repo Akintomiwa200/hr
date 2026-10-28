@@ -49,7 +49,7 @@ export function EmployeeTable({
 
   const filtered = useMemo(() => {
     return employees.filter((emp) => {
-      const name = fullName(emp.firstName, emp.lastName).toLowerCase();
+      const name = fullName(emp.firstName, emp.lastName, emp.middleName).toLowerCase();
       const q = search.toLowerCase();
       const matchesSearch =
         !q ||
@@ -163,7 +163,7 @@ export function EmployeeTable({
                       <Avatar firstName={emp.firstName} lastName={emp.lastName} src={emp.avatar} size="sm" />
                       <span className="min-w-0">
                         <span className="block font-medium text-[13px] text-gray-900 group-hover:text-violet-600 truncate">
-                          {fullName(emp.firstName, emp.lastName)}
+                          {fullName(emp.firstName, emp.lastName, emp.middleName)}
                         </span>
                         <span className="block text-[11px] text-gray-400 font-mono truncate">
                           {emp.employeeCode}

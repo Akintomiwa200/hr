@@ -86,6 +86,7 @@ export async function POST(
     currencyCode,
     employee: {
       firstName: record.employee.firstName,
+      middleName: record.employee.middleName,
       lastName: record.employee.lastName,
       employeeCode: record.employee.employeeCode,
       jobTitle: record.employee.jobTitle,

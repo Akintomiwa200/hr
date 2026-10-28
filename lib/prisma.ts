@@ -70,6 +70,10 @@ export function isNoteModelReady() {
   return hasDelegate(getPrismaClient(), "note", "findMany");
 }
 
+export function isDailyReportModelReady() {
+  return hasDelegate(getPrismaClient(), "dailyReport", "findMany");
+}
+
 export function isSupportModelReady() {
   const client = getPrismaClient();
   return (

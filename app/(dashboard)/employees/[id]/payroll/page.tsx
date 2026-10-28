@@ -44,7 +44,7 @@ export default async function EmployeePayrollPage({
       />
       <EmployeePayrollModule
         employeeId={id}
-        employeeName={fullName(employee.firstName, employee.lastName)}
+        employeeName={fullName(employee.firstName, employee.lastName, employee.middleName)}
         baseSalary={employee.salary}
         records={records}
       />

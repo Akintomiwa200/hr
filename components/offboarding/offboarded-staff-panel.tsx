@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ArchiveRestore, Trash2, UserCheck2 } from "lucide-react";
-import { Badge, Button, Card, CardHeader } from "@/components/ui";
+import { Avatar, Badge, Button, Card, CardHeader } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
 
@@ -16,6 +16,7 @@ type OffboardedRow = {
   department: string | null;
   branch: string | null;
   role: string | null;
+  avatar?: string | null;
   endDate: string;
   deleteAt: string;
   daysLeft: number;
@@ -238,31 +239,39 @@ export function OffboardedStaffPanel() {
             <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
               {employees.map((row) => (
                 <div key={row.id} className="flex items-center justify-between gap-3 p-4 bg-white">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold text-gray-900">{fullName(row)}</p>
-                      {row.expired ? (
-                        <Badge variant="error">Expired — deletes now</Badge>
-                      ) : (
-                        <Badge variant="warning">{row.daysLeft} day(s) left</Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {row.jobTitle}
-                      {row.department ? ` · ${row.department}` : ""}
-                      {row.branch ? ` · ${row.branch}` : ""}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {row.email}
-                      {row.employeeCode ? ` · ${row.employeeCode}` : ""}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1 text-[11px] text-gray-400">
-                      <span>
-                        Last day: <span className="text-gray-600">{formatDate(row.endDate)}</span>
-                      </span>
-                      <span>
-                        Deletes: <span className="text-gray-600">{formatDate(row.deleteAt)}</span>
-                      </span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar
+                      firstName={row.firstName}
+                      lastName={row.lastName}
+                      src={row.avatar}
+                      size="sm"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-900">{fullName(row)}</p>
+                        {row.expired ? (
+                          <Badge variant="error">Expired — deletes now</Badge>
+                        ) : (
+                          <Badge variant="warning">{row.daysLeft} day(s) left</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {row.jobTitle}
+                        {row.department ? ` · ${row.department}` : ""}
+                        {row.branch ? ` · ${row.branch}` : ""}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {row.email}
+                        {row.employeeCode ? ` · ${row.employeeCode}` : ""}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1 text-[11px] text-gray-400">
+                        <span>
+                          Last day: <span className="text-gray-600">{formatDate(row.endDate)}</span>
+                        </span>
+                        <span>
+                          Deletes: <span className="text-gray-600">{formatDate(row.deleteAt)}</span>
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <Button
