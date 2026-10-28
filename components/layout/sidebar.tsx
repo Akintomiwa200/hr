@@ -272,6 +272,7 @@ export function Sidebar({
   role,
   userName,
   userEmail,
+  avatarUrl,
   collapsed,
   mobileOpen = false,
   onCloseMobile,
@@ -282,6 +283,7 @@ export function Sidebar({
   role: Role;
   userName: string;
   userEmail: string;
+  avatarUrl?: string | null;
   collapsed?: boolean;
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
@@ -389,8 +391,16 @@ export function Sidebar({
               collapsed ? "justify-center p-2" : "gap-3 p-2.5"
             )}
           >
-            <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center shrink-0 text-xs font-semibold text-gray-600">
-              {getInitials(userName)}
+            <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center shrink-0 overflow-hidden text-xs font-semibold text-gray-600">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={userName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                getInitials(userName)
+              )}
             </div>
             {!collapsed && (
               <>

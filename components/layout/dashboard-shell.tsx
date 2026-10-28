@@ -98,6 +98,7 @@ export function DashboardShell({
         role={role}
         userName={userName}
         userEmail={userEmail}
+        avatarUrl={avatarUrl}
         collapsed={!isMobile && sidebarCollapsed}
         mobileOpen={mobileOpen}
         onCloseMobile={closeMobile}

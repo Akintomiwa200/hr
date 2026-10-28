@@ -9,6 +9,53 @@ import { notify, readApiError } from "@/lib/toast";
 const inputClass =
   "w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500";
 
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Shrinks large logos before upload so photos straight from a phone or a
+ * designer export still fit within the 2 MB limit (and inside a data URI when
+ * Cloudinary is unavailable). SVG and GIF files keep their original format.
+ */
+async function prepareLogoFile(file: File): Promise<File> {
+  if (file.type === "image/svg+xml" || file.type === "image/gif") return file;
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxDimension = 1024;
+    const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size <= MAX_UPLOAD_BYTES) {
+      bitmap.close?.();
+      return file;
+    }
+
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      bitmap.close?.();
+      return file;
+    }
+    context.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close?.();
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/webp", 0.92)
+    );
+    if (!blob) return file;
+
+    // Some browsers fall back to PNG when WebP encoding is unavailable.
+    const encodedType = blob.type || "image/webp";
+    const extension = encodedType === "image/png" ? "png" : "webp";
+    const name = `${file.name.replace(/\.[^.]+$/, "") || "logo"}.${extension}`;
+    return new File([blob], name, { type: encodedType });
+  } catch {
+    return file;
+  }
+}
+
 export function CompanyProfileCard({
   initialCompany,
 }: {
@@ -56,8 +103,14 @@ export function CompanyProfileCard({
   const uploadLogo = async (file: File) => {
     setUploading(true);
     try {
+      const prepared = await prepareLogoFile(file);
+      if (prepared.size > MAX_UPLOAD_BYTES) {
+        notify.error("Logo must be smaller than 2 MB");
+        return;
+      }
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", prepared);
       const res = await fetch("/api/settings/company/logo", {
         method: "POST",
         body: formData,

@@ -49,8 +49,11 @@ export default async function DashboardLayout({
 // }
 
   // Cache-bust the logo URL so a re-uploaded image is fetched, not a cached copy.
+  // Data URIs (Cloudinary fallback) must stay untouched or the image breaks.
   const companyLogo = company?.logo
-    ? `${company.logo}${company.logo.includes("?") ? "&" : "?"}v=${new Date(company.updatedAt).getTime()}`
+    ? company.logo.startsWith("data:")
+      ? company.logo
+      : `${company.logo}${company.logo.includes("?") ? "&" : "?"}v=${new Date(company.updatedAt).getTime()}`
     : null;
 
   const employeeProfile = session.employeeId
@@ -70,7 +73,7 @@ export default async function DashboardLayout({
           firstName={firstName}
           lastName={lastName}
           employeeId={session.employeeId}
-          avatarUrl={employeeProfile?.avatar ?? null}
+          avatarUrl={employeeProfile?.avatar ?? session.avatar ?? null}
           companyName={company?.name}
           companyLogo={companyLogo}
         >

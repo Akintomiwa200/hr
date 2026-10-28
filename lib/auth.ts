@@ -17,6 +17,8 @@ export interface SessionUser {
   employeeId?: string;
   firstName?: string;
   lastName?: string;
+  /** Avatar uploaded from the account/profile page (stored in user preferences). */
+  avatar?: string;
   /** True when the company is locked pending a subscription (real-time gate). */
   locked?: boolean;
 }
@@ -110,6 +112,7 @@ export async function getSession(): Promise<SessionUser | null> {
       employeeId: dbUser.employee?.id,
       firstName: dbUser.employee?.firstName || userPrefs.firstName || defaultFirst,
       lastName: dbUser.employee?.lastName || userPrefs.lastName || defaultLast,
+      avatar: userPrefs.avatar,
     };
   } catch {
     return null;

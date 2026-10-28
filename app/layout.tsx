@@ -36,7 +36,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} min-h-full font-sans antialiased`}>
+      <body
+        className={`${inter.variable} min-h-full font-sans antialiased`}
+        suppressHydrationWarning
+      >
         <Suspense fallback={null}>
           <AppFeedbackProvider>{children}</AppFeedbackProvider>
         </Suspense>
