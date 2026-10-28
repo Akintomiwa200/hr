@@ -31,6 +31,7 @@ export type EmployeeImportRow = {
   firstName: string;
   lastName: string;
   email: string;
+  phone: string;
   jobTitle: string;
   department: string;
   branch: string;
@@ -41,7 +42,76 @@ export type EmployeeImportRow = {
   hireDate: string;
   dateOfBirth: string;
   address: string;
+  status: string;
 };
+
+/** Compare header labels without worrying about case, spaces, or punctuation. */
+function normalizeHeader(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function cellText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  return String(value).trim();
+}
+
+/**
+ * Build a header-insensitive accessor so sheets using "Name", "Email", or
+ * "Employee ID" (instead of the template's exact labels) still import.
+ */
+function rowReader(row: Record<string, unknown>) {
+  const values = new Map<string, string>();
+  for (const [key, value] of Object.entries(row)) {
+    const text = cellText(value);
+    if (text) values.set(normalizeHeader(key), text);
+  }
+  return (...aliases: string[]) => {
+    for (const alias of aliases) {
+      const text = values.get(normalizeHeader(alias));
+      if (text) return text;
+    }
+    return "";
+  };
+}
+
+function splitFullName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: "", lastName: "" };
+  if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+  return {
+    firstName: parts.slice(0, -1).join(" "),
+    lastName: parts[parts.length - 1],
+  };
+}
+
+const HEADER_WORDS = new Set([
+  "name",
+  "fullname",
+  "firstname",
+  "lastname",
+  "email",
+  "workemail",
+  "employeeid",
+  "employeecode",
+]);
+
+function looksLikeHeaderRow(firstName: string, lastName: string, email: string) {
+  return [firstName, lastName, email].some((value) =>
+    HEADER_WORDS.has(normalizeHeader(value))
+  );
+}
+
+export function parseStatus(value: string): "ACTIVE" | "INACTIVE" {
+  return /inactive|terminated|resigned|suspended|offboard|left/i.test(value)
+    ? "INACTIVE"
+    : "ACTIVE";
+}
 
 const EMPLOYMENT_OPTIONS = ["Full-time", "Freelance"];
 
@@ -241,32 +311,52 @@ export function parseEmployeeImportWorkbook(buffer: Buffer): EmployeeImportRow[]
     const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
 
     for (const row of raw) {
-      const firstName = String(row["First name"] ?? "").trim();
-      const lastName = String(row["Last name"] ?? "").trim();
-      const email = String(row["Work email"] ?? "").trim();
+      const get = rowReader(row);
+
+      const email = get("Work email", "Email", "Email address", "E-mail");
+      const fullName = get("Name", "Full name", "Employee name", "Staff name");
+      let firstName = get("First name", "Firstname", "Given name");
+      let lastName = get("Last name", "Lastname", "Surname", "Family name");
+
+      // A single "Name" column is accepted — split it into first/last name.
+      if (!firstName && !lastName && fullName) {
+        const split = splitFullName(fullName);
+        firstName = split.firstName;
+        lastName = split.lastName;
+      }
+
       if (!firstName && !lastName && !email) continue;
-      if (
-        firstName.toLowerCase() === "first name" ||
-        lastName.toLowerCase() === "last name" ||
-        email.toLowerCase() === "work email"
-      )
-        continue;
+      if (looksLikeHeaderRow(firstName, lastName, email)) continue;
 
       rows.push({
-        employeeCode: String(row["Employee code"] ?? "").trim(),
+        employeeCode: get("Employee code", "Employee ID", "Staff ID", "Employee No"),
         firstName,
         lastName,
         email,
-        jobTitle: String(row["Job title"] ?? "").trim(),
-        department: String(row["Department"] ?? "").trim(),
-        branch: String(row["Branch"] ?? "").trim(),
-        manager: String(row["Manager"] ?? "").trim(),
-        employment: String(row["Employment"] ?? "").trim(),
-        role: String(row["Role"] ?? "").trim(),
-        salary: String(row["Salary"] ?? "").trim(),
-        hireDate: String(row["Start date"] ?? "").trim(),
-        dateOfBirth: String(row["Date of birth"] ?? row["Date of Birth"] ?? "").trim(),
-        address: String(row["Address"] ?? "").trim(),
+        phone: get("Phone", "Phone number", "Mobile", "Mobile number"),
+        jobTitle: get(
+          "Job title",
+          "Job Title",
+          "Position",
+          "Designation",
+          "Job role"
+        ),
+        department: get("Department", "Dept", "Unit"),
+        branch: get("Branch", "Location", "Office"),
+        manager: get("Manager", "Line manager", "Reports to"),
+        employment: get("Employment", "Employment type", "Type"),
+        role: get("Role", "System role", "Access level"),
+        salary: get("Salary", "Gross salary", "Annual salary", "Monthly salary"),
+        hireDate: get(
+          "Start date",
+          "Hire date",
+          "Date joined",
+          "Joining date",
+          "Employment date"
+        ),
+        dateOfBirth: get("Date of birth", "Date of Birth", "DOB", "Birth date"),
+        address: get("Address", "Residential address", "Home address"),
+        status: get("Status", "Employment status"),
       });
     }
   }
@@ -386,9 +476,16 @@ export async function importEmployeesFromTemplate(
         ? null
         : managerByName.get(mgrKey) || null);
 
-    const role = ROLE_BY_LABEL[row.role.trim().toLowerCase()] ?? Role.EMPLOYEE;
+    const role = row.role.trim()
+      ? ROLE_BY_LABEL[row.role.trim().toLowerCase()] ?? Role.EMPLOYEE
+      : undefined;
 
-    const employment = /freelance/i.test(row.employment) ? "FREELANCE" : "FULL_TIME";
+    const employment = /freelance/i.test(row.employment)
+      ? "FREELANCE"
+      : row.employment.trim()
+        ? "FULL_TIME"
+        : undefined;
+    const status = row.status.trim() ? parseStatus(row.status) : undefined;
     const salary = Number(String(row.salary).replace(/[^0-9.-]/g, "")) || 0;
     const hireDate = parseLocalDate(row.hireDate) ?? new Date();
     const dateOfBirth = row.dateOfBirth ? parseLocalDate(row.dateOfBirth) : null;
@@ -400,6 +497,7 @@ export async function importEmployeesFromTemplate(
       firstName: row.firstName,
       lastName: row.lastName,
       email: row.email,
+      phone: row.phone || null,
       jobTitle: row.jobTitle || "Staff",
       departmentId,
       branchId,
@@ -407,7 +505,7 @@ export async function importEmployeesFromTemplate(
       employmentType: employment,
       role,
       salary,
-      status: "ACTIVE",
+      status,
       companyId,
       hireDate,
       dateOfBirth,
@@ -419,14 +517,19 @@ export async function importEmployeesFromTemplate(
       if (existingId && requestedCode) {
         await updateImportedEmployee(existingId, input);
         result.updated += 1;
-        result.rows.push({ name, employeeCode: requestedCode, role, manager: row.manager });
+        result.rows.push({
+          name,
+          employeeCode: requestedCode,
+          role: role ?? "EMPLOYEE",
+          manager: row.manager,
+        });
       } else {
         const { employee } = await createEmployeeAccount(input);
         result.created += 1;
         result.rows.push({
           name,
           employeeCode: employee.employeeCode,
-          role,
+          role: employee.user?.role ?? role ?? "EMPLOYEE",
           manager: row.manager,
         });
         codeToId.set(employee.employeeCode.trim().toLowerCase(), employee.id);
@@ -450,19 +553,32 @@ async function updateImportedEmployee(employeeId: string, input: CreateEmployeeI
     data: {
       firstName: input.firstName.trim(),
       lastName: input.lastName.trim(),
+      ...(input.phone?.trim() ? { phone: input.phone.trim() } : {}),
       jobTitle: input.jobTitle.trim(),
       departmentId: input.departmentId,
       branchId: input.branchId ?? null,
       managerId: input.managerId ?? null,
+      ...(input.employmentType
+        ? {
+            employmentType:
+              input.employmentType === "FREELANCE" ? "FREELANCE" : "FULL_TIME",
+          }
+        : {}),
       salary: Number(input.salary) || 0,
+      ...(input.status ? { status: input.status } : {}),
       hireDate: parseLocalDate(input.hireDate) ?? undefined,
       dateOfBirth: parseLocalDate(input.dateOfBirth) ?? null,
       address: input.address?.trim() || null,
     },
   });
-  if (!input.email || !input.email.includes("@")) return;
-  await prisma.user.updateMany({
-    where: { email: input.email.toLowerCase() },
+  if (!input.role) return;
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: { userId: true },
+  });
+  if (!employee) return;
+  await prisma.user.update({
+    where: { id: employee.userId },
     data: { role: input.role as Role },
   });
 }

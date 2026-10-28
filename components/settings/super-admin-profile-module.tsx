@@ -14,7 +14,6 @@ import {
   MapPin,
   Phone,
   Save,
-  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Trash2,

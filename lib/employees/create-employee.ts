@@ -145,8 +145,32 @@ async function uniqueBiometricPin(companyId: string | null | undefined, employee
   return preferred;
 }
 
+/**
+ * Employees imported without an email still need a unique login record.
+ * Store a clearly-marked internal address derived from the employee code;
+ * the real email can be added later from the employee profile.
+ */
+async function allocateInternalEmail(employeeCode: string) {
+  const base =
+    employeeCode
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "employee";
+  let candidate = `${base}@no-email.local`;
+  let counter = 2;
+  while (
+    await prisma.user.findUnique({ where: { email: candidate }, select: { id: true } })
+  ) {
+    candidate = `${base}-${counter}@no-email.local`;
+    counter += 1;
+  }
+  return candidate;
+}
+
 export async function createEmployeeAccount(input: CreateEmployeeInput) {
-  const normalizedEmail = input.email.trim().toLowerCase();
+  const requestedEmail = (input.email ?? "").trim();
+  const hasEmail = requestedEmail.length > 0;
   const employmentType =
     input.employmentType === "FREELANCE" ? "FREELANCE" : "FULL_TIME";
   let role = normalizeRoleInput(input.role);
@@ -162,6 +186,21 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
     }
   }
 
+  const employeeCode = input.employeeCode?.trim() || (await nextEmployeeCode());
+  if (input.employeeCode?.trim()) {
+    const codeTaken = await prisma.employee.findUnique({
+      where: { employeeCode },
+      select: { id: true },
+    });
+    if (codeTaken) {
+      throw new Error("EMPLOYEE_CODE_EXISTS");
+    }
+  }
+
+  const normalizedEmail = hasEmail
+    ? requestedEmail.toLowerCase()
+    : await allocateInternalEmail(employeeCode);
+
   const existing = await prisma.user.findUnique({
     where: { email: normalizedEmail },
   });
@@ -176,16 +215,6 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
     role,
   });
 
-  const employeeCode = (input.employeeCode?.trim() || (await nextEmployeeCode()));
-  if (input.employeeCode?.trim()) {
-    const codeTaken = await prisma.employee.findUnique({
-      where: { employeeCode },
-      select: { id: true },
-    });
-    if (codeTaken) {
-      throw new Error("EMPLOYEE_CODE_EXISTS");
-    }
-  }
   const passwordHash = await bcrypt.hash(DEFAULT_EMPLOYEE_PASSWORD, 10);
   const biometricPin =
     (typeof input.biometricPin === "string" && input.biometricPin.trim()) ||
@@ -239,14 +268,19 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
     });
   }
 
-  const email = await sendWelcomeEmail({
-    to: normalizedEmail,
-    firstName: employee.firstName,
-    lastName: employee.lastName,
-    password: DEFAULT_EMPLOYEE_PASSWORD,
-    jobTitle: employee.jobTitle,
-    employeeCode: employee.employeeCode,
-  });
+  const email = hasEmail
+    ? await sendWelcomeEmail({
+        to: normalizedEmail,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        password: DEFAULT_EMPLOYEE_PASSWORD,
+        jobTitle: employee.jobTitle,
+        employeeCode: employee.employeeCode,
+      })
+    : ({
+        sent: false,
+        error: "No email address on file — welcome email skipped.",
+      } satisfies SendEmailResult);
 
   return { employee, email };
 }

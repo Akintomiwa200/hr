@@ -30,7 +30,10 @@ export async function POST(request: NextRequest) {
 
   if (rows.length === 0) {
     return NextResponse.json(
-      { error: "No employee rows found in this file" },
+      {
+        error:
+          "No employee rows found. Use headers such as First name and Last name (or Name) plus Work email (or Email) in the first row.",
+      },
       { status: 400 }
     );
   }

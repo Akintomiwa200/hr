@@ -35,10 +35,14 @@ export default async function SettingsPage() {
 
   const cards: SettingsCardItem[] = [];
 
+  const superAdmin = isSuperAdmin(session.role);
+
   cards.push({
     id: "profile",
-    title: "Profile & notifications",
-    description: "Manage your account details, phone, address, and the updates you receive.",
+    title: superAdmin ? "Super Admin profile" : "Profile & notifications",
+    description: superAdmin
+      ? "Manage your root account name, email, photo, password, and platform alerts."
+      : "Manage your account details, phone, address, and the updates you receive.",
     href: "/settings/profile",
     icon: UserRound,
     accent: "text-violet-600 bg-violet-50",
