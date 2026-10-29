@@ -14,6 +14,9 @@ export type PayslipDocumentData = {
     employeeCode: string;
     jobTitle: string;
     department: string;
+    bankName?: string | null;
+    accountNumber?: string | null;
+    nin?: string | null;
   };
   periodStart: Date | string;
   periodEnd: Date | string;
@@ -192,6 +195,8 @@ export function renderPayslipHtml(data: PayslipDocumentData) {
           <p style="margin:0 0 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#7c3aed;">${payeeTitle}</p>
           <p style="margin:0;font-weight:700;color:#111827;font-size:15px;">${payeeName}</p>
           <p style="margin:4px 0 0;font-size:14px;color:#6b7280;">${data.employee.jobTitle}<br/>ID: ${data.employee.employeeCode}</p>
+          ${data.employee.bankName || data.employee.accountNumber ? `<p style="margin:6px 0 0;font-size:13px;color:#4b5563;"><strong style="color:#111827;">Bank:</strong> ${[data.employee.bankName, data.employee.accountNumber].filter(Boolean).join(" · ")}</p>` : ""}
+          ${data.employee.nin ? `<p style="margin:2px 0 0;font-size:13px;color:#4b5563;"><strong style="color:#111827;">NIN:</strong> ${data.employee.nin}</p>` : ""}
         </div>
       </div>
 

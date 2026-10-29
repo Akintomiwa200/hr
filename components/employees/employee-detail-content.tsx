@@ -4,9 +4,11 @@ import {
   Briefcase,
   CalendarDays,
   Clock,
+  Landmark,
   Mail,
   MapPin,
   Phone,
+  ShieldCheck,
   Star,
   Users,
   Wallet,
@@ -264,6 +266,15 @@ export function EmployeeDetailContent({
           )}
           {canViewSalary && (
             <InfoRow icon={Wallet} label="Salary" value={<Money amount={employee.salary} />} />
+          )}
+          {canViewSalary && employee.bankName && (
+            <InfoRow icon={Landmark} label="Bank" value={employee.bankName} />
+          )}
+          {canViewSalary && employee.accountNumber && (
+            <InfoRow icon={Landmark} label="Account number" value={employee.accountNumber} />
+          )}
+          {canViewSalary && employee.nin && (
+            <InfoRow icon={ShieldCheck} label="NIN" value={employee.nin} />
           )}
           {canViewSalary && latestPayroll && (
             <InfoRow

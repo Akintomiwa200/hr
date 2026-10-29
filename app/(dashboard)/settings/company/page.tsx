@@ -18,9 +18,16 @@ export default async function CompanySettingsPage() {
 
   const company = await prisma.company.findUnique({
     where: { id: session.companyId! },
-    select: { name: true, logo: true, email: true, phone: true, address: true },
+    select: { name: true, logo: true, email: true, phone: true, address: true, updatedAt: true },
   });
   if (!company) notFound();
+
+  // Cache-bust the logo URL so a re-uploaded image is fetched, not a cached copy.
+  const logo = company.logo
+    ? company.logo.startsWith("data:")
+      ? company.logo
+      : `${company.logo}${company.logo.includes("?") ? "&" : "?"}v=${company.updatedAt.getTime()}`
+    : null;
 
   return (
     <div>
@@ -38,7 +45,7 @@ export default async function CompanySettingsPage() {
       <CompanyProfileCard
         initialCompany={{
           name: company.name,
-          logo: company.logo,
+          logo,
           email: company.email,
           phone: company.phone,
           address: company.address,

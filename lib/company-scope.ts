@@ -87,10 +87,24 @@ export function portalDocumentCompanyWhere(
   return { OR: [{ companyId: scope.companyId }, { companyId: null }] };
 }
 
+/**
+ * Checklists are strictly per-company. Platform admins without a company can
+ * see everything; everyone else only sees rows owned by their own company.
+ */
 export function checklistCompanyWhere(scope: CompanyScope): Prisma.ChecklistTemplateWhereInput {
   if (scope.isPlatformAdmin && !scope.companyId) return {};
-  if (!scope.companyId) return { OR: [{ companyId: null }, { companyId: scope.companyId }] };
-  return { OR: [{ companyId: scope.companyId }, { companyId: null }] };
+  if (!scope.companyId) return { companyId: "__none__" };
+  return { companyId: scope.companyId };
+}
+
+/** Whether a company-owned record is visible to the current scope. */
+export function companyMatchesScope(
+  scope: CompanyScope,
+  companyId: string | null
+): boolean {
+  if (scope.isPlatformAdmin && !scope.companyId) return true;
+  if (!scope.companyId) return false;
+  return companyId === scope.companyId;
 }
 
 export function noteCompanyWhere(scope: CompanyScope): Prisma.NoteWhereInput {

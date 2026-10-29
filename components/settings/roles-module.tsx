@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, EmptyState } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import Link from "next/link";
 import { notify, readApiError } from "@/lib/toast";
 import { ORG_ROLES, roleLabel } from "@/lib/roles";
 import type { Role } from "@prisma/client";
@@ -161,16 +162,18 @@ export function RolesModule({
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {builtinRoles.map((r) => (
-              <div
+              <Link
                 key={r.role}
-                className="rounded-xl border border-gray-100 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
+                href={`/settings/roles/${r.role}`}
+                className="rounded-xl border border-gray-100 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition hover:border-brand-200 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                aria-label={`View ${r.label} privileges`}
               >
                 <div className="flex items-center gap-2">
                   <BadgeCheck className="w-4 h-4 text-emerald-500 shrink-0" />
                   <span className="font-semibold text-gray-900">{r.label}</span>
                 </div>
                 <p className="text-xs text-gray-400 mt-1 font-mono">{r.role}</p>
-              </div>
+              </Link>
             ))}
           </div>
         </section>

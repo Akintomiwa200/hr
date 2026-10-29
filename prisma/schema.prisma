@@ -259,6 +259,22 @@ model Notification {
   @@index([userId, createdAt])
 }
 
+/// Per-user read receipts for notifications that are derived on the fly
+/// (pending leave, announcements, attendance, appraisal reminders, …). Those
+/// items do not have a Notification row, so their read state is stored here by
+/// stable key (for example "leave-<leaveRequestId>").
+model NotificationRead {
+  id     String   @id @default(cuid())
+  userId String
+  key    String
+  readAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@index([userId, readAt])
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -276,6 +292,7 @@ model User {
   employee        Employee?
   preferences     String?
   notifications   Notification[]
+  notificationReads NotificationRead[]
   notes           Note[]
   dailyReports    DailyReport[]
   supportTicketsCreated  SupportTicket[]   @relation("SupportTicketsAuthored")
@@ -379,6 +396,9 @@ model Employee {
   hireDate         DateTime
   endDate          DateTime?
   salary           Float     @default(0)
+  bankName         String?
+  accountNumber    String?
+  nin              String?
   address          String?
   dateOfBirth      DateTime?
   gender           String?

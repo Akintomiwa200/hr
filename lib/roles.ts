@@ -136,8 +136,8 @@ export const SUPERVISOR_ROLES: Role[] = ["SUPERVISOR"];
 export const REPORTS_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
 /** Team-scoped reports for managers/supervisors. */
 export const REPORTS_TEAM_ROLES: Role[] = ["MANAGER", "SUPERVISOR"];
-/** Managers who can keep their own daily reporting workspace. */
-export const DAILY_REPORTING_ROLES: Role[] = ["MANAGER"];
+/** Managers, HR and company admins can keep their own daily reporting workspace. */
+export const DAILY_REPORTING_ROLES: Role[] = ["COMPANY_ADMIN", "MANAGER", "HR"];
 /** Anyone who can open the Reports module. */
 export const REPORTS_VIEW_ROLES: Role[] = [
   ...REPORTS_ADMIN_ROLES,

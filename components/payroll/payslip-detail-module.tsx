@@ -58,6 +58,9 @@ type PayslipRecord = {
     employeeCode: string;
     jobTitle: string;
     email?: string | null;
+    bankName?: string | null;
+    accountNumber?: string | null;
+    nin?: string | null;
     department: { name: string };
   };
 };
@@ -243,7 +246,7 @@ export function PayslipDetailModule({
 }) {
   const router = useRouter();
   useAppEvents({
-    types: ["payroll_updated"],
+    types: ["payroll_updated", "employee_updated"],
     onEvent: () => scheduleRouterRefresh(() => router.refresh()),
   });
   const formatCurrency = useFormatCurrency();
@@ -541,6 +544,20 @@ export function PayslipDetailModule({
                 {record.employee.jobTitle}
                 <br />
                 ID: {record.employee.employeeCode}
+                {(record.employee.bankName || record.employee.accountNumber) && (
+                  <>
+                    <br />
+                    {[record.employee.bankName, record.employee.accountNumber]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </>
+                )}
+                {record.employee.nin && (
+                  <>
+                    <br />
+                    NIN: {record.employee.nin}
+                  </>
+                )}
               </p>
             </div>
           </div>

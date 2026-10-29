@@ -7,7 +7,7 @@ export default async function NotificationsPage() {
   if (!session) redirect("/login");
 
   return (
-    <div className="w-full max-w-3xl">
+    <div className="w-full max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-[22px] font-bold text-gray-900 tracking-tight">Notifications</h1>
         <p className="text-sm text-gray-500 mt-1">

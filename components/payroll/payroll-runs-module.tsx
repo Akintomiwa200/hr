@@ -4,9 +4,6 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Download,
-  FileSpreadsheet,
-  FileText,
   Layers,
   Plus,
   Trash2,
@@ -14,6 +11,7 @@ import {
 } from "lucide-react";
 import { Button, EmptyState, StatCard, statusBadge } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { PayrollExportMenu } from "@/components/payroll/payroll-export-menu";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 import { useFormatCurrency } from "@/components/providers/currency-provider";
@@ -52,7 +50,7 @@ export function PayrollRunsModule({
   const importRef = useRef<HTMLInputElement>(null);
 
   useAppEvents({
-    types: ["payroll_updated"],
+    types: ["payroll_updated", "employee_updated"],
     onEvent: () => scheduleRouterRefresh(() => router.refresh()),
   });
 
@@ -173,22 +171,7 @@ export function PayrollRunsModule({
             >
               Individual payslips
             </Link>
-            {canExport && (
-              <>
-                <Button variant="secondary" onClick={() => downloadExport("csv")}>
-                  <Download className="w-4 h-4" />
-                  CSV
-                </Button>
-                <Button variant="secondary" onClick={() => downloadExport("xlsx")}>
-                  <FileSpreadsheet className="w-4 h-4" />
-                  Excel
-                </Button>
-                <Button variant="secondary" onClick={() => downloadExport("pdf")}>
-                  <FileText className="w-4 h-4" />
-                  PDF
-                </Button>
-              </>
-            )}
+            {canExport && <PayrollExportMenu onExport={(format) => downloadExport(format)} />}
             {canOperate && (
               <>
                 <input
@@ -253,14 +236,12 @@ export function PayrollRunsModule({
                         Open register
                       </Link>
                       {canExport && (
-                        <button
-                          type="button"
-                          onClick={() => downloadExport("csv", run.id)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg border border-gray-200 text-gray-600 hover:border-brand-200"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          Export
-                        </button>
+                        <PayrollExportMenu
+                          size="sm"
+                          align="left"
+                          side="top"
+                          onExport={(format) => downloadExport(format, run.id)}
+                        />
                       )}
                       {canOperate && (
                         <button
@@ -379,7 +360,15 @@ export function PayrollRunDetailModule({
       netPay: number;
       grossPay: number;
       status: string;
-      employee: { id: string; firstName: string; lastName: string; employeeCode: string };
+      employee: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        employeeCode: string;
+        bankName?: string | null;
+        accountNumber?: string | null;
+        nin?: string | null;
+      };
     }>;
   };
   canOperate: boolean;
@@ -395,7 +384,7 @@ export function PayrollRunDetailModule({
   } | null>(null);
 
   useAppEvents({
-    types: ["payroll_updated"],
+    types: ["payroll_updated", "employee_updated"],
     onEvent: () => scheduleRouterRefresh(() => router.refresh()),
   });
 
@@ -488,17 +477,7 @@ export function PayrollRunDetailModule({
             Back to runs
           </Link>
           {canExport && (
-            <>
-              <Button variant="secondary" onClick={() => downloadExport("csv")}>
-                CSV
-              </Button>
-              <Button variant="secondary" onClick={() => downloadExport("xlsx")}>
-                Excel
-              </Button>
-              <Button variant="secondary" onClick={() => downloadExport("pdf")}>
-                PDF
-              </Button>
-            </>
+            <PayrollExportMenu onExport={(format) => downloadExport(format)} />
           )}
           {canOperate && run.status !== "PAID" && (
             <>
@@ -540,7 +519,19 @@ export function PayrollRunDetailModule({
                 <tr key={record.id} className="border-b border-gray-50 hover:bg-brand-50/20">
                   <td className="px-5 py-3 font-mono text-xs">{record.employee.employeeCode}</td>
                   <td className="px-5 py-3">
-                    {record.employee.firstName} {record.employee.lastName}
+                    <p className="font-medium text-gray-900">
+                      {record.employee.firstName} {record.employee.lastName}
+                    </p>
+                    {(record.employee.bankName ||
+                      record.employee.accountNumber ||
+                      record.employee.nin) && (
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        {[record.employee.bankName, record.employee.accountNumber]
+                          .filter(Boolean)
+                          .join(" · ")}
+                        {record.employee.nin ? `${record.employee.bankName || record.employee.accountNumber ? " · " : ""}NIN ${record.employee.nin}` : ""}
+                      </p>
+                    )}
                   </td>
                   <td className="px-5 py-3">{formatCurrency(record.grossPay)}</td>
                   <td className="px-5 py-3 font-semibold text-emerald-600">

@@ -29,6 +29,9 @@ export function employeeToFormData(employee: {
   managerId?: string | null;
   managers?: { id: string }[];
   salary: number;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  nin?: string | null;
   status: string;
   address?: string | null;
   hireDate?: Date | string | null;
@@ -58,6 +61,9 @@ export function employeeToFormData(employee: {
       employee.employmentType === "FREELANCE" ? "FREELANCE" : "FULL_TIME",
     role: employee.user?.role ?? "EMPLOYEE",
     salary: String(employee.salary),
+    bankName: employee.bankName ?? "",
+    accountNumber: employee.accountNumber ?? "",
+    nin: employee.nin ?? "",
     status: employee.status,
     address: employee.address ?? "",
     hireDate: toDateInputValue(employee.hireDate) || todayInputValue(),
@@ -322,6 +328,45 @@ export function EmployeeFormFields({
         </div>
       </div>
 
+      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-gray-500 mb-3">
+          Payment &amp; compliance
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className={labelClass}>Bank name</label>
+            <input
+              value={data.bankName}
+              onChange={(e) => set("bankName", e.target.value)}
+              className={inputClass}
+              placeholder="e.g. Zenith Bank"
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Account number</label>
+            <input
+              value={data.accountNumber}
+              onChange={(e) => set("accountNumber", e.target.value)}
+              className={inputClass}
+              placeholder="e.g. 0123456789"
+              inputMode="numeric"
+            />
+          </div>
+          <div>
+            <label className={labelClass}>NIN</label>
+            <input
+              value={data.nin}
+              onChange={(e) => set("nin", e.target.value)}
+              className={inputClass}
+              placeholder="National identity number"
+            />
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-gray-400">
+          Shown on payslips and payroll registers so salary payments reach the right account.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelClass}>Start date</label>
@@ -394,6 +439,9 @@ export const emptyEmployeeForm = (
   employmentType: "FULL_TIME",
   role: "EMPLOYEE",
   salary: "",
+  bankName: "",
+  accountNumber: "",
+  nin: "",
   status: "ACTIVE",
   address: "",
   hireDate: todayInputValue(),

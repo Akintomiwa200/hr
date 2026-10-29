@@ -21,6 +21,9 @@ export type CreateEmployeeInput = {
   role?: Role | string;
   roleId?: string | null;
   salary?: number | string;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  nin?: string | null;
   status?: string;
   companyId?: string | null;
   biometricPin?: string | null;
@@ -246,6 +249,9 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
           hireDate: parseLocalDate(input.hireDate) ?? new Date(),
           dateOfBirth: parseLocalDate(input.dateOfBirth),
           salary: Number(input.salary) || 0,
+          bankName: input.bankName?.trim() || null,
+          accountNumber: input.accountNumber?.trim() || null,
+          nin: input.nin?.trim() || null,
           status: input.status || "ACTIVE",
         },
       },

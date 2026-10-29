@@ -22,6 +22,10 @@ export function isNotificationModelReady() {
   return hasDelegate(getPrismaClient(), "notification", "findMany");
 }
 
+export function isNotificationReadModelReady() {
+  return hasDelegate(getPrismaClient(), "notificationRead", "findMany");
+}
+
 export function isRecruitmentModelsReady() {
   const client = getPrismaClient();
   return (

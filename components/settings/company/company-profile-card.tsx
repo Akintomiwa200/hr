@@ -10,6 +10,7 @@ const inputClass =
   "w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500";
 
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+const MIN_LOGO_DIMENSION = 8;
 
 /**
  * Shrinks large logos before upload so photos straight from a phone or a
@@ -56,6 +57,17 @@ async function prepareLogoFile(file: File): Promise<File> {
   }
 }
 
+async function readLogoSize(file: File): Promise<{ width: number; height: number } | null> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const size = { width: bitmap.width, height: bitmap.height };
+    bitmap.close?.();
+    return size;
+  } catch {
+    return null;
+  }
+}
+
 export function CompanyProfileCard({
   initialCompany,
 }: {
@@ -72,10 +84,13 @@ export function CompanyProfileCard({
   const [phone, setPhone] = useState(initialCompany.phone ?? "");
   const [address, setAddress] = useState(initialCompany.address ?? "");
   const [logo, setLogo] = useState(initialCompany.logo);
+  const [failedLogoSrc, setFailedLogoSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  const showLogo = Boolean(logo) && failedLogoSrc !== logo;
 
   const save = async () => {
     setLoading(true);
@@ -106,6 +121,12 @@ export function CompanyProfileCard({
       const prepared = await prepareLogoFile(file);
       if (prepared.size > MAX_UPLOAD_BYTES) {
         notify.error("Logo must be smaller than 2 MB");
+        return;
+      }
+
+      const size = await readLogoSize(prepared);
+      if (size && (size.width < MIN_LOGO_DIMENSION || size.height < MIN_LOGO_DIMENSION)) {
+        notify.error("That image is too small to use as a logo. Please upload a larger image.");
         return;
       }
 
@@ -140,8 +161,23 @@ export function CompanyProfileCard({
       <div className="p-6 space-y-5">
         <div className="flex items-start gap-4">
           <div className="w-16 h-16 rounded-2xl bg-violet-600 flex items-center justify-center shrink-0 overflow-hidden">
-            {logo ? (
-              <img src={logo} alt={name} className="w-full h-full object-contain p-1" />
+            {showLogo ? (
+              <img
+                src={logo ?? undefined}
+                alt={name}
+                className="w-full h-full object-contain bg-white p-1"
+                onError={() => setFailedLogoSrc(logo)}
+                onLoad={(event) => {
+                  const image = event.currentTarget;
+                  if (
+                    image.naturalWidth > 0 &&
+                    (image.naturalWidth < MIN_LOGO_DIMENSION ||
+                      image.naturalHeight < MIN_LOGO_DIMENSION)
+                  ) {
+                    setFailedLogoSrc(logo);
+                  }
+                }}
+              />
             ) : (
               <Building2 className="w-7 h-7 text-white" />
             )}

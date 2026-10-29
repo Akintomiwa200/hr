@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
-import { getCompanyScope, requireOrgCompanyId } from "@/lib/company-scope";
+import { getCompanyScope, companyMatchesScope } from "@/lib/company-scope";
 import { canManageChecklists } from "@/lib/checklist/access";
 import { findOrCreateChecklistInstance } from "@/lib/checklist/instantiate";
 import { parseDocumentNames } from "@/lib/checklist/documents";
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
   const instanceWhere: Record<string, unknown> = {};
   if (scope.companyId) {
-    instanceWhere.OR = [{ companyId: scope.companyId }, { companyId: null }];
+    instanceWhere.companyId = scope.companyId;
   } else if (!scope.isPlatformAdmin) {
     instanceWhere.companyId = "__none__";
   }
@@ -100,19 +100,52 @@ export async function POST(request: NextRequest) {
 
   if (!title?.trim()) return badRequest("title is required");
 
+  const scope = getCompanyScope(session);
   let resolvedInstanceId = instanceId as string | undefined;
-  const companyId = requireOrgCompanyId(getCompanyScope(session));
+  let companyId: string | null = scope.companyId ?? null;
 
-  if (!resolvedInstanceId) {
+  if (resolvedInstanceId) {
+    const instance = await prisma.checklistInstance.findUnique({
+      where: { id: resolvedInstanceId },
+      select: { id: true, companyId: true },
+    });
+    if (!instance) return badRequest("Checklist instance not found");
+    if (!companyMatchesScope(scope, instance.companyId)) return unauthorized();
+    companyId = instance.companyId ?? companyId;
+  } else {
     if (!employeeId || !checklistType) {
       return badRequest("Provide instanceId or employeeId + checklistType");
     }
+
+    const employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { id: true, user: { select: { companyId: true } } },
+    });
+    if (!employee) return badRequest("Employee not found");
+    const employeeCompanyId = employee.user?.companyId ?? null;
+    if (!companyMatchesScope(scope, employeeCompanyId)) return unauthorized();
+
+    companyId = scope.companyId ?? employeeCompanyId;
     const instance = await findOrCreateChecklistInstance({
       employeeId,
       companyId,
       type: checklistType,
     });
     resolvedInstanceId = instance.id;
+  }
+
+  if (assigneeId) {
+    const assignee = await prisma.employee.findUnique({
+      where: { id: assigneeId },
+      select: { id: true, user: { select: { companyId: true } } },
+    });
+    if (!assignee) return badRequest("Assignee not found");
+    if (!companyMatchesScope(scope, assignee.user?.companyId ?? null)) {
+      return unauthorized();
+    }
+    if (companyId && assignee.user?.companyId !== companyId) {
+      return badRequest("Assignee must belong to the same company");
+    }
   }
 
   const docs = parseDocumentNames(requiredDocuments);

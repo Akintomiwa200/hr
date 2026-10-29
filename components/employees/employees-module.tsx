@@ -463,6 +463,7 @@ export function EmployeesModule({
       notify.success("Employee updated successfully");
       setEditEmployee(null);
       await refreshList();
+      router.refresh();
     } catch {
       notify.error("Something went wrong");
     } finally {
@@ -994,7 +995,12 @@ export function EmployeesModule({
                   ? ([["End date", formatDate(viewEmployee.endDate)]] as const)
                   : []),
                 ...(canViewSalary
-                  ? ([["Salary", formatCurrency(viewEmployee.salary)]] as const)
+                  ? ([
+                      ["Salary", formatCurrency(viewEmployee.salary)],
+                      ["Bank", viewEmployee.bankName || "—"],
+                      ["Account number", viewEmployee.accountNumber || "—"],
+                      ["NIN", viewEmployee.nin || "—"],
+                    ] as const)
                   : []),
                 ["Address", viewEmployee.address || "—"],
               ].map(([label, value]) => (

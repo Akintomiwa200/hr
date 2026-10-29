@@ -119,8 +119,8 @@ export async function DELETE(
       await tx.auditLog.updateMany({ where: { companyId: id }, data: { companyId: null } });
       await tx.document.updateMany({ where: { companyId: id }, data: { companyId: null } });
       await tx.documentFolder.updateMany({ where: { companyId: id }, data: { companyId: null } });
-      await tx.checklistTemplate.updateMany({ where: { companyId: id }, data: { companyId: null } });
-      await tx.checklistInstance.updateMany({ where: { companyId: id }, data: { companyId: null } });
+      await tx.checklistInstance.deleteMany({ where: { companyId: id } });
+      await tx.checklistTemplate.deleteMany({ where: { companyId: id } });
       await tx.portalTemplate.updateMany({ where: { companyId: id }, data: { companyId: null } });
       await tx.portalDocument.updateMany({ where: { companyId: id }, data: { companyId: null } });
       await tx.kpiDefinition.updateMany({ where: { companyId: id }, data: { companyId: null } });

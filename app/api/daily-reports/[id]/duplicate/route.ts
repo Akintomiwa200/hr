@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { notFound, requireRoles, unauthorized, badRequest } from "@/lib/api-auth";
+import { notFound, requireRoles, unauthorized } from "@/lib/api-auth";
 import { DAILY_REPORTING_ROLES } from "@/lib/roles";
 import { isDailyReportModelReady, prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
@@ -20,8 +20,7 @@ export async function POST(
     );
   }
 
-  const companyId = guard.session.companyId;
-  if (!companyId) return badRequest("Join a company before creating daily reports.");
+  const companyId = guard.session.companyId ?? null;
 
   const { id } = await params;
   const original = await prisma.dailyReport.findUnique({ where: { id } });

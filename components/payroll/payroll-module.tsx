@@ -18,6 +18,8 @@ import {
 import { Avatar, Button, EmptyState, StatCard, statusBadge } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { PayrollSettingsPanel } from "@/components/payroll/payroll-settings-panel";
+import { PayrollExportMenu } from "@/components/payroll/payroll-export-menu";
+import { PayrollManageMenu } from "@/components/payroll/payroll-manage-menu";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate, fullName, cn } from "@/lib/utils";
 import { useFormatCurrency } from "@/components/providers/currency-provider";
@@ -35,7 +37,7 @@ type PayrollRow = {
   grossPay: number;
   netPay: number;
   status: string;
-  employee: { id: string; firstName: string; lastName: string; avatar?: string | null };
+  employee: { id: string; firstName: string; lastName: string; avatar?: string | null; bankName?: string | null; accountNumber?: string | null; nin?: string | null };
 };
 
 type EmployeeOption = { id: string; firstName: string; lastName: string; salary?: number };
@@ -79,7 +81,7 @@ export function PayrollModule({
   const formatCurrency = useFormatCurrency();
 
   useAppEvents({
-    types: ["payroll_updated"],
+    types: ["payroll_updated", "employee_updated"],
     onEvent: () => scheduleRouterRefresh(() => router.refresh()),
   });
 
@@ -233,6 +235,21 @@ export function PayrollModule({
     setPreview(null);
   };
 
+  const openCreate = () => {
+    const employee = employees[0];
+    setForm({
+      employeeId: employee?.id ?? "",
+      periodStart: "",
+      periodEnd: "",
+      baseSalary: employee?.salary?.toString() ?? "",
+      bonus: "0",
+      status: "DRAFT",
+      damageAmount: "",
+    });
+    setPreview(null);
+    setCreateOpen(true);
+  };
+
   return (
     <>
       {stats && (
@@ -244,22 +261,22 @@ export function PayrollModule({
       )}
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-brand-50/30 via-white to-white">
-          <div>
+        <div className="px-5 py-4 border-b border-gray-100 flex flex-col gap-3 bg-gradient-to-r from-brand-50/30 via-white to-white">
+          <div className="min-w-0">
             <h2 className="text-base font-semibold text-gray-900">Payslips</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-gray-500 mt-0.5 truncate">
               Pro-rata salary from attendance · lateness · manual deductions
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2 xl:flex-nowrap">
             {showEmployeeColumn && (
-              <div className="relative">
+              <div className="relative w-44 shrink-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search employee..."
-                  className="pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25 w-full sm:w-48"
+                  className="pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25 w-full"
                 />
                 {search && (
                   <button type="button" onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400">
@@ -268,59 +285,43 @@ export function PayrollModule({
                 )}
               </div>
             )}
-            {canManageSettings && settings && <PayrollSettingsPanel settings={settings} />}
+            {canManageSettings && settings && (
+              <div className="shrink-0 whitespace-nowrap">
+                <PayrollSettingsPanel settings={settings} />
+              </div>
+            )}
             {showGroupRuns && (
               <Link
                 href="/payroll/runs"
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50"
+                className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50"
               >
                 <Layers className="w-4 h-4" />
                 Group runs
               </Link>
             )}
             {canExport && showEmployeeColumn && (
-              <Button
-                variant="secondary"
-                onClick={() => window.open("/api/payroll/export?format=csv", "_blank")}
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </Button>
-            )}
-            {canOperate && canManageSettings && (
-              <Link
-                href="/payroll/deductions"
-                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50"
-              >
-                Deductions
-              </Link>
+              <PayrollExportMenu
+                className="shrink-0"
+                onExport={(format) =>
+                  window.open(`/api/payroll/export?format=${format}`, "_blank")
+                }
+              />
             )}
             {canOperate && (
-              <Link
-                href="/loans"
-                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50"
-              >
-                Loans
-              </Link>
+              <PayrollManageMenu
+                className="shrink-0"
+                showDeductions={canManageSettings}
+                showLoans
+              />
             )}
             {canOperate && workspaceMode === "org" && (
-              <Button
-                onClick={() => {
-                  setCreateOpen(true);
-                  setPreview(null);
-                }}
-              >
+              <Button className="shrink-0 whitespace-nowrap" onClick={openCreate}>
                 <Plus className="w-4 h-4" />
                 Process individual
               </Button>
             )}
             {canOperate && workspaceMode !== "org" && (
-              <Button
-                onClick={() => {
-                  setCreateOpen(true);
-                  setPreview(null);
-                }}
-              >
+              <Button className="shrink-0 whitespace-nowrap" onClick={openCreate}>
                 <Plus className="w-4 h-4" />
                 Process payroll
               </Button>
@@ -379,6 +380,15 @@ export function PayrollModule({
                           </Link>
                         </div>
                       )}
+                      {showEmployeeColumn &&
+                        canOperate &&
+                        (record.employee.bankName || record.employee.accountNumber) && (
+                          <p className="text-[11px] text-gray-500 mt-1">
+                            {[record.employee.bankName, record.employee.accountNumber]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        )}
                       <p className={cn("text-sm text-gray-600", showEmployeeColumn && "mt-0.5")}>
                         {formatDate(record.periodStart)} – {formatDate(record.periodEnd)}
                       </p>

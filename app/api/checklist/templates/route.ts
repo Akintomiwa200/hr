@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     where: {
       type,
       id: { not: template.id },
-      ...(companyId ? { OR: [{ companyId }, { companyId: null }] } : {}),
+      companyId,
     },
     data: { isActive: false },
   });

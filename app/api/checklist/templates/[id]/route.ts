@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageTemplates } from "@/lib/checklist/access";
+import { companyMatchesScope, getCompanyScope } from "@/lib/company-scope";
 import { parseDocumentNames } from "@/lib/checklist/documents";
 import {
   fetchTemplateTaskRequiredDocumentsMap,
@@ -18,11 +19,12 @@ export async function GET(
   if (!session) return unauthorized();
 
   const { id } = await params;
+  const scope = getCompanyScope(session);
   const template = await prisma.checklistTemplate.findUnique({
     where: { id },
     include: { tasks: { orderBy: { sortOrder: "asc" } } },
   });
-  if (!template) return notFound();
+  if (!template || !companyMatchesScope(scope, template.companyId)) return notFound();
   const docs = await fetchTemplateTaskRequiredDocumentsMap(id);
 
   return NextResponse.json({
@@ -43,8 +45,9 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
+  const scope = getCompanyScope(session);
   const existing = await prisma.checklistTemplate.findUnique({ where: { id } });
-  if (!existing) return notFound();
+  if (!existing || !companyMatchesScope(scope, existing.companyId)) return notFound();
 
   if (body.action === "add_task") {
     if (!body.title?.trim()) return badRequest("Task title is required");
@@ -74,9 +77,7 @@ export async function PATCH(
       where: {
         type: existing.type,
         id: { not: id },
-        ...(existing.companyId
-          ? { OR: [{ companyId: existing.companyId }, { companyId: null }] }
-          : {}),
+        companyId: existing.companyId,
       },
       data: { isActive: false },
     });
@@ -116,16 +117,20 @@ export async function DELETE(
 
   const { id } = await params;
   const taskId = request.nextUrl.searchParams.get("taskId");
+  const scope = getCompanyScope(session);
+
+  const existing = await prisma.checklistTemplate.findUnique({ where: { id } });
+  if (!existing || !companyMatchesScope(scope, existing.companyId)) return notFound();
 
   if (taskId) {
-    await prisma.checklistTemplateTask.delete({ where: { id: taskId } });
+    const result = await prisma.checklistTemplateTask.deleteMany({
+      where: { id: taskId, templateId: id },
+    });
+    if (result.count === 0) return notFound();
     broadcastAppEvent("checklist_updated", { id, action: "task_deleted" });
     revalidatePath("/checklist/settings");
     return NextResponse.json({ success: true });
   }
-
-  const existing = await prisma.checklistTemplate.findUnique({ where: { id } });
-  if (!existing) return notFound();
 
   await prisma.checklistTemplate.delete({ where: { id } });
   broadcastAppEvent("checklist_updated", { id, action: "template_deleted" });

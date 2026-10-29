@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageChecklists, canViewChecklists } from "@/lib/checklist/access";
+import { companyMatchesScope, getCompanyScope } from "@/lib/company-scope";
 import { ensureDefaultOffboardingTemplate } from "@/lib/checklist/instantiate";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
@@ -26,6 +27,11 @@ export default async function OffboardingDetailPage({
     },
   });
   if (!instance || instance.type !== "OFFBOARDING") notFound();
+  const scope = getCompanyScope(session);
+  if (!companyMatchesScope(scope, instance.companyId)) notFound();
+  if (!canManageChecklists(session) && session.employeeId !== instance.employeeId) {
+    redirect("/checklist/todos");
+  }
   const tasks = await hydrateChecklistTasks(instance.tasks);
 
   const completed = tasks.filter((t) => t.status === "COMPLETED").length;

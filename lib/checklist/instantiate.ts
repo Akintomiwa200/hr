@@ -36,6 +36,18 @@ async function resolveHrAssigneeId(companyId: string | null) {
   return anyHrEmployee?.id ?? null;
 }
 
+async function resolveEmployeeCompanyId(
+  employeeId: string,
+  companyId: string | null
+): Promise<string | null> {
+  if (companyId) return companyId;
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: { user: { select: { companyId: true } } },
+  });
+  return employee?.user?.companyId ?? null;
+}
+
 export async function createChecklistFromTemplate(opts: {
   templateId: string;
   employeeId: string;
@@ -44,25 +56,30 @@ export async function createChecklistFromTemplate(opts: {
   startDate?: Date;
   endDate?: Date | null;
 }) {
+  const employee = await prisma.employee.findUnique({
+    where: { id: opts.employeeId },
+    include: { manager: true, user: { select: { companyId: true } } },
+  });
+  if (!employee) throw new Error("Employee not found");
+
+  const companyId = opts.companyId ?? employee.user?.companyId ?? null;
+
   const template = await prisma.checklistTemplate.findUnique({
     where: { id: opts.templateId },
     include: { tasks: { orderBy: { sortOrder: "asc" } } },
   });
   if (!template) throw new Error("Template not found");
+  if (template.companyId !== companyId) {
+    throw new Error("Template does not belong to this company");
+  }
   const templateDocs = await fetchTemplateTaskRequiredDocumentsMap(template.id);
 
-  const employee = await prisma.employee.findUnique({
-    where: { id: opts.employeeId },
-    include: { manager: true },
-  });
-  if (!employee) throw new Error("Employee not found");
-
   const start = opts.startDate ?? new Date();
-  const hrAssigneeId = await resolveHrAssigneeId(opts.companyId);
+  const hrAssigneeId = await resolveHrAssigneeId(companyId);
 
   const instance = await prisma.checklistInstance.create({
     data: {
-      companyId: opts.companyId,
+      companyId,
       templateId: template.id,
       type: opts.type,
       employeeId: employee.id,
@@ -157,6 +174,8 @@ export async function findOrCreateChecklistInstance(opts: {
   companyId: string | null;
   type: "ONBOARDING" | "OFFBOARDING";
 }) {
+  const companyId = await resolveEmployeeCompanyId(opts.employeeId, opts.companyId);
+
   const existing = await prisma.checklistInstance.findFirst({
     where: {
       employeeId: opts.employeeId,
@@ -167,18 +186,16 @@ export async function findOrCreateChecklistInstance(opts: {
   if (existing) return existing;
 
   if (opts.type === "ONBOARDING") {
-    await ensureDefaultOnboardingTemplate(opts.companyId);
+    await ensureDefaultOnboardingTemplate(companyId);
   } else {
-    await ensureDefaultOffboardingTemplate(opts.companyId);
+    await ensureDefaultOffboardingTemplate(companyId);
   }
 
   const template = await prisma.checklistTemplate.findFirst({
     where: {
       type: opts.type,
       isActive: true,
-      ...(opts.companyId
-        ? { OR: [{ companyId: opts.companyId }, { companyId: null }] }
-        : {}),
+      companyId,
     },
     orderBy: { createdAt: "desc" },
   });
@@ -187,7 +204,7 @@ export async function findOrCreateChecklistInstance(opts: {
   const created = await createChecklistFromTemplate({
     templateId: template.id,
     employeeId: opts.employeeId,
-    companyId: opts.companyId,
+    companyId,
     type: opts.type,
   });
   if (!created) throw new Error("Failed to create checklist instance");
@@ -206,11 +223,9 @@ export async function resolveActiveTemplate(
     where: {
       type,
       isActive: true,
-      ...(companyId
-        ? { OR: [{ companyId }, { companyId: null }] }
-        : {}),
+      companyId,
     },
-    orderBy: [{ companyId: "desc" }, { updatedAt: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
   });
   if (active) return active;
 
@@ -234,11 +249,13 @@ export async function startEmployeeOnboarding(opts: {
   });
   if (existing) return { instance: existing, created: false as const };
 
-  const template = await resolveActiveTemplate("ONBOARDING", opts.companyId);
+  const companyId = await resolveEmployeeCompanyId(opts.employeeId, opts.companyId);
+
+  const template = await resolveActiveTemplate("ONBOARDING", companyId);
   const instance = await createChecklistFromTemplate({
     templateId: template.id,
     employeeId: opts.employeeId,
-    companyId: opts.companyId,
+    companyId,
     type: "ONBOARDING",
     startDate: opts.startDate,
   });
@@ -269,13 +286,14 @@ export async function startEmployeeOffboarding(opts: {
 
   let instance = existing;
   let created = false;
+  const companyId = await resolveEmployeeCompanyId(opts.employeeId, opts.companyId);
 
   if (!instance) {
-    const template = await resolveActiveTemplate("OFFBOARDING", opts.companyId);
+    const template = await resolveActiveTemplate("OFFBOARDING", companyId);
     instance = await createChecklistFromTemplate({
       templateId: template.id,
       employeeId: opts.employeeId,
-      companyId: opts.companyId,
+      companyId,
       type: "OFFBOARDING",
       startDate: opts.endDate,
       endDate: opts.endDate ?? null,
@@ -336,21 +354,11 @@ export async function ensureDefaultOnboardingTemplate(companyId: string | null) 
     where: {
       type: "ONBOARDING",
       name: "Onboarding v.1",
-      ...(companyId
-        ? { OR: [{ companyId }, { companyId: null }] }
-        : { companyId: null }),
+      companyId,
     },
     orderBy: { createdAt: "desc" },
   });
-  if (existing) {
-    if (companyId && existing.companyId == null) {
-      return prisma.checklistTemplate.update({
-        where: { id: existing.id },
-        data: { companyId },
-      });
-    }
-    return existing;
-  }
+  if (existing) return existing;
 
   const created = await prisma.checklistTemplate.create({
     data: {
@@ -401,21 +409,11 @@ export async function ensureDefaultOffboardingTemplate(companyId: string | null)
     where: {
       type: "OFFBOARDING",
       name: "Offboarding v.1",
-      ...(companyId
-        ? { OR: [{ companyId }, { companyId: null }] }
-        : { companyId: null }),
+      companyId,
     },
     orderBy: { createdAt: "desc" },
   });
-  if (existing) {
-    if (companyId && existing.companyId == null) {
-      return prisma.checklistTemplate.update({
-        where: { id: existing.id },
-        data: { companyId },
-      });
-    }
-    return existing;
-  }
+  if (existing) return existing;
 
   const created = await prisma.checklistTemplate.create({
     data: {

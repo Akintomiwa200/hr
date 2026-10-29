@@ -7,13 +7,14 @@ import {
   normalizeRole,
 } from "@/lib/roles";
 import { fullName } from "@/lib/utils";
-import type { NavNotification, NavSummary, NavTeamMember } from "@/lib/nav-summary-types";
+import type { NavNotification, NavSummary } from "@/lib/nav-summary-types";
 import {
   getCompanyScope,
   employeeCompanyWhere,
   announcementCompanyWhere,
 } from "@/lib/company-scope";
 import {
+  getComputedNotificationReads,
   getUserNotifications,
   getUnreadNotificationCount,
   isNotificationEnabled,
@@ -24,6 +25,7 @@ import {
 export type { NavNotification, NavSummary, NavTeamMember } from "@/lib/nav-summary-types";
 
 const RECENT_DAYS = 14;
+const FEED_LIMIT = 60;
 
 function daysAgo(days: number) {
   const d = new Date();
@@ -38,17 +40,24 @@ function startOfDay(date = new Date()) {
   return d;
 }
 
-function isComputedId(id: string) {
-  return id.includes("-") && !id.startsWith("cl");
-}
+export type NotificationFeed = {
+  items: NavNotification[];
+  unreadCount: number;
+  pendingLeaveCount: number;
+};
 
-export async function getNavSummary(session: SessionUser): Promise<NavSummary> {
+/**
+ * Builds the complete notification feed for the current user: persisted
+ * `Notification` rows plus notifications that are derived from live data
+ * (pending leave, announcements, payroll, attendance, appraisals, …).
+ * Read state for derived items is merged in from `NotificationRead`.
+ */
+export async function getNotificationFeed(session: SessionUser): Promise<NotificationFeed> {
   const role = normalizeRole(session.role);
   const scope = getCompanyScope(session);
   const orgEmployee = employeeCompanyWhere(scope);
   const since = daysAgo(RECENT_DAYS);
   const today = startOfDay();
-  const canInvite = canManageEmployees(role);
   const isApprover = canApproveLeave(role);
   const teamScope = canViewTeamScope(role) && session.employeeId;
 
@@ -57,13 +66,6 @@ export async function getNavSummary(session: SessionUser): Promise<NavSummary> {
     select: { preferences: true },
   });
   const preferences = parseUserPreferences(userPrefs?.preferences);
-
-  const currentEmployee = session.employeeId
-    ? await prisma.employee.findUnique({
-        where: { id: session.employeeId },
-        select: { departmentId: true },
-      })
-    : null;
 
   const teamWhere =
     session.employeeId && (role === "MANAGER" || role === "SUPERVISOR")
@@ -77,14 +79,12 @@ export async function getNavSummary(session: SessionUser): Promise<NavSummary> {
     pendingLeaves,
     myLeaveUpdates,
     recentPayroll,
-    teamMembers,
-    departmentPeers,
     teamAbsentToday,
     teamLateToday,
     pendingManagerAppraisals,
     myAppraisalUpdates,
   ] = await Promise.all([
-    getUserNotifications(session.id, 30),
+    getUserNotifications(session.id, FEED_LIMIT),
     getUnreadNotificationCount(session.id),
     prisma.announcement.findMany({
       where: { createdAt: { gte: since }, ...announcementCompanyWhere(scope) },
@@ -128,39 +128,6 @@ export async function getNavSummary(session: SessionUser): Promise<NavSummary> {
           },
           orderBy: { createdAt: "desc" },
           take: 2,
-        })
-      : Promise.resolve([]),
-    canViewTeamScope(role) && session.employeeId
-      ? prisma.employee.findMany({
-          where: { managerId: session.employeeId, status: "ACTIVE", ...orgEmployee },
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            avatar: true,
-            jobTitle: true,
-          },
-          orderBy: { firstName: "asc" },
-          take: 6,
-        })
-      : Promise.resolve([]),
-    session.employeeId && currentEmployee?.departmentId
-      ? prisma.employee.findMany({
-          where: {
-            status: "ACTIVE",
-            id: { not: session.employeeId },
-            departmentId: currentEmployee.departmentId,
-            ...orgEmployee,
-          },
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            avatar: true,
-            jobTitle: true,
-          },
-          orderBy: { firstName: "asc" },
-          take: 6,
         })
       : Promise.resolve([]),
     teamWhere
@@ -329,6 +296,14 @@ export async function getNavSummary(session: SessionUser): Promise<NavSummary> {
     }
   }
 
+  const computedKeys = notifications.filter((n) => !n.persistent).map((n) => n.id);
+  if (computedKeys.length > 0) {
+    const reads = await getComputedNotificationReads(session.id, computedKeys);
+    for (const item of notifications) {
+      if (!item.persistent) item.readAt = reads.get(item.id) ?? null;
+    }
+  }
+
   notifications.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
@@ -336,18 +311,74 @@ export async function getNavSummary(session: SessionUser): Promise<NavSummary> {
   const unreadComputed = notifications.filter(
     (n) => !n.persistent && !n.readAt
   ).length;
-  const notificationCount = unreadDbCount + unreadComputed;
+
+  return {
+    items: notifications,
+    unreadCount: unreadDbCount + unreadComputed,
+    pendingLeaveCount: pendingLeaves.length,
+  };
+}
+
+export async function getNavSummary(session: SessionUser): Promise<NavSummary> {
+  const role = normalizeRole(session.role);
+  const scope = getCompanyScope(session);
+  const orgEmployee = employeeCompanyWhere(scope);
+  const canInvite = canManageEmployees(role);
+
+  const currentEmployee = session.employeeId
+    ? await prisma.employee.findUnique({
+        where: { id: session.employeeId },
+        select: { departmentId: true },
+      })
+    : null;
+
+  const [feed, teamMembers, departmentPeers] = await Promise.all([
+    getNotificationFeed(session),
+    canViewTeamScope(role) && session.employeeId
+      ? prisma.employee.findMany({
+          where: { managerId: session.employeeId, status: "ACTIVE", ...orgEmployee },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            jobTitle: true,
+          },
+          orderBy: { firstName: "asc" },
+          take: 6,
+        })
+      : Promise.resolve([]),
+    session.employeeId && currentEmployee?.departmentId
+      ? prisma.employee.findMany({
+          where: {
+            status: "ACTIVE",
+            id: { not: session.employeeId },
+            departmentId: currentEmployee.departmentId,
+            ...orgEmployee,
+          },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            jobTitle: true,
+          },
+          orderBy: { firstName: "asc" },
+          take: 6,
+        })
+      : Promise.resolve([]),
+  ]);
 
   const previewMembers =
     teamMembers.length > 0 ? teamMembers : departmentPeers;
   const teamOverflowCount = Math.max(previewMembers.length - 3, 0);
 
   return {
-    notificationCount,
-    notifications: notifications.slice(0, 12),
+    notificationCount: feed.unreadCount,
+    notifications: feed.items.slice(0, 12),
     teamMembers: previewMembers.slice(0, 3),
     teamOverflowCount,
-    pendingLeaveCount: pendingLeaves.length,
+    pendingLeaveCount: feed.pendingLeaveCount,
     inviteHref: canInvite ? "/checklist/onboarding" : null,
     canInvite,
     messagesHref: "/help/contact",

@@ -3,10 +3,14 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { badRequest, forbidden, requireSession, unauthorized } from "@/lib/api-auth";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { readImageDimensions } from "@/lib/image-dimensions";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { normalizeRole } from "@/lib/roles";
 
 const MAX_BYTES = 2 * 1024 * 1024;
+// A 1x1 (or similarly tiny) image would be stretched into a solid colour block
+// in the sidebar — reject it instead of silently replacing a real logo.
+const MIN_LOGO_DIMENSION = 8;
 
 const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
   png: "image/png",
@@ -48,6 +52,16 @@ export async function POST(request: NextRequest) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  const dimensions = readImageDimensions(buffer);
+  if (
+    dimensions &&
+    (dimensions.width < MIN_LOGO_DIMENSION || dimensions.height < MIN_LOGO_DIMENSION)
+  ) {
+    return badRequest(
+      "That image is too small to use as a company logo. Please upload a larger image."
+    );
+  }
+
   const publicId = ["smarthr", "company", session.companyId, "logo"].join("/");
 
   let url: string;

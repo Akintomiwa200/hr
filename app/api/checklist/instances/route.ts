@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
-import { getCompanyScope, requireOrgCompanyId } from "@/lib/company-scope";
+import { getCompanyScope, companyMatchesScope } from "@/lib/company-scope";
 import { canManageChecklists } from "@/lib/checklist/access";
 import {
   createChecklistFromTemplate,
@@ -24,9 +24,11 @@ export async function GET(request: NextRequest) {
     ...(employeeId ? { employeeId } : {}),
   };
 
-  // Include company instances and legacy rows with null companyId for this org
+  // Checklists are strictly per-company: no legacy/global rows are shared.
   if (scope.companyId) {
-    where.OR = [{ companyId: scope.companyId }, { companyId: null }];
+    where.companyId = scope.companyId;
+  } else if (!scope.isPlatformAdmin) {
+    where.companyId = "__none__";
   }
 
   // Employees only see their own checklists
@@ -70,7 +72,17 @@ export async function POST(request: NextRequest) {
       return badRequest("type must be ONBOARDING or OFFBOARDING");
     }
 
-    const companyId = requireOrgCompanyId(getCompanyScope(session));
+    const scope = getCompanyScope(session);
+
+    const employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { id: true, user: { select: { companyId: true } } },
+    });
+    if (!employee) return badRequest("Employee not found");
+
+    const employeeCompanyId = employee.user?.companyId ?? null;
+    if (!companyMatchesScope(scope, employeeCompanyId)) return unauthorized();
+    const companyId = scope.companyId ?? employeeCompanyId;
 
     const existing = await prisma.checklistInstance.findFirst({
       where: {
@@ -87,7 +99,16 @@ export async function POST(request: NextRequest) {
     }
 
     let resolvedTemplateId = templateId as string | undefined;
-    if (!resolvedTemplateId) {
+    if (resolvedTemplateId) {
+      const template = await prisma.checklistTemplate.findUnique({
+        where: { id: resolvedTemplateId },
+        select: { id: true, companyId: true },
+      });
+      if (!template) return badRequest("Template not found");
+      if (template.companyId !== companyId) {
+        return badRequest("Template does not belong to this company");
+      }
+    } else {
       const template =
         type === "ONBOARDING"
           ? await ensureDefaultOnboardingTemplate(companyId)

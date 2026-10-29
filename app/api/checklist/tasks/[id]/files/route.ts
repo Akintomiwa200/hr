@@ -3,7 +3,6 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
-import { canManageChecklists } from "@/lib/checklist/access";
 import { canUploadChecklistDocument } from "@/lib/checklist/task-access";
 import { slugDocumentName } from "@/lib/checklist/documents";
 import { deleteTaskFile, fetchTaskFiles, findTaskFile, insertTaskFile } from "@/lib/checklist/document-store";
@@ -30,9 +29,7 @@ export async function GET(
     },
   });
   if (!task) return notFound();
-  if (!canUploadChecklistDocument(session, task) && !canManageChecklists(session)) {
-    return unauthorized();
-  }
+  if (!canUploadChecklistDocument(session, task)) return unauthorized();
   return NextResponse.json(await fetchTaskFiles(id));
 }
 
@@ -130,9 +127,7 @@ export async function DELETE(
     include: { instance: true },
   });
   if (!task) return notFound();
-  if (!canUploadChecklistDocument(session, task) && !canManageChecklists(session)) {
-    return unauthorized();
-  }
+  if (!canUploadChecklistDocument(session, task)) return unauthorized();
 
   const file = await findTaskFile(fileId, id);
   if (!file) return notFound();

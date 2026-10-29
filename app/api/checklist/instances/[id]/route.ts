@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageChecklists } from "@/lib/checklist/access";
+import { companyMatchesScope, getCompanyScope } from "@/lib/company-scope";
 import { hydrateChecklistTasks } from "@/lib/checklist/document-store";
 
 export async function GET(
@@ -27,6 +28,12 @@ export async function GET(
   });
   if (!instance) return notFound();
 
+  const scope = getCompanyScope(session);
+  if (!companyMatchesScope(scope, instance.companyId)) return notFound();
+  if (!canManageChecklists(session) && session.employeeId !== instance.employeeId) {
+    return unauthorized();
+  }
+
   const completed = instance.tasks.filter((t) => t.status === "COMPLETED").length;
   const total = instance.tasks.length;
   const tasks = await hydrateChecklistTasks(instance.tasks);
@@ -47,8 +54,9 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
+  const scope = getCompanyScope(session);
   const existing = await prisma.checklistInstance.findUnique({ where: { id } });
-  if (!existing) return notFound();
+  if (!existing || !companyMatchesScope(scope, existing.companyId)) return notFound();
 
   const instance = await prisma.checklistInstance.update({
     where: { id },

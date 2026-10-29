@@ -25,6 +25,9 @@ export type PayrollExportRow = {
   employeeName: string;
   department: string;
   jobTitle: string;
+  bankName: string;
+  accountNumber: string;
+  nin: string;
   periodStart: string;
   periodEnd: string;
   baseSalary: number;
@@ -53,6 +56,9 @@ export function mapRecordToExportRow(record: {
     firstName: string;
     lastName: string;
     jobTitle: string;
+    bankName?: string | null;
+    accountNumber?: string | null;
+    nin?: string | null;
     department?: { name: string } | null;
   };
 }): PayrollExportRow {
@@ -61,6 +67,9 @@ export function mapRecordToExportRow(record: {
     employeeName: `${record.employee.firstName} ${record.employee.lastName}`.trim(),
     department: record.employee.department?.name ?? "",
     jobTitle: record.employee.jobTitle,
+    bankName: record.employee.bankName ?? "",
+    accountNumber: record.employee.accountNumber ?? "",
+    nin: record.employee.nin ?? "",
     periodStart: record.periodStart.toISOString().slice(0, 10),
     periodEnd: record.periodEnd.toISOString().slice(0, 10),
     baseSalary: record.baseSalary,
@@ -89,6 +98,9 @@ export function payrollRegisterHtml(
       <td>${row.employeeCode}</td>
       <td>${row.employeeName}</td>
       <td>${row.department}</td>
+      <td>${row.bankName}</td>
+      <td>${row.accountNumber}</td>
+      <td>${row.nin}</td>
       <td>${row.periodStart} – ${row.periodEnd}</td>
       <td>${fmt(row.grossPay)}</td>
       <td>${fmt(row.deductions)}</td>
@@ -122,12 +134,13 @@ export function payrollRegisterHtml(
   <p class="meta">${rows.length} employee(s) · Generated ${new Date().toLocaleString()}</p>
   <table>
     <thead><tr>
-      <th>#</th><th>Code</th><th>Name</th><th>Department</th><th>Period</th>
+      <th>#</th><th>Code</th><th>Name</th><th>Department</th><th>Bank</th>
+      <th>Account</th><th>NIN</th><th>Period</th>
       <th>Gross</th><th>Deductions</th><th>Net</th><th>Status</th>
     </tr></thead>
     <tbody>${body}</tbody>
     <tfoot><tr>
-      <td colspan="5">Totals</td>
+      <td colspan="8">Totals</td>
       <td>${fmt(totals.gross)}</td>
       <td>${fmt(totals.deductions)}</td>
       <td>${fmt(totals.net)}</td>

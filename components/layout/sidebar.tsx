@@ -293,6 +293,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [failedLogoSrc, setFailedLogoSrc] = useState<string | null>(null);
   const navScroll = useAutoHideScrollbar();
   const { summary } = useNavSummary();
 
@@ -325,11 +326,21 @@ export function Sidebar({
           onClick={onCloseMobile}
         >
           <div className="w-10 h-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
-            {companyLogo ? (
+            {companyLogo && failedLogoSrc !== companyLogo ? (
               <img
                 src={companyLogo}
                 alt={companyName ?? "Company"}
                 className="w-full h-full object-contain p-1"
+                onError={() => setFailedLogoSrc(companyLogo)}
+                onLoad={(event) => {
+                  const image = event.currentTarget;
+                  if (
+                    image.naturalWidth > 0 &&
+                    (image.naturalWidth < 8 || image.naturalHeight < 8)
+                  ) {
+                    setFailedLogoSrc(companyLogo);
+                  }
+                }}
               />
             ) : (
               <BrandIcon className="w-5 h-5 text-violet-600" strokeWidth={2.5} />

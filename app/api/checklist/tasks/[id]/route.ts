@@ -91,6 +91,7 @@ export async function PATCH(
     include: { instance: true },
   });
   if (!existing) return notFound();
+  if (!canAccessChecklistTask(session, existing)) return unauthorized();
 
   const isAdmin = canManageChecklists(session);
   const completing =
@@ -262,8 +263,12 @@ export async function DELETE(
   if (!session || !canManageChecklists(session)) return unauthorized();
 
   const { id } = await params;
-  const existing = await prisma.checklistTask.findUnique({ where: { id } });
+  const existing = await prisma.checklistTask.findUnique({
+    where: { id },
+    include: { instance: true },
+  });
   if (!existing) return notFound();
+  if (!canAccessChecklistTask(session, existing)) return unauthorized();
 
   if (existing.status === "COMPLETED") {
     return badRequest("Completed tasks cannot be deleted.");

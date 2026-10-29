@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   Bell,
   CalendarOff,
+  Check,
+  CheckCheck,
   ChevronsUpDown,
   CircleHelp,
   ClipboardList,
@@ -42,13 +44,83 @@ const notificationIcons: Record<NavNotification["type"], typeof Bell> = {
   loan: HandCoins,
 };
 
+const notificationTypeLabels: Record<NavNotification["type"], string> = {
+  leave: "Leave",
+  announcement: "Announcement",
+  payroll: "Payroll",
+  attendance: "Attendance",
+  performance: "Performance",
+  subscription: "Subscription",
+  integration: "Integration",
+  checklist: "Checklist",
+  general: "Update",
+  loan: "Loan",
+};
+
 function NotificationsMenu() {
   const { summary, refresh } = useNavSummary();
   const [open, setOpen] = useState(false);
+  const [readOverrides, setReadOverrides] = useState<Record<string, string>>({});
   const ref = useRef<HTMLDivElement>(null);
 
+  const items = summary.notifications.map((item) =>
+    !item.readAt && readOverrides[item.id]
+      ? { ...item, readAt: readOverrides[item.id] }
+      : item
+  );
+  const hiddenUnreadCount = Math.max(
+    0,
+    summary.notificationCount - summary.notifications.filter((item) => !item.readAt).length
+  );
+  const unreadCount = items.filter((item) => !item.readAt).length + hiddenUnreadCount;
+
+  function clearOverride(id: string) {
+    setReadOverrides((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
   function markRead(id: string) {
-    void fetch(`/api/notifications/${id}`, { method: "PATCH" }).then(() => refresh());
+    setReadOverrides((prev) => ({ ...prev, [id]: new Date().toISOString() }));
+    void (async () => {
+      try {
+        const res = await fetch(`/api/notifications/${id}`, {
+          method: "PATCH",
+          keepalive: true,
+        });
+        if (!res.ok) throw new Error("Could not mark notification as read");
+        void refresh();
+      } catch {
+        clearOverride(id);
+      }
+    })();
+  }
+
+  function markAllRead() {
+    setReadOverrides((prev) => {
+      const next = { ...prev };
+      for (const item of summary.notifications) {
+        if (!item.readAt) next[item.id] = new Date().toISOString();
+      }
+      return next;
+    });
+    void (async () => {
+      try {
+        const res = await fetch("/api/notifications", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ all: true }),
+        });
+        if (!res.ok) throw new Error("Could not mark all as read");
+      } catch {
+        setReadOverrides({});
+      } finally {
+        void refresh();
+        setOpen(false);
+      }
+    })();
   }
 
   useEffect(() => {
@@ -57,8 +129,15 @@ function NotificationsMenu() {
         setOpen(false);
       }
     }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
   }, []);
 
   return (
@@ -68,40 +147,36 @@ function NotificationsMenu() {
         onClick={() => setOpen((v) => !v)}
         className="relative p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:bg-brand-50/50 hover:text-brand-600 transition-colors"
         aria-label="Notifications"
+        aria-expanded={open}
       >
         <Bell className="w-4 h-4" />
-        {summary.notificationCount > 0 && (
+        {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center text-[9px] font-bold bg-red-500 text-white rounded-full ring-2 ring-white">
-            {summary.notificationCount > 9 ? "9+" : summary.notificationCount}
+            {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[320px] sm:w-[360px] bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <p className="text-[13px] font-semibold text-gray-900">
+        <div
+          role="dialog"
+          aria-label="Notifications"
+          className="fixed left-3 right-3 top-[68px] z-50 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[420px]"
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+            <p className="min-w-0 truncate text-[13px] font-semibold text-gray-900">
               Notifications
-              {summary.notificationCount > 0 && (
+              {unreadCount > 0 && (
                 <span className="ml-2 text-[10px] font-bold text-brand-600">
-                  {summary.notificationCount} unread
+                  {unreadCount} unread
                 </span>
               )}
             </p>
-            <div className="flex items-center gap-3">
-              {summary.notificationCount > 0 && (
+            <div className="flex shrink-0 items-center gap-3">
+              {unreadCount > 0 && (
                 <button
                   type="button"
-                  onClick={() => {
-                    void fetch("/api/notifications", {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ all: true }),
-                    }).finally(() => {
-                      void refresh();
-                      setOpen(false);
-                    });
-                  }}
+                  onClick={markAllRead}
                   className="text-[11px] font-medium text-brand-600 hover:text-brand-700 hover:underline"
                 >
                   Mark all as read
@@ -116,9 +191,10 @@ function NotificationsMenu() {
               </Link>
             </div>
           </div>
-          <div className="max-h-[360px] overflow-y-auto">
-            {summary.notifications.length > 0 ? (
-              summary.notifications.slice(0, 8).map((item) => (
+
+          <div className="max-h-[min(70vh,460px)] overflow-y-auto">
+            {items.length > 0 ? (
+              items.slice(0, 8).map((item) => (
                 <NotificationRow
                   key={item.id}
                   item={item}
@@ -127,10 +203,33 @@ function NotificationsMenu() {
                 />
               ))
             ) : (
-              <p className="px-4 py-8 text-center text-[13px] text-gray-500">
-                You&apos;re all caught up.
-              </p>
+              <div className="px-4 py-10 text-center">
+                <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-brand-500">
+                  <CheckCheck className="h-5 w-5" />
+                </div>
+                <p className="text-[13px] font-semibold text-gray-900">You&apos;re all caught up</p>
+                <p className="mx-auto mt-1 max-w-[240px] text-[11px] leading-relaxed text-gray-500">
+                  Leave updates, announcements, and payroll alerts will appear here.
+                </p>
+                <Link
+                  href="/notifications"
+                  onClick={() => setOpen(false)}
+                  className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-brand-600 hover:underline"
+                >
+                  View notifications
+                </Link>
+              </div>
             )}
+          </div>
+
+          <div className="border-t border-gray-100 bg-gray-50/60 px-4 py-2 text-center">
+            <Link
+              href="/notifications"
+              onClick={() => setOpen(false)}
+              className="text-[11px] font-medium text-gray-600 hover:text-brand-600"
+            >
+              Open notification centre
+            </Link>
           </div>
         </div>
       )}
@@ -148,35 +247,65 @@ function NotificationRow({
   onRead: (id: string) => void;
 }) {
   const Icon = notificationIcons[item.type] ?? Bell;
-  const unread = item.persistent ? !item.readAt : true;
+  const unread = !item.readAt;
+  const typeLabel = notificationTypeLabels[item.type] ?? "Update";
 
   return (
-    <Link
-      href={item.href}
-      onClick={() => {
-        if (item.persistent && !item.readAt) onRead(item.id);
-        onNavigate();
-      }}
-      className={`flex gap-3 px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 ${
-        unread ? "bg-brand-50/30" : ""
+    <div
+      className={`group flex items-start gap-1 border-b border-gray-50 px-2 py-2.5 last:border-0 transition-colors ${
+        unread ? "bg-brand-50/40 hover:bg-brand-50/70" : "hover:bg-gray-50"
       }`}
     >
-      <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
-        <Icon className="w-4 h-4 text-brand-600" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[12px] font-semibold text-gray-900 truncate">
-          <span className="flex items-center gap-1.5">
-            {unread && <span className="w-1.5 h-1.5 rounded-full bg-brand-500 shrink-0" />}
+      <Link
+        href={item.href}
+        onClick={() => {
+          if (unread) onRead(item.id);
+          onNavigate();
+        }}
+        className="flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2 py-0.5"
+      >
+        <div
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+            unread ? "bg-brand-50" : "bg-gray-50"
+          }`}
+        >
+          <Icon className={`h-4 w-4 ${unread ? "text-brand-600" : "text-gray-400"}`} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 text-[12px] font-semibold text-gray-900">
+            {unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />}
             <span className="truncate">{item.title}</span>
-          </span>
-        </p>
-        <p className="text-[11px] text-gray-500 line-clamp-2 mt-0.5">{item.message}</p>
-        <p className="text-[10px] text-gray-400 mt-1">
-          {formatRelativeTime(item.createdAt)}
-        </p>
-      </div>
-    </Link>
+          </p>
+          <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-gray-500">
+            {item.message}
+          </p>
+          <p className="mt-1 flex items-center gap-1.5 text-[10px] text-gray-400">
+            <span>{formatRelativeTime(item.createdAt)}</span>
+            <span className="text-gray-300">•</span>
+            <span>{typeLabel}</span>
+            {!unread && (
+              <>
+                <span className="text-gray-300">•</span>
+                <span>Read</span>
+              </>
+            )}
+          </p>
+        </div>
+      </Link>
+      {unread ? (
+        <button
+          type="button"
+          onClick={() => onRead(item.id)}
+          aria-label={`Mark "${item.title}" as read`}
+          title="Mark as read"
+          className="mt-1 shrink-0 rounded-md p-1.5 text-gray-400 opacity-0 transition hover:bg-white hover:text-brand-600 focus:opacity-100 group-hover:opacity-100"
+        >
+          <Check className="h-3.5 w-3.5" />
+        </button>
+      ) : (
+        <CheckCheck className="mt-2 mr-1.5 h-3.5 w-3.5 shrink-0 text-gray-300" />
+      )}
+    </div>
   );
 }
 

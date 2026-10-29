@@ -31,6 +31,9 @@ export type EmployeeFormData = {
   employmentType: "FULL_TIME" | "FREELANCE";
   role: Role;
   salary: string;
+  bankName: string;
+  accountNumber: string;
+  nin: string;
   status: string;
   address: string;
   hireDate: string;

@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageTemplates } from "@/lib/checklist/access";
+import { companyMatchesScope, getCompanyScope } from "@/lib/company-scope";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { ChecklistTemplateDetailModule } from "@/components/checklist/checklist-template-detail-module";
@@ -15,8 +16,9 @@ export default async function ChecklistTemplateDetailPage({
   if (!session || !canManageTemplates(session)) redirect("/checklist/onboarding");
 
   const { id } = await params;
+  const scope = getCompanyScope(session);
   const template = await prisma.checklistTemplate.findUnique({ where: { id } });
-  if (!template) notFound();
+  if (!template || !companyMatchesScope(scope, template.companyId)) notFound();
 
   return (
     <div>

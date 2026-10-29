@@ -1,12 +1,18 @@
 import type { SessionUser } from "@/lib/auth";
 import { canManageChecklists } from "@/lib/checklist/access";
+import { companyMatchesScope, getCompanyScope } from "@/lib/company-scope";
 
 type TaskAccessShape = {
   assigneeId?: string | null;
-  instance?: { employeeId?: string | null } | null;
+  instance?: {
+    employeeId?: string | null;
+    companyId?: string | null;
+  } | null;
 };
 
 export function canAccessChecklistTask(session: SessionUser, task: TaskAccessShape) {
+  const scope = getCompanyScope(session);
+  if (!companyMatchesScope(scope, task.instance?.companyId ?? null)) return false;
   if (canManageChecklists(session)) return true;
   if (session.employeeId && task.assigneeId === session.employeeId) return true;
   if (session.employeeId && task.instance?.employeeId === session.employeeId) return true;

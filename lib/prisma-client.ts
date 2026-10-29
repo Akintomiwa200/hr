@@ -22,6 +22,7 @@ function isPrismaClientFresh(client: PrismaClient) {
   return (
     hasAdditionalManagerRelation &&
     hasDelegate(client, "notification", "findMany") &&
+    hasDelegate(client, "notificationRead", "findMany") &&
     hasDelegate(client, "recruitmentStage", "count") &&
     hasDelegate(client, "recruitmentTag", "count") &&
     hasDelegate(client, "recruitmentSource", "count") &&

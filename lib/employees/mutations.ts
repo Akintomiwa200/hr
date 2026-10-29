@@ -9,4 +9,7 @@ export function notifyEmployeeChange(
   revalidatePath("/employees");
   revalidatePath("/dashboard");
   revalidatePath(`/employees/${id}`);
+  revalidatePath(`/employees/${id}/payroll`);
+  revalidatePath("/payroll");
+  revalidatePath("/payroll/runs");
 }

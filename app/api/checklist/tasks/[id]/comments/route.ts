@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
-import { canManageChecklists } from "@/lib/checklist/access";
+import { canAccessChecklistTask } from "@/lib/checklist/task-access";
 
 export async function GET(
   _request: NextRequest,
@@ -13,12 +13,12 @@ export async function GET(
   if (!session) return unauthorized();
 
   const { id } = await params;
-  const task = await prisma.checklistTask.findUnique({ where: { id } });
+  const task = await prisma.checklistTask.findUnique({
+    where: { id },
+    include: { instance: true },
+  });
   if (!task) return notFound();
-
-  const isAssignee = session.employeeId && task.assigneeId === session.employeeId;
-  const isAdmin = canManageChecklists(session);
-  if (!isAssignee && !isAdmin) return unauthorized();
+  if (!canAccessChecklistTask(session, task)) return unauthorized();
 
   const comments = await prisma.checklistTaskComment.findMany({
     where: { taskId: id },
@@ -41,13 +41,11 @@ export async function POST(
 
   const task = await prisma.checklistTask.findUnique({
     where: { id },
-    include: { assignee: true },
+    include: { assignee: true, instance: true },
   });
   if (!task) return notFound();
 
-  const isAssignee = session.employeeId && task.assigneeId === session.employeeId;
-  const isAdmin = canManageChecklists(session);
-  if (!isAssignee && !isAdmin) return unauthorized();
+  if (!canAccessChecklistTask(session, task)) return unauthorized();
 
   let authorName = session.email;
   if (session.firstName && session.lastName) {

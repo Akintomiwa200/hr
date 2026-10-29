@@ -93,6 +93,9 @@ export async function PATCH(
     employmentType,
     role,
     salary,
+    bankName,
+    accountNumber,
+    nin,
     status,
     hireDate,
     endDate,
@@ -188,6 +191,15 @@ export async function PATCH(
         managers: { set: managerIds.filter((managerEmployeeId: string) => managerEmployeeId !== id && managerEmployeeId !== (managerId || existing.managerId)).map((managerEmployeeId: string) => ({ id: managerEmployeeId })) },
       }),
       ...(salary !== undefined && { salary: Number(salary) || 0 }),
+      ...(bankName !== undefined && {
+        bankName: bankName ? String(bankName).trim() || null : null,
+      }),
+      ...(accountNumber !== undefined && {
+        accountNumber: accountNumber ? String(accountNumber).trim() || null : null,
+      }),
+      ...(nin !== undefined && {
+        nin: nin ? String(nin).trim() || null : null,
+      }),
       ...(status !== undefined && { status }),
       ...(hireDate !== undefined && {
         hireDate: parseLocalDate(hireDate) ?? existing.hireDate,

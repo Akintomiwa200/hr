@@ -30,7 +30,7 @@ export default async function RolesPage() {
   const builtinRoles = ORG_ROLES.map((role) => ({ role, label: roleLabel(role) }));
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full max-w-6xl mx-auto">
       <Link
         href="/settings"
         className="inline-flex items-center gap-1.5 text-[13px] font-medium text-gray-500 hover:text-brand-600 mb-4"
