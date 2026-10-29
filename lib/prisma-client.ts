@@ -12,7 +12,15 @@ function hasDelegate(client: PrismaClient, key: string, method: "findMany" | "co
 
 /** Dev hot-reload can cache an old client missing newly generated models. */
 function isPrismaClientFresh(client: PrismaClient) {
+  const runtimeDataModel = (client as PrismaClient & {
+    _runtimeDataModel?: { models?: Record<string, { fields?: { name: string }[] }> };
+  })._runtimeDataModel;
+  const hasAdditionalManagerRelation = runtimeDataModel?.models?.Employee?.fields?.some(
+    (field) => field.name === "managers"
+  );
+
   return (
+    hasAdditionalManagerRelation &&
     hasDelegate(client, "notification", "findMany") &&
     hasDelegate(client, "recruitmentStage", "count") &&
     hasDelegate(client, "recruitmentTag", "count") &&

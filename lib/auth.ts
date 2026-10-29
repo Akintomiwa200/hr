@@ -106,10 +106,18 @@ export async function getSession(): Promise<SessionUser | null> {
     const defaultFirst = dbUser.role === Role.SUPER_ADMIN ? "Super" : undefined;
     const defaultLast = dbUser.role === Role.SUPER_ADMIN ? "Admin" : undefined;
 
+    // Platform administrators are not tenant-bound. If a SUPER_ADMIN account
+    // is attached to a company, scope it as a company admin so it receives the
+    // company workspace and cannot use platform-wide session permissions.
+    const effectiveRole =
+      dbUser.role === Role.SUPER_ADMIN && companyId
+        ? Role.COMPANY_ADMIN
+        : normalizeRole(dbUser.role);
+
     return {
       id: dbUser.id,
       email: dbUser.email,
-      role: normalizeRole(dbUser.role),
+      role: effectiveRole,
       companyId,
       locked,
       employeeId: dbUser.employee?.id,

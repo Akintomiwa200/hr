@@ -114,9 +114,9 @@ export function EmployeesModule({
   const formatCurrency = useFormatCurrency();
   const [employees, setEmployees] = useState(initialEmployees);
   const [search, setSearch] = useState("");
-  const [employmentFilter, setEmploymentFilter] = useState("ALL");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [activeFilter, setActiveFilter] = useState("ALL");
+  const [departmentFilter, setDepartmentFilter] = useState("ALL");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [menuRect, setMenuRect] = useState<{
@@ -169,20 +169,29 @@ export function EmployeesModule({
   const filtered = useMemo(() => {
     return employees.filter((emp) => {
       const name = fullName(emp.firstName, emp.lastName, emp.middleName).toLowerCase();
-      const q = search.toLowerCase();
-      const matchesSearch =
-        !q ||
-        name.includes(q) ||
-        emp.email.toLowerCase().includes(q) ||
-        emp.employeeCode.toLowerCase().includes(q);
-
+      const managerNames = [emp.manager, ...(emp.managers ?? [])]
+        .filter((manager): manager is NonNullable<typeof manager> => Boolean(manager))
+        .map((manager) => `${manager.firstName} ${manager.lastName}`.toLowerCase());
+      const q = search.trim().toLowerCase();
       const empType = resolveEmploymentType(emp);
-      const matchesEmployment =
-        employmentFilter === "ALL" ||
-        (employmentFilter === "FULL_TIME" && empType === "FULL_TIME") ||
-        (employmentFilter === "FREELANCE" && empType === "FREELANCE");
-
       const empRole = emp.user?.role ?? "EMPLOYEE";
+      const searchableFields = [
+        name,
+        emp.email,
+        emp.employeeCode,
+        emp.phone ?? "",
+        emp.jobTitle,
+        emp.department.name,
+        emp.branch?.name ?? "",
+        emp.branch?.location ?? "",
+        emp.status,
+        empType,
+        employmentLabel(empType),
+        empRole,
+        empRole.replaceAll("_", " "),
+        ...managerNames,
+      ];
+      const matchesSearch = !q || searchableFields.some((value) => value.toLowerCase().includes(q));
       const matchesRole = roleFilter === "ALL" || empRole === roleFilter;
 
       const matchesActive =
@@ -190,9 +199,11 @@ export function EmployeesModule({
         (activeFilter === "ACTIVE" && emp.status === "ACTIVE") ||
         (activeFilter === "INACTIVE" && emp.status === "INACTIVE");
 
-      return matchesSearch && matchesEmployment && matchesRole && matchesActive;
+      const matchesDepartment = departmentFilter === "ALL" || emp.departmentId === departmentFilter;
+
+      return matchesSearch && matchesRole && matchesActive && matchesDepartment;
     });
-  }, [employees, search, employmentFilter, roleFilter, activeFilter]);
+  }, [employees, search, roleFilter, activeFilter, departmentFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -603,54 +614,45 @@ export function EmployeesModule({
                 ? `Directory (${filtered.length})`
                 : `All employees (${filtered.length})`}
           </h3>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             <input
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              placeholder="Search Employee"
-              className="px-3 py-2 text-[12px] bg-gray-50 border border-gray-200 rounded-lg w-40 focus:outline-none focus:ring-2 focus:ring-violet-500"
+              placeholder="Search name, location, manager…"
+              aria-label="Search employees by name, email, code, phone, title, department, location, or manager"
+              className="px-3 py-2 text-[12px] bg-gray-50 border border-gray-200 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-violet-500"
             />
             <select
-              value={employmentFilter}
-              onChange={(e) => {
-                setEmploymentFilter(e.target.value);
-                setPage(1);
-              }}
+              value={departmentFilter}
+              onChange={(e) => { setDepartmentFilter(e.target.value); setPage(1); }}
               className="px-3 py-2 text-[12px] bg-gray-50 border border-gray-200 rounded-lg text-gray-600"
             >
-              <option value="ALL">All Employment</option>
-              <option value="FULL_TIME">Full-time</option>
-              <option value="FREELANCE">Freelance</option>
-            </select>
-            <select
-              value={roleFilter}
-              onChange={(e) => {
-                setRoleFilter(e.target.value);
-                setPage(1);
-              }}
-              className="px-3 py-2 text-[12px] bg-gray-50 border border-gray-200 rounded-lg text-gray-600"
-            >
-              <option value="ALL">All Role</option>
-              {roles.map((role) => (
-                <option key={role} value={role}>
-                  {role.charAt(0) + role.slice(1).toLowerCase()}
-                </option>
-              ))}
+              <option value="ALL">All Departments</option>
+              {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
             </select>
             <select
               value={activeFilter}
-              onChange={(e) => {
-                setActiveFilter(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) => { setActiveFilter(e.target.value); setPage(1); }}
               className="px-3 py-2 text-[12px] bg-gray-50 border border-gray-200 rounded-lg text-gray-600"
             >
               <option value="ALL">All Status</option>
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
+            </select>
+            <select
+              value={roleFilter}
+              onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
+              className="px-3 py-2 text-[12px] bg-gray-50 border border-gray-200 rounded-lg text-gray-600"
+            >
+              <option value="ALL">All Roles</option>
+              {roles.map((role) => (
+                <option key={role} value={role}>
+                  {role.charAt(0) + role.slice(1).toLowerCase()}
+                </option>
+              ))}
             </select>
             {canExport && (
             <>
