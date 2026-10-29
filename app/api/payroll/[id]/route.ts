@@ -21,6 +21,7 @@ import {
   type PayrollLineItem,
   serializeBreakdown,
 } from "@/lib/payroll-types";
+import { refreshPayrollRunTotals } from "@/lib/payroll-bulk";
 import { createNotification } from "@/lib/notifications";
 
 export async function GET(
@@ -161,7 +162,18 @@ export async function DELETE(
   if (!canManage) return forbidden();
 
   await prisma.payrollRecord.delete({ where: { id } });
-  broadcastAppEvent("payroll_updated", { id });
+  if (existing.payrollRunId) {
+    await refreshPayrollRunTotals(existing.payrollRunId);
+  }
+  broadcastAppEvent("payroll_updated", {
+    id,
+    runId: existing.payrollRunId ?? undefined,
+  });
   revalidatePath("/payroll");
+  revalidatePath("/payroll/runs");
+  if (existing.payrollRunId) {
+    revalidatePath(`/payroll/runs/${existing.payrollRunId}`);
+  }
+  revalidatePath(`/employees/${existing.employeeId}/payroll`);
   return NextResponse.json({ success: true });
 }

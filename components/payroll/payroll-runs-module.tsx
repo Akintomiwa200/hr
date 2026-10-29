@@ -9,6 +9,7 @@ import {
   FileText,
   Layers,
   Plus,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { Button, EmptyState, StatCard, statusBadge } from "@/components/ui";
@@ -57,6 +58,7 @@ export function PayrollRunsModule({
 
   const [bulkOpen, setBulkOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [deleteRun, setDeleteRun] = useState<PayrollRunRow | null>(null);
   const [form, setForm] = useState({
     periodStart: "",
     periodEnd: "",
@@ -102,6 +104,25 @@ export function PayrollRunsModule({
       if (data.run?.id) router.push(`/payroll/runs/${data.run.id}`);
     } catch {
       notify.error("Failed to generate payroll run");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const removeRun = async () => {
+    if (!deleteRun) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/payroll/runs/${deleteRun.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to delete payroll run"));
+        return;
+      }
+      notify.success("Payroll run deleted");
+      setDeleteRun(null);
+      router.refresh();
+    } catch {
+      notify.error("Failed to delete payroll run");
     } finally {
       setLoading(false);
     }
@@ -241,6 +262,17 @@ export function PayrollRunsModule({
                           Export
                         </button>
                       )}
+                      {canOperate && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteRun(run)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                          title="Delete payroll run"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 </article>
@@ -307,6 +339,31 @@ export function PayrollRunsModule({
           </Button>
         </div>
       </Dialog>
+
+      <Dialog
+        open={!!deleteRun}
+        onClose={() => setDeleteRun(null)}
+        title="Delete payroll run"
+      >
+        <p className="text-sm text-gray-600 mb-4">
+          Delete{" "}
+          <strong>
+            {deleteRun?.label ??
+              (deleteRun
+                ? `${formatDate(deleteRun.periodStart)} – ${formatDate(deleteRun.periodEnd)}`
+                : "this payroll run")}
+          </strong>{" "}
+          and all {deleteRun?.employeeCount ?? 0} payslip(s) in it? This cannot be undone.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setDeleteRun(null)}>
+            Cancel
+          </Button>
+          <Button variant="danger" loading={loading} onClick={removeRun}>
+            Delete run
+          </Button>
+        </div>
+      </Dialog>
     </>
   );
 }
@@ -331,6 +388,11 @@ export function PayrollRunDetailModule({
   const router = useRouter();
   const formatCurrency = useFormatCurrency();
   const [loading, setLoading] = useState(false);
+  const [deleteRunOpen, setDeleteRunOpen] = useState(false);
+  const [deleteRecord, setDeleteRecord] = useState<{
+    id: string;
+    employeeName: string;
+  } | null>(null);
 
   useAppEvents({
     types: ["payroll_updated"],
@@ -353,6 +415,44 @@ export function PayrollRunDetailModule({
       router.refresh();
     } catch {
       notify.error("Failed to update run");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const removeRun = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/payroll/runs/${run.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to delete payroll run"));
+        return;
+      }
+      notify.success("Payroll run deleted");
+      setDeleteRunOpen(false);
+      router.push("/payroll/runs");
+      router.refresh();
+    } catch {
+      notify.error("Failed to delete payroll run");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const removeRecord = async () => {
+    if (!deleteRecord) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/payroll/${deleteRecord.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to delete payslip"));
+        return;
+      }
+      notify.success("Payslip deleted from this run");
+      setDeleteRecord(null);
+      router.refresh();
+    } catch {
+      notify.error("Failed to delete payslip");
     } finally {
       setLoading(false);
     }
@@ -410,6 +510,12 @@ export function PayrollRunDetailModule({
               </Button>
             </>
           )}
+          {canOperate && (
+            <Button variant="danger" onClick={() => setDeleteRunOpen(true)}>
+              <Trash2 className="w-4 h-4" />
+              Delete run
+            </Button>
+          )}
         </div>
       </div>
 
@@ -442,12 +548,30 @@ export function PayrollRunDetailModule({
                   </td>
                   <td className="px-5 py-3">{statusBadge(record.status)}</td>
                   <td className="px-5 py-3 text-right">
-                    <Link
-                      href={`/payroll/${record.id}`}
-                      className="text-brand-600 hover:text-brand-700 font-medium"
-                    >
-                      {canOperate ? "View / edit" : "View"}
-                    </Link>
+                    <div className="inline-flex items-center gap-3">
+                      <Link
+                        href={`/payroll/${record.id}`}
+                        className="text-brand-600 hover:text-brand-700 font-medium"
+                      >
+                        {canOperate ? "View / edit" : "View"}
+                      </Link>
+                      {canOperate && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDeleteRecord({
+                              id: record.id,
+                              employeeName: `${record.employee.firstName} ${record.employee.lastName}`,
+                            })
+                          }
+                          className="inline-flex items-center gap-1 text-red-600 hover:text-red-700 font-medium"
+                          title="Delete payslip"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -455,6 +579,44 @@ export function PayrollRunDetailModule({
           </table>
         </div>
       </div>
+
+      <Dialog
+        open={deleteRunOpen}
+        onClose={() => setDeleteRunOpen(false)}
+        title="Delete payroll run"
+      >
+        <p className="text-sm text-gray-600 mb-4">
+          Delete <strong>{run.label ?? "this payroll run"}</strong> and all{" "}
+          {run.employeeCount} payslip(s) in it? This cannot be undone.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setDeleteRunOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" loading={loading} onClick={removeRun}>
+            Delete run
+          </Button>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={!!deleteRecord}
+        onClose={() => setDeleteRecord(null)}
+        title="Delete payslip"
+      >
+        <p className="text-sm text-gray-600 mb-4">
+          Remove {deleteRecord?.employeeName ?? "this employee"}&apos;s payslip from this run? This
+          cannot be undone.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setDeleteRecord(null)}>
+            Cancel
+          </Button>
+          <Button variant="danger" loading={loading} onClick={removeRecord}>
+            Delete payslip
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }
