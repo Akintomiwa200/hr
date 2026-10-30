@@ -35,6 +35,7 @@ type EmployeeDetail = Employee & {
   department: Department;
   branch?: { id: string; name: string; location: string } | null;
   manager: Employee | null;
+  managers?: Pick<Employee, "id" | "firstName" | "lastName">[];
   directReports: Employee[];
   leaveRequests: LeaveRequest[];
   attendanceRecords: Attendance[];
@@ -243,11 +244,12 @@ export function EmployeeDetailContent({
           )}
           <InfoRow
             icon={Users}
-            label="Manager"
+            label="Reporting managers"
             value={
-              employee.manager
-                ? fullName(employee.manager.firstName, employee.manager.lastName)
-                : "—"
+              [...new Map([employee.manager, ...(employee.managers ?? [])]
+                .filter((manager): manager is NonNullable<typeof manager> => Boolean(manager))
+                .map((manager) => [manager.id, fullName(manager.firstName, manager.lastName)] as const))
+                .values()].join(", ") || "—"
             }
           />
           <InfoRow icon={CalendarDays} label="Start Date" value={formatDate(employee.hireDate)} />

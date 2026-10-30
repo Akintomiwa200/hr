@@ -8,7 +8,7 @@ import {
   canViewEmployee,
 } from "@/lib/employee-access";
 import { notifyEmployeeChange } from "@/lib/employees/mutations";
-import { canAssignRole, normalizeRole } from "@/lib/roles";
+import { canAssignRole, LINE_MANAGER_ROLES, normalizeRole } from "@/lib/roles";
 import { parseLocalDate } from "@/lib/dates";
 import { parseEmployeeShiftFields } from "@/lib/employee-shift";
 import { replayUnprocessedPunchesForEmployee } from "@/lib/zkteco/service";
@@ -107,6 +107,24 @@ export async function PATCH(
   if (cameThroughAgent && !String(agentName ?? "").trim()) {
     return NextResponse.json({ error: "Enter the agent name." }, { status: 400 });
   }
+  const requestedManagerIds = managerIds !== undefined
+    ? (Array.isArray(managerIds) ? [...new Set(managerIds.map(String).filter(Boolean))] : [])
+    : managerId ? [String(managerId)] : [];
+  if (managerIds !== undefined || managerId !== undefined) {
+    const validManagers = requestedManagerIds.length
+      ? await prisma.employee.findMany({
+          where: {
+            id: { in: requestedManagerIds, not: id },
+            status: "ACTIVE",
+            user: { companyId: existing.user?.companyId ?? null, role: { in: LINE_MANAGER_ROLES } },
+          },
+          select: { id: true },
+        })
+      : [];
+    if (validManagers.length !== requestedManagerIds.length) {
+      return NextResponse.json({ error: "Select active reporting managers from your company." }, { status: 400 });
+    }
+  }
 
   if (role && existing.user) {
     const nextRole = normalizeRole(String(role));
@@ -192,9 +210,11 @@ export async function PATCH(
         biometricPin: biometricPin ? String(biometricPin).trim() : null,
       }),
       ...(shiftFields && shiftFields),
-      ...(managerId !== undefined && { managerId: managerId || null }),
+      ...((managerId !== undefined || Array.isArray(managerIds)) && {
+        managerId: Array.isArray(managerIds) ? requestedManagerIds[0] ?? null : managerId || null,
+      }),
       ...(managerIds !== undefined && Array.isArray(managerIds) && {
-        managers: { set: managerIds.filter((managerEmployeeId: string) => managerEmployeeId !== id && managerEmployeeId !== (managerId || existing.managerId)).map((managerEmployeeId: string) => ({ id: managerEmployeeId })) },
+        managers: { set: requestedManagerIds.filter((managerEmployeeId) => managerEmployeeId !== id && managerEmployeeId !== (managerId || requestedManagerIds[0] || "")).map((managerEmployeeId) => ({ id: managerEmployeeId })) },
       }),
       ...(salary !== undefined && { salary: Number(salary) || 0 }),
       ...(bankName !== undefined && {

@@ -26,6 +26,7 @@ export default async function EmployeeDetailPage({
       department: true,
       branch: true,
       manager: true,
+      managers: { select: { id: true, firstName: true, lastName: true } },
       directReports: true,
       user: { select: { role: true } },
       leaveRequests: { take: 5, orderBy: { createdAt: "desc" } },

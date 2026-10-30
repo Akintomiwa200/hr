@@ -58,7 +58,7 @@ export function employeeToFormData(employee: {
         ? `${String(employee.shiftStartHour).padStart(2, "0")}:${String(employee.shiftStartMinute).padStart(2, "0")}`
         : "09:00",
     managerId: employee.managerId ?? "",
-    managerIds: employee.managers?.map((manager) => manager.id) ?? [],
+    managerIds: [...new Set([employee.managerId, ...(employee.managers?.map((manager) => manager.id) ?? [])].filter((id): id is string => Boolean(id)))],
     employmentType:
       employee.employmentType === "FREELANCE" ? "FREELANCE" : "FULL_TIME",
     role: employee.user?.role ?? "EMPLOYEE",
@@ -200,31 +200,29 @@ export function EmployeeFormFields({
           </select>
         </div>
         <div>
-          <label className={labelClass}>Primary manager</label>
-          <select
-            value={data.managerId}
-            onChange={(e) => set("managerId", e.target.value)}
-            className={inputClass}
-          >
-            <option value="">None</option>
-            {managers.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.firstName} {m.lastName}
-              </option>
-            ))}
-          </select>
-          <label className={`${labelClass} mt-3`}>Additional managers</label>
-          <select
-            multiple
-            value={data.managerIds}
-            onChange={(event) => set("managerIds", Array.from(event.target.selectedOptions, (option) => option.value))}
-            className={`${inputClass} min-h-24`}
-          >
-            {managers.filter((manager) => manager.id !== data.managerId).map((manager) => (
-              <option key={manager.id} value={manager.id}>{manager.firstName} {manager.lastName}</option>
-            ))}
-          </select>
-          <p className="mt-1 text-[11px] text-gray-400">Hold Ctrl (Windows) or Command (Mac) to select more than one.</p>
+          <label className={labelClass}>Reporting managers</label>
+          <div className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3">
+            {managers.length ? managers.map((manager) => {
+              const checked = data.managerIds.includes(manager.id);
+              return (
+                <label key={manager.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      const selected = checked
+                        ? data.managerIds.filter((id) => id !== manager.id)
+                        : [...data.managerIds, manager.id];
+                      onChange({ ...data, managerIds: selected, managerId: selected[0] ?? "" });
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  {manager.firstName} {manager.lastName}
+                </label>
+              );
+            }) : <p className="px-2 py-1 text-xs text-gray-400">No active managers available.</p>}
+          </div>
+          <p className="mt-1 text-[11px] text-gray-400">Select every manager who supervises this employee.</p>
         </div>
       </div>
 

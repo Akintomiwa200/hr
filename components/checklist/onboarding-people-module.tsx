@@ -108,7 +108,11 @@ export function OnboardingPeopleModule({
     setSuccess(null);
 
     const form = e.currentTarget;
-    const data = Object.fromEntries(new FormData(form).entries());
+    const formData = new FormData(form);
+    const managerIds = formData.getAll("managerIds").map(String);
+    const data: Record<string, unknown> = Object.fromEntries(formData.entries());
+    data.managerIds = managerIds;
+    data.managerId = managerIds[0] ?? "";
     const email = String(data.email || "").trim();
 
     try {
@@ -241,15 +245,16 @@ export function OnboardingPeopleModule({
                 </select>
               </div>
               <div>
-                <label className={labelClass}>Manager</label>
-                <select name="managerId" className={inputClass}>
-                  <option value="">None</option>
-                  {managers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {fullName(m.firstName, m.lastName)}
-                    </option>
-                  ))}
-                </select>
+                <label className={labelClass}>Reporting managers</label>
+                <div className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3">
+                  {managers.length ? managers.map((manager) => (
+                    <label key={manager.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                      <input type="checkbox" name="managerIds" value={manager.id} className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                      {fullName(manager.firstName, manager.lastName)}
+                    </label>
+                  )) : <p className="px-2 py-1 text-xs text-gray-400">No active managers available.</p>}
+                </div>
+                <p className="mt-1 text-[11px] text-gray-400">Select every manager who supervises this employee.</p>
               </div>
               <div>
                 <label className={labelClass}>Employment</label>

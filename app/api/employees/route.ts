@@ -7,7 +7,7 @@ import { createEmployeeAccount } from "@/lib/employees/create-employee";
 import { assertCanAddEmployee, subscriptionErrorMessage } from "@/lib/subscription";
 import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
 import { peopleDirectoryEmployeeWhere } from "@/lib/employee-access";
-import { canAssignRole, normalizeRole } from "@/lib/roles";
+import { canAssignRole, LINE_MANAGER_ROLES, normalizeRole } from "@/lib/roles";
 import { parseLocalDate } from "@/lib/dates";
 import { parseEmployeeShiftFields } from "@/lib/employee-shift";
 import { replayUnprocessedPunchesForEmployee } from "@/lib/zkteco/service";
@@ -104,6 +104,20 @@ export async function POST(request: NextRequest) {
   if (body.cameThroughAgent && !String(body.agentName ?? "").trim()) {
     return NextResponse.json({ error: "Enter the agent’s name." }, { status: 400 });
   }
+  const requestedManagerIds = [...new Set((Array.isArray(managerIds) ? managerIds : managerId ? [managerId] : []).map(String).filter(Boolean))];
+  if (requestedManagerIds.length) {
+    const validManagers = await prisma.employee.findMany({
+      where: {
+        id: { in: requestedManagerIds },
+        status: "ACTIVE",
+        user: { companyId: session.companyId ?? null, role: { in: LINE_MANAGER_ROLES } },
+      },
+      select: { id: true },
+    });
+    if (validManagers.length !== requestedManagerIds.length) {
+      return NextResponse.json({ error: "Select active reporting managers from your company." }, { status: 400 });
+    }
+  }
 
   const normalizedEmployeeCode =
     typeof employeeCode === "string" ? employeeCode.trim() : "";
@@ -154,7 +168,7 @@ export async function POST(request: NextRequest) {
       departmentId,
       branchId: branchId || null,
       biometricPin: biometricPin || null,
-      managerId,
+      managerId: requestedManagerIds[0] ?? managerId,
       employmentType,
       role: resolvedRole,
       roleId: resolvedRoleId,
@@ -171,10 +185,10 @@ export async function POST(request: NextRequest) {
       employeeCode: normalizedEmployeeCode || null,
     });
 
-    if (Array.isArray(managerIds) && managerIds.length) {
+    if (requestedManagerIds.length > 1) {
       await prisma.employee.update({
         where: { id: employee.id },
-        data: { managers: { connect: managerIds.filter((managerEmployeeId: string) => managerEmployeeId !== managerId).map((id: string) => ({ id })) } },
+        data: { managers: { connect: requestedManagerIds.slice(1).filter((managerEmployeeId) => managerEmployeeId !== employee.id).map((id) => ({ id })) } },
       });
     }
 
