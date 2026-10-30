@@ -1,9 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, Link2, Plus, Search } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Eye,
+  FileText,
+  Link2,
+  MoreVertical,
+  Pause,
+  Play,
+  Plus,
+  Search,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { JobWizard } from "@/components/recruitment/job-wizard";
@@ -11,7 +24,6 @@ import { notify, readApiError } from "@/lib/toast";
 import { formatRelativeTime } from "@/lib/utils";
 import {
   JOB_STATUS_LABELS,
-  JOB_STATUS_OPTIONS,
   jobStatusBadgeClass,
 } from "@/lib/recruitment/constants";
 import type { JobStatus } from "@prisma/client";
@@ -48,9 +60,23 @@ export function JobsListModule({
   const [search, setSearch] = useState("");
   const [wizardOpen, setWizardOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
-  const [statusMenu, setStatusMenu] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deleteJob, setDeleteJob] = useState<Job | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -63,9 +89,9 @@ export function JobsListModule({
     );
   }, [initial, search]);
 
-  const updateStatus = async (jobId: string, status: JobStatus) => {
+  const updateStatus = useCallback(async (jobId: string, status: JobStatus) => {
     setLoading(true);
-    setStatusMenu(null);
+    setMenuOpen(null);
     try {
       const res = await fetch(`/api/jobs/${jobId}`, {
         method: "PATCH",
@@ -83,9 +109,75 @@ export function JobsListModule({
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
-  const copyApplicationLink = async (jobId: string) => {
+  const handleDelete = useCallback(async () => {
+    if (!deleteJob) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/jobs/${deleteJob.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to delete job"));
+        return;
+      }
+      notify.success("Job deleted successfully");
+      setDeleteJob(null);
+      router.refresh();
+    } catch {
+      notify.error("Failed to delete job");
+    } finally {
+      setLoading(false);
+    }
+  }, [deleteJob, router]);
+
+  const duplicateJob = useCallback(async (job: Job) => {
+    setLoading(true);
+    setMenuOpen(null);
+    try {
+      // Fetch full job data first
+      const getRes = await fetch(`/api/jobs/${job.id}`);
+      if (!getRes.ok) {
+        notify.error("Failed to fetch job details");
+        return;
+      }
+      const fullJob = await getRes.json();
+
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `${fullJob.title} (Copy)`,
+          departmentId: fullJob.departmentId,
+          location: fullJob.location,
+          office: fullJob.office,
+          type: fullJob.type,
+          quantity: fullJob.quantity,
+          expectedClosingDate: fullJob.expectedClosingDate,
+          salaryMin: fullJob.salaryMin,
+          salaryMax: fullJob.salaryMax,
+          description: fullJob.description,
+          requirements: fullJob.requirements,
+          responsibilities: fullJob.responsibilities,
+          benefits: fullJob.benefits,
+          status: "DRAFT",
+          hiringTeam: fullJob.hiringTeam ? JSON.parse(fullJob.hiringTeam) : [],
+          pipelineStages: fullJob.pipelineStages ? JSON.parse(fullJob.pipelineStages) : null,
+        }),
+      });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to duplicate job"));
+        return;
+      }
+      notify.success("Job duplicated as draft");
+      router.refresh();
+    } catch {
+      notify.error("Failed to duplicate job");
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
+
+  const copyApplicationLink = useCallback(async (jobId: string) => {
     const url = `${window.location.origin}/careers/${jobId}`;
     try {
       await navigator.clipboard.writeText(url);
@@ -95,7 +187,7 @@ export function JobsListModule({
     } catch {
       notify.error("Failed to copy link");
     }
-  };
+  }, []);
 
   return (
     <>
@@ -143,50 +235,127 @@ export function JobsListModule({
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                {canManage && (
-                  <div className="relative">
-                    <button
-                      type="button"
-                      disabled={loading}
-                      onClick={() => setStatusMenu(statusMenu === job.id ? null : job.id)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium border border-gray-200 rounded-lg hover:bg-gray-50"
-                    >
-                      Status
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    </button>
-                    {statusMenu === job.id && (
-                      <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-100 rounded-xl shadow-lg z-20 py-1">
-                        {JOB_STATUS_OPTIONS.map((status) => (
-                          <button
-                            key={status}
-                            type="button"
-                            onClick={() => void updateStatus(job.id, status)}
-                            className="w-full text-left px-3 py-2 text-[13px] hover:bg-gray-50 flex items-center justify-between"
-                          >
-                            {JOB_STATUS_LABELS[status]}
-                            {job.status === status && <span className="text-brand-600">✓</span>}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  title="Copy application link"
-                  onClick={() => void copyApplicationLink(job.id)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-brand-200 transition-colors"
-                >
-                  {copiedId === job.id ? (
-                    <Check className="w-3.5 h-3.5 text-green-600" />
-                  ) : (
-                    <Link2 className="w-3.5 h-3.5" />
-                  )}
-                  {copiedId === job.id ? "Copied!" : "Copy Link"}
-                </button>
                 <span className="text-[11px] text-gray-400 whitespace-nowrap">
                   Created {formatRelativeTime(job.postedAt)}
                 </span>
+
+                {/* Actions dropdown */}
+                <div className="relative" ref={menuOpen === job.id ? menuRef : undefined}>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => setMenuOpen(menuOpen === job.id ? null : job.id)}
+                    className="inline-flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Actions"
+                    aria-label={`Actions for ${job.title}`}
+                    aria-expanded={menuOpen === job.id}
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+
+                  {menuOpen === job.id && (
+                    <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-100 rounded-xl shadow-lg z-30 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                      {/* View Job */}
+                      <Link
+                        href={`/recruitment/${job.id}`}
+                        onClick={() => setMenuOpen(null)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+                      >
+                        <Eye className="w-4 h-4 text-gray-400" />
+                        View job
+                      </Link>
+
+                      {/* Copy Application Link */}
+                      <button
+                        type="button"
+                        onClick={() => { void copyApplicationLink(job.id); setMenuOpen(null); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+                      >
+                        {copiedId === job.id ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <Link2 className="w-4 h-4 text-gray-400" />
+                        )}
+                        {copiedId === job.id ? "Link copied!" : "Copy application link"}
+                      </button>
+
+                      {canManage && (
+                        <>
+                          {/* Divider */}
+                          <div className="border-t border-gray-100 my-1" />
+
+                          {/* Status changes — show relevant options based on current status */}
+                          {job.status !== "OPEN" && (
+                            <button
+                              type="button"
+                              onClick={() => void updateStatus(job.id, "OPEN")}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-green-700 hover:bg-green-50"
+                            >
+                              <Play className="w-4 h-4" />
+                              Set active
+                            </button>
+                          )}
+
+                          {job.status !== "DRAFT" && (
+                            <button
+                              type="button"
+                              onClick={() => void updateStatus(job.id, "DRAFT")}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-amber-700 hover:bg-amber-50"
+                            >
+                              <FileText className="w-4 h-4" />
+                              Set as draft
+                            </button>
+                          )}
+
+                          {job.status !== "INACTIVE" && (
+                            <button
+                              type="button"
+                              onClick={() => void updateStatus(job.id, "INACTIVE")}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-orange-700 hover:bg-orange-50"
+                            >
+                              <Pause className="w-4 h-4" />
+                              Suspend job
+                            </button>
+                          )}
+
+                          {job.status !== "CLOSED" && (
+                            <button
+                              type="button"
+                              onClick={() => void updateStatus(job.id, "CLOSED")}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-600 hover:bg-gray-50"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              Close job
+                            </button>
+                          )}
+
+                          {/* Divider */}
+                          <div className="border-t border-gray-100 my-1" />
+
+                          {/* Duplicate */}
+                          <button
+                            type="button"
+                            onClick={() => void duplicateJob(job)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+                          >
+                            <Copy className="w-4 h-4 text-gray-400" />
+                            Duplicate job
+                          </button>
+
+                          {/* Delete */}
+                          <button
+                            type="button"
+                            onClick={() => { setDeleteJob(job); setMenuOpen(null); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete job
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -198,6 +367,47 @@ export function JobsListModule({
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!deleteJob}
+        onClose={() => setDeleteJob(null)}
+        title="Delete job"
+        description="This action cannot be undone. All candidate applications associated with this job will also be removed."
+        size="sm"
+      >
+        {deleteJob && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Are you sure you want to delete{" "}
+              <strong>{deleteJob.title}</strong>?
+              {deleteJob.applications.length > 0 && (
+                <span className="text-red-600 block mt-1">
+                  This job has {deleteJob.applications.length} candidate{deleteJob.applications.length === 1 ? "" : "s"} applied.
+                </span>
+              )}
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => void handleDelete()}
+                disabled={loading}
+                className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-medium bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-60"
+              >
+                <Trash2 className="w-4 h-4" />
+                {loading ? "Deleting..." : "Delete job"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteJob(null)}
+                className="px-4 py-2 text-[13px] text-gray-500 hover:bg-gray-50 rounded-xl"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </Dialog>
 
       <JobWizard
         open={wizardOpen}

@@ -29,12 +29,12 @@ export default async function AuditReportPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="mb-1 text-[13px] font-medium text-brand-600">
-              List Report › Audit Reports
+              Company operations › Audit Trail
             </p>
-            <h1 className="text-2xl font-bold text-gray-900">Activity audit trail</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Audit Trail</h1>
             <p className="mt-1 max-w-2xl text-sm text-gray-500">
-              Every sensitive action across your workspace — sign-ins, changes, approvals and
-              exports — captured in a tamper-evident log.
+              A live record of staff and workspace operations, including additions, changes,
+              suspensions, offboarding, and deletions.
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[12.5px] font-medium text-emerald-700">

@@ -12,6 +12,8 @@ import { canAssignRole, normalizeRole } from "@/lib/roles";
 import { parseLocalDate } from "@/lib/dates";
 import { parseEmployeeShiftFields } from "@/lib/employee-shift";
 import { replayUnprocessedPunchesForEmployee } from "@/lib/zkteco/service";
+import { audit } from "@/lib/audit";
+import { notifyCompanyAdminsOfStaffChange } from "@/lib/employees/admin-alerts";
 
 export async function GET(
   _request: NextRequest,
@@ -237,6 +239,14 @@ export async function PATCH(
   }
 
   notifyEmployeeChange(id, "updated");
+  await audit({
+    actor: session,
+    module: "employees",
+    action: "UPDATE",
+    entityId: id,
+    entityLabel: `${employee.firstName} ${employee.lastName}`.trim(),
+    meta: { changedFields: Object.keys(body) },
+  });
 
   const pinChanged =
     biometricPin !== undefined || branchId !== undefined || status === "ACTIVE";
@@ -267,7 +277,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const existing = await prisma.employee.findUnique({ where: { id } });
+  const existing = await prisma.employee.findUnique({ where: { id }, include: { user: { select: { companyId: true } } } });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -294,6 +304,8 @@ export async function DELETE(
   });
 
   notifyEmployeeChange(id, "deleted");
+  await audit({ actor: session, module: "employees", action: "DELETE", entityId: id, entityLabel: `${existing.firstName} ${existing.lastName}`.trim() });
+  await notifyCompanyAdminsOfStaffChange({ companyId: existing.user.companyId, employeeName: `${existing.firstName} ${existing.lastName}`.trim(), action: "deleted" });
 
   return NextResponse.json({ success: true });
 }

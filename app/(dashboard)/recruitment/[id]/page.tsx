@@ -6,6 +6,8 @@ import { RecruitmentTabs } from "@/components/recruitment/recruitment-tabs";
 import { JobDetailModule } from "@/components/recruitment/job-detail-module";
 import { getRecruitmentContextForSession } from "@/lib/recruitment/data";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
+import { resolveRecruitmentCompanyId } from "@/lib/recruitment/data";
+import { isSuperAdmin } from "@/lib/roles";
 
 export default async function JobDetailPage({
   params,
@@ -32,6 +34,9 @@ export default async function JobDetailPage({
   ]);
 
   if (!job) notFound();
+  const companyId = await resolveRecruitmentCompanyId(session.id, session.companyId);
+  const jobCompanyId = job.companyId ?? job.department.companyId;
+  if (!isSuperAdmin(session.role) && jobCompanyId !== companyId) notFound();
 
   return (
     <div>

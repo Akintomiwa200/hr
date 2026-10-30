@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export const auditModules = [
   "dashboard",
@@ -26,6 +27,7 @@ export const auditModules = [
   "reports",
   "bulk-messaging",
   "bonuses",
+  "audit-trail",
 ] as const;
 
 export type AuditModule = (typeof auditModules)[number];
@@ -42,6 +44,9 @@ export const auditActions = [
   "IMPORT",
   "SYNC",
   "OFFBOARD",
+  "SUSPEND",
+  "ARCHIVE",
+  "REACTIVATE",
 ] as const;
 
 export type AuditAction = (typeof auditActions)[number];
@@ -83,6 +88,10 @@ export function audit(entry: AuditEntry) {
         meta: meta ?? undefined,
         ipAddress: entry.ipAddress ?? null,
       },
+    })
+    .then((row) => {
+      broadcastAppEvent("audit_updated", { companyId: row.companyId, id: row.id });
+      return row;
     })
     .catch(() => null);
 }

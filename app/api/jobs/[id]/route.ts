@@ -2,11 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
-import { isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
-import { canManageRecruitment } from "@/lib/roles";
+import { forbidden, notFound, requireSession, unauthorized } from "@/lib/api-auth";
+import { canManageRecruitment, isSuperAdmin } from "@/lib/roles";
 import { resolveRecruitmentCompanyId } from "@/lib/recruitment/data";
 import { resolveHiringTeamMembers } from "@/lib/recruitment/provision-staff";
 import type { HiringTeamMember } from "@/lib/recruitment/constants";
+import { audit } from "@/lib/audit";
+
+async function canAccessJob(
+  job: { companyId: string | null; department: { companyId: string | null } },
+  session: { id: string; companyId?: string | null; role: Parameters<typeof isSuperAdmin>[0] }
+) {
+  if (isSuperAdmin(session.role)) return true;
+  const companyId = await resolveRecruitmentCompanyId(session.id, session.companyId);
+  const ownerCompanyId = job.companyId ?? job.department.companyId;
+  return ownerCompanyId === companyId;
+}
 
 export async function GET(
   _request: NextRequest,
@@ -28,6 +39,7 @@ export async function GET(
   });
 
   if (!job) return notFound();
+  if (!(await canAccessJob(job, session))) return forbidden();
   return NextResponse.json(job);
 }
 
@@ -36,13 +48,24 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await requireSession();
-  if (!session || !isHr(session)) return unauthorized();
+  if (!session || !canManageRecruitment(session.role)) return unauthorized();
 
   const { id } = await params;
   const body = await request.json();
 
-  const existing = await prisma.job.findUnique({ where: { id } });
+  const existing = await prisma.job.findUnique({ where: { id }, include: { department: { select: { companyId: true } } } });
   if (!existing) return notFound();
+  if (!(await canAccessJob(existing, session))) return forbidden();
+  if (body.status !== undefined && !["OPEN", "INACTIVE", "CLOSED", "DRAFT"].includes(body.status)) {
+    return NextResponse.json({ error: "Choose a valid job status." }, { status: 400 });
+  }
+  if (body.departmentId !== undefined) {
+    const department = await prisma.department.findUnique({ where: { id: String(body.departmentId) }, select: { companyId: true } });
+    const companyId = await resolveRecruitmentCompanyId(session.id, session.companyId);
+    if (!department || (department.companyId !== companyId && !isSuperAdmin(session.role))) {
+      return NextResponse.json({ error: "Choose a department in your company." }, { status: 403 });
+    }
+  }
 
   let resolvedHiringTeam: string | null | undefined;
   if (body.hiringTeam !== undefined) {
@@ -92,6 +115,14 @@ export async function PATCH(
   });
 
   broadcastAppEvent("job_updated", { id });
+  await audit({
+    actor: session,
+    module: "recruitment",
+    action: body.status === "INACTIVE" ? "SUSPEND" : "UPDATE",
+    entityId: id,
+    entityLabel: job.title,
+    meta: { changedFields: Object.keys(body), status: job.status },
+  });
   revalidatePath("/recruitment");
   revalidatePath(`/recruitment/${id}`);
   revalidatePath("/careers");
@@ -107,11 +138,13 @@ export async function DELETE(
   if (!session || !canManageRecruitment(session.role)) return unauthorized();
 
   const { id } = await params;
-  const existing = await prisma.job.findUnique({ where: { id } });
+  const existing = await prisma.job.findUnique({ where: { id }, include: { department: { select: { companyId: true } } } });
   if (!existing) return notFound();
+  if (!(await canAccessJob(existing, session))) return forbidden();
 
   await prisma.job.delete({ where: { id } });
   broadcastAppEvent("job_updated", { id });
+  await audit({ actor: session, module: "recruitment", action: "DELETE", entityId: id, entityLabel: existing.title });
   revalidatePath("/recruitment");
   revalidatePath("/careers");
   revalidatePath(`/careers/${id}`);

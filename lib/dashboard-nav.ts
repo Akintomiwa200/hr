@@ -97,14 +97,6 @@ export const dashboardNavSections: NavSection[] = [
         icon: Megaphone,
         roles: ALL_STAFF,
       },
-      {
-        id: "audit-reports",
-        href: "/reports/audit",
-        label: "Audit Reports",
-        pageTitle: "Audit Reports",
-        icon: FileText,
-        roles: REPORTS_VIEW_ROLES,
-      }
     ]
   },
   {
@@ -126,6 +118,14 @@ export const dashboardNavSections: NavSection[] = [
         icon: BarChart3,
         roles: REPORTS_VIEW_ROLES,
         match: (pathname) => pathname.startsWith("/reports") && !pathname.startsWith("/reports/audit"),
+      },
+      {
+        id: "audit-trail",
+        href: "/reports/audit",
+        label: "Audit Trail",
+        pageTitle: "Audit Trail",
+        icon: FileText,
+        roles: ["COMPANY_ADMIN", "HR"],
       },
       {
         id: "team-management",

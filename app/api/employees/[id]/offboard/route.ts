@@ -8,6 +8,7 @@ import { notifyEmployeeChange } from "@/lib/employees/mutations";
 import { prisma } from "@/lib/prisma";
 import { parseLocalDate } from "@/lib/dates";
 import { audit } from "@/lib/audit";
+import { notifyCompanyAdminsOfStaffChange } from "@/lib/employees/admin-alerts";
 
 export async function POST(
   request: NextRequest,
@@ -46,6 +47,13 @@ export async function POST(
       entityId: id,
       entityLabel: `${employee.firstName} ${employee.lastName}`.trim(),
       meta: { deactivate, endDate: endDate.toISOString() },
+    });
+    await notifyCompanyAdminsOfStaffChange({
+      companyId,
+      employeeName: `${employee.firstName} ${employee.lastName}`.trim(),
+      action: "offboarded",
+      details: `End date ${endDate.toLocaleDateString()}`,
+      href: "/offboarded-staff",
     });
     revalidatePath("/checklist/offboarding");
     revalidatePath("/checklist/todos");

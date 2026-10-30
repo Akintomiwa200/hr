@@ -4,6 +4,8 @@ import { canManageEmployees } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hardDeleteEmployee } from "@/lib/offboarding/cleanup";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { audit } from "@/lib/audit";
+import { notifyCompanyAdminsOfStaffChange } from "@/lib/employees/admin-alerts";
 
 export async function DELETE(
   _request: NextRequest,
@@ -24,6 +26,8 @@ export async function DELETE(
     select: {
       id: true,
       status: true,
+      firstName: true,
+      lastName: true,
       endDate: true,
       user: { select: { companyId: true } },
     },
@@ -50,6 +54,11 @@ export async function DELETE(
   }
 
   const deleted = await hardDeleteEmployee(id);
+
+  if (deleted) {
+    await audit({ actor: session, module: "offboarding", action: "DELETE", entityId: id, entityLabel: `${employee.firstName} ${employee.lastName}`.trim() });
+    await notifyCompanyAdminsOfStaffChange({ companyId: employee.user?.companyId, employeeName: `${employee.firstName} ${employee.lastName}`.trim(), action: "deleted" });
+  }
 
   broadcastAppEvent("employee_updated", {
     id,

@@ -5,6 +5,7 @@ import { isApplicationActivityReady, prisma } from "@/lib/prisma";
 import { assertCanAddEmployee } from "@/lib/subscription";
 import { fullName } from "@/lib/utils";
 import type { HiringTeamMember } from "@/lib/recruitment/constants";
+import { notifyCompanyAdminsOfStaffChange } from "@/lib/employees/admin-alerts";
 
 async function logOnboardingActivity(input: {
   applicationId: string;
@@ -70,6 +71,12 @@ export async function onboardHiredCandidate(applicationId: string, actorName?: s
     });
 
     notifyEmployeeChange(employee.id, "created");
+    await notifyCompanyAdminsOfStaffChange({
+      companyId: application.job.companyId,
+      employeeName: fullName(application.firstName, application.lastName),
+      action: "onboarded",
+      href: `/employees/${employee.id}`,
+    });
 
     try {
       const { startEmployeeOnboarding } = await import("@/lib/checklist/instantiate");

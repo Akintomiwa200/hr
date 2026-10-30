@@ -6,6 +6,7 @@ import { parseLocalDate } from "@/lib/dates";
 import { notifyEmployeeChange } from "@/lib/employees/mutations";
 import { audit } from "@/lib/audit";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { notifyCompanyAdminsOfStaffChange } from "@/lib/employees/admin-alerts";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -13,7 +14,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { id } = await params;
   if (!(await canManageEmployee(session, id))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const employee = await prisma.employee.findUnique({ where: { id }, select: { id: true, firstName: true, lastName: true, userId: true } });
+  const employee = await prisma.employee.findUnique({ where: { id }, select: { id: true, firstName: true, lastName: true, userId: true, user: { select: { companyId: true } } } });
   if (!employee) return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   const body = (await request.json().catch(() => ({}))) as { action?: string; until?: string; reason?: string };
   const now = new Date();
@@ -48,6 +49,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   notifyEmployeeChange(id, "updated");
+  if (body.action === "suspend") {
+    await notifyCompanyAdminsOfStaffChange({ companyId: employee.user.companyId, employeeName: `${employee.firstName} ${employee.lastName}`.trim(), action: "suspended", details: `Until ${parseLocalDate(body.until)?.toLocaleDateString() ?? body.until}${body.reason ? `. Reason: ${body.reason}` : ""}`, href: `/employees/${id}` });
+  } else if (body.action === "reactivate") {
+    await notifyCompanyAdminsOfStaffChange({ companyId: employee.user.companyId, employeeName: `${employee.firstName} ${employee.lastName}`.trim(), action: "reactivated", href: `/employees/${id}` });
+  } else {
+    await notifyCompanyAdminsOfStaffChange({ companyId: employee.user.companyId, employeeName: `${employee.firstName} ${employee.lastName}`.trim(), action: "offboarded", href: "/offboarded-staff" });
+  }
   broadcastAppEvent("dashboard_updated", { source: "employee_lifecycle", employeeId: id });
   return NextResponse.json({ success: true });
 }

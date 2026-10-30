@@ -51,7 +51,7 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   OPEN: "Active",
   CLOSED: "Closed",
   DRAFT: "Draft",
-  INACTIVE: "Unactive",
+  INACTIVE: "Suspended",
 };
 
 export const JOB_STATUS_OPTIONS: JobStatus[] = ["OPEN", "INACTIVE", "CLOSED", "DRAFT"];

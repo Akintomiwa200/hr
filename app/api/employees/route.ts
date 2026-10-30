@@ -13,6 +13,7 @@ import { parseEmployeeShiftFields } from "@/lib/employee-shift";
 import { replayUnprocessedPunchesForEmployee } from "@/lib/zkteco/service";
 import { celebrateNewEmployee } from "@/lib/birthdays";
 import { audit } from "@/lib/audit";
+import { notifyCompanyAdminsOfStaffChange } from "@/lib/employees/admin-alerts";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -181,6 +182,12 @@ export async function POST(request: NextRequest) {
     }
 
     notifyEmployeeChange(employee.id, "created");
+    await notifyCompanyAdminsOfStaffChange({
+      companyId: session.companyId,
+      employeeName: `${firstName} ${lastName}`.trim(),
+      action: "onboarded",
+      href: `/employees/${employee.id}`,
+    });
 
     // If the new employee's birthday is today, celebrate immediately (real-time).
     try {

@@ -21,6 +21,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAppEvents } from "@/hooks/use-app-events";
 import type { AuditSummary } from "@/lib/audit";
 
 type AuditLogRow = {
@@ -328,6 +329,8 @@ export function AuditModule({
     });
   };
 
+  useAppEvents({ types: ["audit_updated"], onEvent: refresh });
+
   const stats = useMemo(() => {
     const top = summary.byAction[0];
     const topVisual = top ? actionVisual(top.action) : { icon: ShieldAlert };
@@ -525,7 +528,7 @@ export function AuditModule({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            <h3 className="text-sm font-semibold text-gray-900">Latest activity</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Latest audit trail</h3>
           </div>
           <span className="text-[12px] text-gray-400">{rows.length} shown</span>
         </div>
