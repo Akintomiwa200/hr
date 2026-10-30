@@ -11,6 +11,7 @@ import {
   getAllNavItems,
   getNavSections,
   getSettingsNavItem,
+  isNavMatch,
   type NavItem,
 } from "@/lib/dashboard-nav";
 import { roleWorkspaceLabel, roleLabel, canManageOrgContent, hasRole } from "@/lib/roles";
@@ -90,6 +91,8 @@ function NavCollapsible({
   isActive,
   collapsed,
   activeId,
+  pathname,
+  bonusesEnabled,
   notificationCount,
   pendingLeaveCount,
   onNavigate,
@@ -98,6 +101,8 @@ function NavCollapsible({
   isActive: boolean;
   collapsed?: boolean;
   activeId: string | null;
+  pathname: string;
+  bonusesEnabled: boolean;
   notificationCount: number;
   pendingLeaveCount: number;
   onNavigate?: () => void;
@@ -152,8 +157,10 @@ function NavCollapsible({
 
       {isOpen && item.subItems && (
         <div className="pl-9 pr-2 space-y-0.5 pt-0.5">
-          {item.subItems.map((subItem) => {
-            const isSubActive = activeId === subItem.id;
+          {item.subItems
+            .filter((subItem) => bonusesEnabled || !subItem.id.startsWith("bonus-"))
+            .map((subItem) => {
+            const isSubActive = activeId === subItem.id || isNavMatch(pathname, subItem);
             const badge =
               subItem.id === "notifications"
                 ? notificationCount
@@ -193,6 +200,8 @@ function NavSection({
   items,
   role,
   activeId,
+  pathname,
+  bonusesEnabled,
   notificationCount,
   pendingLeaveCount,
   collapsed,
@@ -202,6 +211,8 @@ function NavSection({
   items: NavItem[];
   role: Role;
   activeId: string | null;
+  pathname: string;
+  bonusesEnabled: boolean;
   notificationCount: number;
   pendingLeaveCount: number;
   collapsed?: boolean;
@@ -236,6 +247,8 @@ function NavSection({
                 isActive={isItemActive}
                 collapsed={collapsed}
                 activeId={activeId}
+                pathname={pathname}
+                bonusesEnabled={bonusesEnabled}
                 notificationCount={notificationCount}
                 pendingLeaveCount={pendingLeaveCount}
                 onNavigate={onNavigate}
@@ -279,6 +292,7 @@ export function Sidebar({
   employeeId,
   companyName,
   companyLogo,
+  bonusesEnabled = false,
 }: {
   role: Role;
   userName: string;
@@ -290,6 +304,7 @@ export function Sidebar({
   employeeId?: string | null;
   companyName?: string;
   companyLogo?: string | null;
+  bonusesEnabled?: boolean;
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -372,6 +387,8 @@ export function Sidebar({
             items={section.items}
             role={role}
             activeId={activeId}
+            pathname={pathname}
+            bonusesEnabled={bonusesEnabled}
             notificationCount={summary.notificationCount}
             pendingLeaveCount={summary.pendingLeaveCount}
             collapsed={collapsed}

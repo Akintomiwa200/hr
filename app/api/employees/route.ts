@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       department: true,
       manager: { select: { id: true, firstName: true, lastName: true } },
       managers: { select: { id: true, firstName: true, lastName: true } },
-      user: { select: { role: true } },
+      user: { select: { role: true, suspendedAt: true, suspendedUntil: true, suspensionReason: true, archivedAt: true, isActive: true } },
       branch: { select: { id: true, name: true, location: true } },
     },
     orderBy: { firstName: "asc" },

@@ -25,6 +25,7 @@ export const auditModules = [
   "offboarding",
   "reports",
   "bulk-messaging",
+  "bonuses",
 ] as const;
 
 export type AuditModule = (typeof auditModules)[number];

@@ -57,6 +57,8 @@ import {
   PERFORMANCE_VIEW_ROLES,
   CONTENT_ADMIN_ROLES,
   DAILY_REPORTING_ROLES,
+  BONUS_ADMIN_ROLES,
+  BONUS_VIEW_ROLES,
   RECRUITMENT_ROLES,
   SETTINGS_ROLES,
   SUBSCRIPTION_ADMIN_ROLES,
@@ -175,6 +177,12 @@ export const dashboardNavSections: NavSection[] = [
         pageTitle: "Employees",
         icon: Users,
         roles: PEOPLE_VIEW_ROLES,
+        match: (pathname) =>
+          pathname === "/employees" ||
+          (pathname.startsWith("/employees/") &&
+            !pathname.startsWith("/employees/new")) ||
+          pathname.startsWith("/bonuses") ||
+          pathname.startsWith("/branches"),
         subItems: [
           {
             id: "employee-list",
@@ -204,6 +212,63 @@ export const dashboardNavSections: NavSection[] = [
             pageTitle: "Departments",
             roles: PEOPLE_ADMIN_ROLES,
             match: (pathname) => pathname.startsWith("/departments/manage"),
+          },
+          {
+            id: "branches",
+            href: "/branches",
+            label: "Branches",
+            pageTitle: "Branches",
+            roles: DEVICE_ADMIN_ROLES,
+            match: (pathname) => pathname.startsWith("/branches"),
+          },
+          {
+            id: "bonus-overview",
+            href: "/bonuses",
+            label: "Bonuses",
+            pageTitle: "Bonuses",
+            roles: BONUS_VIEW_ROLES,
+            match: (pathname) => pathname === "/bonuses",
+          },
+          {
+            id: "bonus-awards",
+            href: "/bonuses/awards",
+            label: "Bonus awards",
+            pageTitle: "Bonus awards",
+            roles: BONUS_VIEW_ROLES,
+            match: (pathname) =>
+              pathname.startsWith("/bonuses/awards") &&
+              pathname !== "/bonuses/awards/new",
+          },
+          {
+            id: "bonus-new-award",
+            href: "/bonuses/awards/new",
+            label: "Create bonus award",
+            pageTitle: "Create bonus award",
+            roles: BONUS_ADMIN_ROLES,
+          },
+          {
+            id: "bonus-plans",
+            href: "/bonuses/plans",
+            label: "Bonus plans",
+            pageTitle: "Bonus plans",
+            roles: BONUS_ADMIN_ROLES,
+            match: (pathname) => pathname.startsWith("/bonuses/plans"),
+          },
+          {
+            id: "bonus-payouts",
+            href: "/bonuses/payouts",
+            label: "Bonus payouts",
+            pageTitle: "Bonus payouts",
+            roles: BONUS_VIEW_ROLES,
+            match: (pathname) => pathname.startsWith("/bonuses/payouts"),
+          },
+          {
+            id: "bonus-settings",
+            href: "/bonuses/settings",
+            label: "Bonus settings",
+            pageTitle: "Bonus settings",
+            roles: BONUS_ADMIN_ROLES,
+            match: (pathname) => pathname.startsWith("/bonuses/settings"),
           }
         ]
       },
@@ -512,7 +577,10 @@ export function getAllNavItems(role: Role): NavItem[] {
   ].filter((item) => hasRole(role, item.roles));
 }
 
-export function isNavMatch(pathname: string, item: NavItem): boolean {
+export function isNavMatch(
+  pathname: string,
+  item: Pick<NavItem, "href" | "match">
+): boolean {
   if (item.match) return item.match(pathname);
   if (pathname === item.href) return true;
   if (item.href === "/dashboard") return false;
@@ -542,6 +610,30 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
   {
     test: (p) => p === "/notifications",
     title: "Notifications",
+  },
+  {
+    test: (p) => p === "/bonuses/awards/new",
+    title: "New bonus award",
+  },
+  {
+    test: (p) => /^\/bonuses\/awards\/[^/]+$/.test(p),
+    title: "Bonus award",
+  },
+  {
+    test: (p) => p === "/bonuses/plans",
+    title: "Bonus plans",
+  },
+  {
+    test: (p) => p === "/bonuses/payouts",
+    title: "Bonus payouts",
+  },
+  {
+    test: (p) => p === "/bonuses/settings" || p === "/settings/bonuses",
+    title: "Bonus settings",
+  },
+  {
+    test: (p) => p === "/bonuses",
+    title: "Bonuses",
   },
   {
     test: (p) => p === "/daily-reporting/new",

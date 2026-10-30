@@ -31,6 +31,7 @@ export function DashboardShell({
   avatarUrl,
   companyName,
   companyLogo,
+  bonusesEnabled = false,
   children,
 }: {
   role: Role;
@@ -42,6 +43,7 @@ export function DashboardShell({
   avatarUrl?: string | null;
   companyName?: string;
   companyLogo?: string | null;
+  bonusesEnabled?: boolean;
   children: React.ReactNode;
 }) {
   const isMobile = useIsMobile();
@@ -105,6 +107,7 @@ export function DashboardShell({
         employeeId={employeeId}
         companyName={companyName}
         companyLogo={companyLogo}
+        bonusesEnabled={bonusesEnabled}
       />
 
       <div

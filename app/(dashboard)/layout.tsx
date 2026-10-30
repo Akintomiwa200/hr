@@ -9,6 +9,7 @@ import { CurrencyProvider } from "@/components/providers/currency-provider";
 import { prisma } from "@/lib/prisma";
 import { getNavSummary } from "@/lib/nav-summary";
 import { getAppCurrencyCode } from "@/lib/currency-server";
+import { isBonusModuleEnabled } from "@/lib/bonuses/settings";
 
 export default async function DashboardLayout({
   children,
@@ -20,7 +21,7 @@ export default async function DashboardLayout({
 
   const firstName = session.firstName || "User";
   const lastName = session.lastName || "";
-  const [navSummary, currencyCode, company] = await Promise.all([
+  const [navSummary, currencyCode, company, bonusesEnabled] = await Promise.all([
     getNavSummary(session),
     getAppCurrencyCode(),
     session.companyId
@@ -29,6 +30,7 @@ export default async function DashboardLayout({
           select: { name: true, logo: true, updatedAt: true, isLocked: true, plan: true },
         })
       : Promise.resolve(null),
+    isBonusModuleEnabled(session.companyId),
   ]);
 
 // DEMO MODE: payment gates disabled — see comment.md to re-enable.
@@ -76,6 +78,7 @@ export default async function DashboardLayout({
           avatarUrl={employeeProfile?.avatar ?? session.avatar ?? null}
           companyName={company?.name}
           companyLogo={companyLogo}
+          bonusesEnabled={bonusesEnabled}
         >
           {/* DEMO MODE: plan/feature gate disabled — see comment.md to re-enable. */}
           {/* <PlanFeatureGate planId={session.companyId ? companyPlan : null}> */}

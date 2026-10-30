@@ -138,6 +138,13 @@ export const REPORTS_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
 export const REPORTS_TEAM_ROLES: Role[] = ["MANAGER", "SUPERVISOR"];
 /** Managers, HR and company admins can keep their own daily reporting workspace. */
 export const DAILY_REPORTING_ROLES: Role[] = ["COMPANY_ADMIN", "MANAGER", "HR"];
+
+/** Configure and run the Bonuses module (plans, awards, payouts, settings). */
+export const BONUS_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
+/** Approve bonus awards once approval workflow is enabled. */
+export const BONUS_APPROVER_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "ACCOUNT_OFFICER"];
+/** Open the Bonuses module. Employees only ever see their own awards. */
+export const BONUS_VIEW_ROLES: Role[] = [...ORG_ROLES];
 /** Anyone who can open the Reports module. */
 export const REPORTS_VIEW_ROLES: Role[] = [
   ...REPORTS_ADMIN_ROLES,

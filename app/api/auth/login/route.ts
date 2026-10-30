@@ -36,7 +36,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!user.isActive || user.archivedAt) {
+    let isActive = user.isActive;
+    if (user.suspendedUntil) {
+      if (user.suspendedUntil > new Date()) {
+        return NextResponse.json(
+          {
+            error: `This account is suspended until ${user.suspendedUntil.toISOString().slice(0, 10)}.${user.suspensionReason ? ` Reason: ${user.suspensionReason}` : ""}`,
+          },
+          { status: 403 }
+        );
+      }
+
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { id: user.id },
+          data: { isActive: true, suspendedAt: null, suspendedUntil: null, suspensionReason: null },
+        }),
+        ...(user.employee
+          ? [prisma.employee.update({ where: { id: user.employee.id }, data: { status: "ACTIVE" } })]
+          : []),
+      ]);
+      isActive = true;
+    }
+
+    if (!isActive || user.archivedAt) {
       return NextResponse.json(
         {
           error: user.archivedAt

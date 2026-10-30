@@ -16,6 +16,9 @@ import {
   ChevronDown,
   FileSpreadsheet,
   Cpu,
+  Archive,
+  CalendarClock,
+  UserRoundCheck,
 } from "lucide-react";
 import { Avatar, statusBadge } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
@@ -143,6 +146,9 @@ export function EmployeesModule({
   const [createOpen, setCreateOpen] = useState(false);
   const [createSuccess, setCreateSuccess] = useState<OnboardingSuccess | null>(null);
   const [deleteEmployee, setDeleteEmployee] = useState<EmployeeRow | null>(null);
+  const [suspendEmployee, setSuspendEmployee] = useState<EmployeeRow | null>(null);
+  const [suspensionUntil, setSuspensionUntil] = useState("");
+  const [suspensionReason, setSuspensionReason] = useState("");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkDepartment, setBulkDepartment] = useState(departments[0]?.id ?? "");
 
@@ -197,6 +203,7 @@ export function EmployeesModule({
       const matchesActive =
         activeFilter === "ALL" ||
         (activeFilter === "ACTIVE" && emp.status === "ACTIVE") ||
+        (activeFilter === "SUSPENDED" && emp.status === "SUSPENDED") ||
         (activeFilter === "INACTIVE" && emp.status === "INACTIVE");
 
       const matchesDepartment = departmentFilter === "ALL" || emp.departmentId === departmentFilter;
@@ -497,6 +504,34 @@ export function EmployeesModule({
     }
   }
 
+  async function updateEmployeeLifecycle(employee: EmployeeRow, action: "suspend" | "archive" | "reactivate", extra: Record<string, string> = {}) {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/employees/${employee.id}/lifecycle`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...extra }),
+      });
+      if (!res.ok) {
+        notify.error(await readApiError(res, `Could not ${action} employee`));
+        return;
+      }
+      notify.success(action === "suspend" ? "Employee suspended" : action === "archive" ? "Employee archived" : "Employee reactivated");
+      setSuspendEmployee(null);
+      setSuspensionReason("");
+      await refreshList();
+      router.refresh();
+    } catch {
+      notify.error(`Could not ${action} employee`);
+    } finally { setLoading(false); }
+  }
+
+  async function handleSuspend(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!suspendEmployee) return;
+    await updateEmployeeLifecycle(suspendEmployee, "suspend", { until: suspensionUntil, reason: suspensionReason });
+  }
+
   async function handleBulk(action: "deactivate" | "activate" | "set_department") {
     if (selected.size === 0) return;
     setLoading(true);
@@ -641,6 +676,7 @@ export function EmployeesModule({
             >
               <option value="ALL">All Status</option>
               <option value="ACTIVE">Active</option>
+              <option value="SUSPENDED">Suspended</option>
               <option value="INACTIVE">Inactive</option>
             </select>
             <select
@@ -837,7 +873,7 @@ export function EmployeesModule({
                           label={employmentLabel(resolveEmploymentType(emp))}
                           variant={variant}
                         />
-                        {emp.status !== "ACTIVE" && statusBadge(emp.status)}
+                        {emp.status !== "ACTIVE" && <div className="flex flex-col items-start gap-0.5">{statusBadge(emp.status)}{emp.status === "SUSPENDED" && emp.user?.suspendedUntil && <span className="text-[10px] text-gray-400">Until {formatDate(emp.user.suspendedUntil)}</span>}</div>}
                       </div>
                     </td>
                     <td className="px-5 py-3.5 relative">
@@ -1167,6 +1203,21 @@ export function EmployeesModule({
         )}
       </Dialog>
 
+      <Dialog
+        open={!!suspendEmployee}
+        onClose={() => setSuspendEmployee(null)}
+        title="Suspend staff access"
+        description="Sign-in is blocked immediately. Access is restored automatically after the end date when the employee next signs in."
+        size="sm"
+      >
+        {suspendEmployee && <form onSubmit={handleSuspend} className="space-y-4">
+          <p className="text-sm text-gray-700">Suspending <strong>{fullName(suspendEmployee.firstName, suspendEmployee.lastName, suspendEmployee.middleName)}</strong></p>
+          <label className="block space-y-1.5 text-xs font-medium text-gray-700">Suspension ends on<input required type="date" min={new Date().toISOString().slice(0, 10)} value={suspensionUntil} onChange={(event) => setSuspensionUntil(event.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" /></label>
+          <label className="block space-y-1.5 text-xs font-medium text-gray-700">Reason (optional)<textarea rows={3} maxLength={500} value={suspensionReason} onChange={(event) => setSuspensionReason(event.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="Add a note for the employee record" /></label>
+          <div className="flex justify-end gap-2"><button type="button" onClick={() => setSuspendEmployee(null)} className="rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancel</button><button type="submit" disabled={loading || !suspensionUntil} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">{loading ? "Suspending…" : "Suspend staff"}</button></div>
+        </form>}
+      </Dialog>
+
       {/* Bulk department */}
       <Dialog
         open={bulkOpen}
@@ -1448,6 +1499,17 @@ export function EmployeesModule({
                 >
                   Leave
                 </Link>
+                {menuEmp.status === "ACTIVE" && <button type="button" onClick={() => {
+                  const nextWeek = new Date(); nextWeek.setDate(nextWeek.getDate() + 7);
+                  setSuspensionUntil(nextWeek.toISOString().slice(0, 10));
+                  setSuspensionReason(""); setSuspendEmployee(menuEmp); setMenuOpen(null);
+                }} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-amber-700 hover:bg-amber-50"><CalendarClock className="w-4 h-4" /> Suspend temporarily</button>}
+                {menuEmp.status !== "ACTIVE" && <button type="button" onClick={() => void updateEmployeeLifecycle(menuEmp, "reactivate")} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-emerald-700 hover:bg-emerald-50"><UserRoundCheck className="w-4 h-4" /> Reactivate staff</button>}
+                {menuEmp.status !== "INACTIVE" && <button type="button" onClick={() => {
+                  if (window.confirm(`Archive ${fullName(menuEmp.firstName, menuEmp.lastName, menuEmp.middleName)}? They will lose sign-in access.`)) {
+                    setMenuOpen(null); void updateEmployeeLifecycle(menuEmp, "archive");
+                  }
+                }} className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"><Archive className="w-4 h-4" /> Archive staff</button>}
                 <button
                   type="button"
                   onClick={() => {

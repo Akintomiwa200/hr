@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Plus, Search } from "lucide-react";
+import { Check, ChevronDown, Link2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { JobWizard } from "@/components/recruitment/job-wizard";
@@ -50,6 +50,7 @@ export function JobsListModule({
   const [successOpen, setSuccessOpen] = useState(false);
   const [statusMenu, setStatusMenu] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -81,6 +82,18 @@ export function JobsListModule({
       notify.error("Failed to update status");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const copyApplicationLink = async (jobId: string) => {
+    const url = `${window.location.origin}/careers/${jobId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(jobId);
+      notify.success("Application link copied to clipboard");
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      notify.error("Failed to copy link");
     }
   };
 
@@ -158,6 +171,19 @@ export function JobsListModule({
                     )}
                   </div>
                 )}
+                <button
+                  type="button"
+                  title="Copy application link"
+                  onClick={() => void copyApplicationLink(job.id)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-brand-200 transition-colors"
+                >
+                  {copiedId === job.id ? (
+                    <Check className="w-3.5 h-3.5 text-green-600" />
+                  ) : (
+                    <Link2 className="w-3.5 h-3.5" />
+                  )}
+                  {copiedId === job.id ? "Copied!" : "Copy Link"}
+                </button>
                 <span className="text-[11px] text-gray-400 whitespace-nowrap">
                   Created {formatRelativeTime(job.postedAt)}
                 </span>

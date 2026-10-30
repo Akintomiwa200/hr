@@ -14,6 +14,7 @@ import {
 import {
   Building2,
   ExternalLink,
+  Gift,
   Link2,
   MessageSquare,
   Shield,
@@ -21,7 +22,11 @@ import {
   Wallet,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
-import { INTEGRATION_ADMIN_ROLES, SUBSCRIPTION_ADMIN_ROLES } from "@/lib/roles";
+import {
+  BONUS_ADMIN_ROLES,
+  INTEGRATION_ADMIN_ROLES,
+  SUBSCRIPTION_ADMIN_ROLES,
+} from "@/lib/roles";
 
 const COMPANY_EDIT_ROLES: string[] = ["SUPER_ADMIN", "COMPANY_ADMIN", "HR"];
 
@@ -56,6 +61,18 @@ export default async function SettingsPage() {
       href: "/settings/company",
       icon: Building2,
       accent: "text-sky-600 bg-sky-50",
+    });
+  }
+
+  if (hasRole(session.role, BONUS_ADMIN_ROLES)) {
+    cards.push({
+      id: "bonuses",
+      title: "Bonuses & incentives",
+      description:
+        "Activate the Bonuses module, define plans, approval rules, eligibility, caps and payout schedules.",
+      href: "/bonuses/settings",
+      icon: Gift,
+      accent: "text-rose-600 bg-rose-50",
     });
   }
 

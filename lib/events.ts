@@ -27,7 +27,8 @@ export type RealtimeEventType =
   | "support_updated"
   | "bulk_message_created"
   | "bulk_message_updated"
-  | "loan_updated";
+  | "loan_updated"
+  | "bonus_updated";
 
 export type RealtimeEvent = {
   type: RealtimeEventType;

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, notFound, requireRoles } from "@/lib/api-auth";
 import { DEVICE_ADMIN_ROLES } from "@/lib/roles";
+import { companyMatchesScope, getCompanyScope } from "@/lib/company-scope";
 import { isKnownTimezone } from "@/lib/zkteco/timezones";
 
 export async function PATCH(
@@ -15,6 +16,7 @@ export async function PATCH(
   const { id } = await params;
   const existing = await prisma.branch.findUnique({ where: { id } });
   if (!existing) return notFound();
+  if (!companyMatchesScope(getCompanyScope(result.session!), existing.companyId)) return notFound();
 
   const body = await request.json().catch(() => ({}));
   const data: {
@@ -59,6 +61,7 @@ export async function DELETE(
     include: { _count: { select: { employees: true, devices: true } } },
   });
   if (!existing) return notFound();
+  if (!companyMatchesScope(getCompanyScope(result.session!), existing.companyId)) return notFound();
   if (existing._count.employees > 0 || existing._count.devices > 0) {
     return badRequest("Move employees and devices off this branch before deleting it");
   }

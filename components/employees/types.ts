@@ -4,7 +4,14 @@ export type EmployeeRow = Employee & {
   endDate?: Date | string | null;
   department: Department;
   branch?: { id: string; name: string; location?: string | null } | null;
-  user?: { role: Role } | null;
+  user?: {
+    role: Role;
+    suspendedAt?: Date | string | null;
+    suspendedUntil?: Date | string | null;
+    suspensionReason?: string | null;
+    archivedAt?: Date | string | null;
+    isActive?: boolean;
+  } | null;
   manager?: { id: string; firstName: string; lastName: string } | null;
   managers?: { id: string; firstName: string; lastName: string }[];
 };

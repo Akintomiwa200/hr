@@ -335,6 +335,7 @@ export function statusBadge(status: string) {
   const map: Record<string, { label: string; variant: BadgeProps["variant"] }> = {
     ACTIVE: { label: "Active", variant: "success" },
     INACTIVE: { label: "Inactive", variant: "neutral" },
+    SUSPENDED: { label: "Suspended", variant: "error" },
     PENDING: { label: "Pending", variant: "warning" },
     APPROVED: { label: "Approved", variant: "success" },
     REJECTED: { label: "Rejected", variant: "error" },

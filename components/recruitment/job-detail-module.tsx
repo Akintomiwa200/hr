@@ -4,9 +4,11 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Check,
   Columns3,
   FileText,
   LayoutGrid,
+  Link2,
   Pencil,
   Plus,
   Search,
@@ -64,6 +66,19 @@ export function JobDetailModule({
     resumeUrl: "",
     coverLetter: "",
   });
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const copyApplicationLink = async () => {
+    const url = `${window.location.origin}/careers/${job.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      notify.success("Application link copied to clipboard");
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      notify.error("Failed to copy link");
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -154,6 +169,19 @@ export function JobDetailModule({
             <button type="button" onClick={() => setView("table")} className={`p-2 rounded-md ${view === "table" ? "bg-gray-100" : ""}`}><Columns3 className="w-4 h-4" /></button>
             <button type="button" onClick={() => setView("pipeline")} className={`p-2 rounded-md ${view === "pipeline" ? "bg-gray-100" : ""}`}><LayoutGrid className="w-4 h-4" /></button>
           </div>
+          <button
+            type="button"
+            title="Copy application link"
+            onClick={() => void copyApplicationLink()}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-brand-200 transition-colors"
+          >
+            {copiedLink ? (
+              <Check className="w-4 h-4 text-green-600" />
+            ) : (
+              <Link2 className="w-4 h-4" />
+            )}
+            {copiedLink ? "Copied!" : "Copy Application Link"}
+          </button>
           {canManage && (
             <Button onClick={() => setAddOpen(true)}><Plus className="w-4 h-4" /> Add Candidates</Button>
           )}
