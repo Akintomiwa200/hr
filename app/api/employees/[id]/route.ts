@@ -71,7 +71,6 @@ export async function PATCH(
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-
   if (!(await assertEmployeeInCompany(session, id))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -102,7 +101,12 @@ export async function PATCH(
     hireDate,
     endDate,
     dateOfBirth,
+    cameThroughAgent,
+    agentName,
   } = body;
+  if (cameThroughAgent && !String(agentName ?? "").trim()) {
+    return NextResponse.json({ error: "Enter the agent name." }, { status: 400 });
+  }
 
   if (role && existing.user) {
     const nextRole = normalizeRole(String(role));
@@ -209,6 +213,10 @@ export async function PATCH(
       ...(dateOfBirth !== undefined && {
         dateOfBirth: dateOfBirth ? parseLocalDate(dateOfBirth) : null,
       }),
+      ...(cameThroughAgent !== undefined && { cameThroughAgent: Boolean(cameThroughAgent) }),
+      ...(cameThroughAgent !== undefined || agentName !== undefined
+        ? { agentName: cameThroughAgent ? String(agentName ?? "").trim() || null : null }
+        : {}),
     },
     include: {
       department: true,

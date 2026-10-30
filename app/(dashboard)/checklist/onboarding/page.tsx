@@ -34,7 +34,7 @@ export default async function ChecklistOnboardingPage() {
       .map((c) => ({ baseRole: c.baseRole, label: c.label, roleId: c.id })),
   ];
 
-  const [departments, managers, jobTitleRows] = await Promise.all([
+  const [departments, managers, jobTitleRows, agentRows] = await Promise.all([
     prisma.department.findMany({
       where: scope.companyId ? { OR: [{ companyId: scope.companyId }, { companyId: null }] } : {},
       orderBy: { name: "asc" },
@@ -53,7 +53,14 @@ export default async function ChecklistOnboardingPage() {
       select: { title: true },
       orderBy: { title: "asc" },
     }),
+    prisma.employee.findMany({
+      where: { ...employeeCompanyWhere(scope), cameThroughAgent: true, agentName: { not: null } },
+      distinct: ["agentName"],
+      select: { agentName: true },
+      orderBy: { agentName: "asc" },
+    }),
   ]);
+  const agentNames = agentRows.map((row) => row.agentName).filter((name): name is string => Boolean(name));
 
   const jobTitles = [
     ...new Set([
@@ -81,6 +88,7 @@ export default async function ChecklistOnboardingPage() {
         managers={managers}
         jobTitles={jobTitles}
         roleOptions={roleOptions}
+        agentNames={agentNames}
       />
     </div>
   );

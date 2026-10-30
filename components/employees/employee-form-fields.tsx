@@ -37,6 +37,8 @@ export function employeeToFormData(employee: {
   hireDate?: Date | string | null;
   endDate?: Date | string | null;
   dateOfBirth?: Date | string | null;
+  cameThroughAgent?: boolean | null;
+  agentName?: string | null;
   user?: { role: Role } | null;
 }): EmployeeFormData {
   return {
@@ -69,6 +71,8 @@ export function employeeToFormData(employee: {
     hireDate: toDateInputValue(employee.hireDate) || todayInputValue(),
     endDate: toDateInputValue(employee.endDate),
     dateOfBirth: toDateInputValue(employee.dateOfBirth),
+    cameThroughAgent: Boolean(employee.cameThroughAgent),
+    agentName: employee.agentName ?? "",
   };
 }
 
@@ -80,6 +84,7 @@ export function EmployeeFormFields({
   managers,
   isEdit,
   allowedRoles = ORG_ROLES,
+  agentNames = [],
 }: {
   data: EmployeeFormData;
   onChange: (data: EmployeeFormData) => void;
@@ -88,6 +93,7 @@ export function EmployeeFormFields({
   managers: ManagerOption[];
   isEdit?: boolean;
   allowedRoles?: Role[];
+  agentNames?: string[];
 }) {
   const { currency } = useCurrency();
   function set(field: keyof EmployeeFormData, value: string | boolean | string[]) {
@@ -407,6 +413,34 @@ export function EmployeeFormFields({
       </div>
 
       <div>
+        <label className="flex items-center gap-2 text-[13px] font-medium text-gray-700">
+          <input
+            type="checkbox"
+            checked={data.cameThroughAgent}
+            onChange={(e) => onChange({ ...data, cameThroughAgent: e.target.checked, agentName: e.target.checked ? data.agentName : "" })}
+            className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+          />
+          This employee came through an agent
+        </label>
+        {data.cameThroughAgent && (
+          <div className="mt-3">
+            <label className={labelClass}>Agent</label>
+            <input
+              list="employee-agent-options"
+              value={data.agentName}
+              onChange={(e) => set("agentName", e.target.value)}
+              required
+              className={inputClass}
+              placeholder="Select or enter the agent’s name"
+            />
+            <datalist id="employee-agent-options">
+              {agentNames.map((name) => <option key={name} value={name} />)}
+            </datalist>
+          </div>
+        )}
+      </div>
+
+      <div>
         <label className={labelClass}>Address</label>
         <input
           value={data.address}
@@ -447,4 +481,6 @@ export const emptyEmployeeForm = (
   hireDate: todayInputValue(),
   endDate: "",
   dateOfBirth: "",
+  cameThroughAgent: false,
+  agentName: "",
 });

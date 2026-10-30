@@ -171,6 +171,10 @@ export function EmployeesModule({
     () => [...new Set(employees.map((e) => e.user?.role ?? "EMPLOYEE"))],
     [employees]
   );
+  const agentNames = useMemo(
+    () => [...new Set(employees.map((employee) => employee.agentName?.trim()).filter((name): name is string => Boolean(name)))].sort((a, b) => a.localeCompare(b)),
+    [employees]
+  );
 
   const filtered = useMemo(() => {
     return employees.filter((emp) => {
@@ -1103,6 +1107,7 @@ export function EmployeesModule({
             branches={branches}
             managers={managers}
             allowedRoles={allowedRoles}
+            agentNames={agentNames}
           />
           <div className="flex gap-3 pt-2">
             <button
@@ -1144,6 +1149,7 @@ export function EmployeesModule({
             managers={managers}
             isEdit
             allowedRoles={allowedRoles}
+            agentNames={agentNames}
           />
           <div className="flex gap-3 pt-2">
             <button

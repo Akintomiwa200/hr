@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { audit } from "@/lib/audit";
 import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { canManageTemplates } from "@/lib/checklist/access";
 import { companyMatchesScope, getCompanyScope } from "@/lib/company-scope";
@@ -132,8 +133,48 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   }
 
-  await prisma.checklistTemplate.delete({ where: { id } });
+  const activeTemplate = await prisma.checklistTemplate.findFirst({
+    where: { type: existing.type, companyId: existing.companyId, isActive: true, id: { not: id } },
+    select: { id: true },
+  });
+  const replacement = existing.isActive || !activeTemplate
+    ? await prisma.checklistTemplate.findFirst({
+        where: { type: existing.type, companyId: existing.companyId, id: { not: id } },
+        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+        select: { id: true },
+      })
+    : null;
+
+  if ((existing.isActive || !activeTemplate) && !replacement) {
+    return NextResponse.json(
+      { error: "This is the last template for this workflow. Create another template before deleting it." },
+      { status: 409 }
+    );
+  }
+
+  if (replacement) {
+    await prisma.$transaction([
+      prisma.checklistTemplate.updateMany({
+        where: { type: existing.type, companyId: existing.companyId, id: { not: id } },
+        data: { isActive: false },
+      }),
+      prisma.checklistTemplate.update({ where: { id: replacement.id }, data: { isActive: true } }),
+      prisma.checklistTemplate.delete({ where: { id } }),
+    ]);
+  } else {
+    await prisma.checklistTemplate.delete({ where: { id } });
+  }
+  await audit({
+    actor: session,
+    module: "checklist",
+    action: "DELETE",
+    entityId: id,
+    entityLabel: existing.name,
+    meta: { type: existing.type, activatedReplacement: replacement?.id ?? null },
+  });
   broadcastAppEvent("checklist_updated", { id, action: "template_deleted" });
   revalidatePath("/checklist/settings");
-  return NextResponse.json({ success: true });
+  revalidatePath("/checklist/onboarding");
+  revalidatePath("/checklist/offboarding");
+  return NextResponse.json({ success: true, replacementActivated: Boolean(replacement) });
 }

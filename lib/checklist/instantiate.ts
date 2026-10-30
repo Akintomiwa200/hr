@@ -185,21 +185,7 @@ export async function findOrCreateChecklistInstance(opts: {
   });
   if (existing) return existing;
 
-  if (opts.type === "ONBOARDING") {
-    await ensureDefaultOnboardingTemplate(companyId);
-  } else {
-    await ensureDefaultOffboardingTemplate(companyId);
-  }
-
-  const template = await prisma.checklistTemplate.findFirst({
-    where: {
-      type: opts.type,
-      isActive: true,
-      companyId,
-    },
-    orderBy: { createdAt: "desc" },
-  });
-  if (!template) throw new Error(`No active ${opts.type.toLowerCase()} template found`);
+  const template = await resolveActiveTemplate(opts.type, companyId);
 
   const created = await createChecklistFromTemplate({
     templateId: template.id,
@@ -228,7 +214,14 @@ export async function resolveActiveTemplate(
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
   });
   if (active) return active;
-
+  const fallback = await prisma.checklistTemplate.findFirst({
+    where: { type, companyId },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+  });
+  if (fallback) {
+    await prisma.checklistTemplate.updateMany({ where: { type, companyId }, data: { isActive: false } });
+    return prisma.checklistTemplate.update({ where: { id: fallback.id }, data: { isActive: true } });
+  }
   return type === "ONBOARDING"
     ? ensureDefaultOnboardingTemplate(companyId)
     : ensureDefaultOffboardingTemplate(companyId);
@@ -360,6 +353,12 @@ export async function ensureDefaultOnboardingTemplate(companyId: string | null) 
   });
   if (existing) return existing;
 
+  const anyTemplate = await prisma.checklistTemplate.findFirst({
+    where: { type: "ONBOARDING", companyId },
+    orderBy: { createdAt: "desc" },
+  });
+  if (anyTemplate) return anyTemplate;
+
   const created = await prisma.checklistTemplate.create({
     data: {
       companyId,
@@ -414,6 +413,12 @@ export async function ensureDefaultOffboardingTemplate(companyId: string | null)
     orderBy: { createdAt: "desc" },
   });
   if (existing) return existing;
+
+  const anyTemplate = await prisma.checklistTemplate.findFirst({
+    where: { type: "OFFBOARDING", companyId },
+    orderBy: { createdAt: "desc" },
+  });
+  if (anyTemplate) return anyTemplate;
 
   const created = await prisma.checklistTemplate.create({
     data: {

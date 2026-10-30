@@ -53,12 +53,14 @@ export function OnboardingPeopleModule({
   managers,
   jobTitles = [],
   roleOptions = ORG_ROLES.map((role) => ({ baseRole: role, label: role, roleId: null })),
+  agentNames = [],
 }: {
   canManage: boolean;
   departments: Department[];
   managers: Manager[];
   jobTitles?: string[];
   roleOptions?: RoleOption[];
+  agentNames?: string[];
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -68,6 +70,7 @@ export function OnboardingPeopleModule({
   const [roleValue, setRoleValue] = useState("EMPLOYEE");
   const [customJobTitle, setCustomJobTitle] = useState(false);
   const [jobTitleSelect, setJobTitleSelect] = useState("");
+  const [cameThroughAgent, setCameThroughAgent] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent && rows.length === 0) setListLoading(true);
@@ -135,6 +138,7 @@ export function OnboardingPeopleModule({
       setRoleValue("EMPLOYEE");
       setCustomJobTitle(false);
       setJobTitleSelect("");
+      setCameThroughAgent(false);
       await load(true);
       router.refresh();
     } catch {
@@ -283,6 +287,35 @@ export function OnboardingPeopleModule({
                   defaultValue={todayInputValue()}
                   className={inputClass}
                 />
+              </div>
+              <div className="sm:col-span-2 xl:col-span-3 rounded-xl border border-gray-100 p-4">
+                <label className="flex items-center gap-2 text-[13px] font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    name="cameThroughAgent"
+                    value="true"
+                    checked={cameThroughAgent}
+                    onChange={(event) => setCameThroughAgent(event.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  This person came through an agent
+                </label>
+                {cameThroughAgent && (
+                  <div className="mt-3 max-w-md">
+                    <label className={labelClass}>Agent</label>
+                    <input
+                      name="agentName"
+                      list="onboarding-agent-options"
+                      required
+                      className={inputClass}
+                      placeholder="Select or enter the agent’s name"
+                    />
+                    <datalist id="onboarding-agent-options">
+                      {agentNames.map((name) => <option key={name} value={name} />)}
+                    </datalist>
+                    <p className="mt-1 text-[11px] text-gray-400">Choose a previous agent or type a new name.</p>
+                  </div>
+                )}
               </div>
             </div>
 

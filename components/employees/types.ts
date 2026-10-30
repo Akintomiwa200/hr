@@ -46,4 +46,6 @@ export type EmployeeFormData = {
   hireDate: string;
   endDate: string;
   dateOfBirth: string;
+  cameThroughAgent: boolean;
+  agentName: string;
 };

@@ -30,6 +30,8 @@ export type CreateEmployeeInput = {
   branchId?: string | null;
   hireDate?: string | Date | null;
   dateOfBirth?: string | Date | null;
+  cameThroughAgent?: boolean;
+  agentName?: string | null;
   employeeCode?: string | null;
 };
 
@@ -252,6 +254,8 @@ export async function createEmployeeAccount(input: CreateEmployeeInput) {
           bankName: input.bankName?.trim() || null,
           accountNumber: input.accountNumber?.trim() || null,
           nin: input.nin?.trim() || null,
+          cameThroughAgent: Boolean(input.cameThroughAgent),
+          agentName: input.cameThroughAgent ? input.agentName?.trim() || null : null,
           status: input.status || "ACTIVE",
         },
       },

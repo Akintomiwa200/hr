@@ -101,6 +101,9 @@ export async function POST(request: NextRequest) {
   if (!firstName || !lastName || !email || !jobTitle || !departmentId) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
+  if (body.cameThroughAgent && !String(body.agentName ?? "").trim()) {
+    return NextResponse.json({ error: "Enter the agent’s name." }, { status: 400 });
+  }
 
   const normalizedEmployeeCode =
     typeof employeeCode === "string" ? employeeCode.trim() : "";
@@ -163,6 +166,8 @@ export async function POST(request: NextRequest) {
       companyId: session.companyId,
       hireDate,
       dateOfBirth,
+      cameThroughAgent: Boolean(body.cameThroughAgent),
+      agentName: body.agentName ? String(body.agentName).trim() : null,
       employeeCode: normalizedEmployeeCode || null,
     });
 

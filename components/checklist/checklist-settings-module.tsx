@@ -27,6 +27,7 @@ export function ChecklistSettingsModule({ canManage }: { canManage: boolean }) {
   const [form, setForm] = useState({ name: "", description: "" });
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/checklist/templates?type=${tab}`, { cache: "no-store" });
@@ -90,15 +91,18 @@ export function ChecklistSettingsModule({ canManage }: { canManage: boolean }) {
     }
   };
 
-  const remove = async (id: string) => {
-    setBusyId(id);
+  const remove = async () => {
+    if (!templateToDelete) return;
+    setBusyId(templateToDelete.id);
     try {
-      const res = await fetch(`/api/checklist/templates/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/checklist/templates/${templateToDelete.id}`, { method: "DELETE" });
       if (!res.ok) {
         notify.error(await readApiError(res, "Failed to delete template"));
         return;
       }
-      notify.success("Template deleted");
+      const result = await res.json();
+      notify.success(result.replacementActivated ? "Template deleted; the next template is now active" : "Template deleted");
+      setTemplateToDelete(null);
       await load();
     } finally {
       setBusyId(null);
@@ -250,7 +254,7 @@ export function ChecklistSettingsModule({ canManage }: { canManage: boolean }) {
                 {canManage && (
                   <button
                     type="button"
-                    onClick={() => remove(tpl.id)}
+                    onClick={() => setTemplateToDelete(tpl)}
                     disabled={busyId === tpl.id}
                     className="p-2 text-red-500 hover:bg-red-50 rounded-lg shrink-0"
                     title="Delete template"
@@ -279,6 +283,40 @@ export function ChecklistSettingsModule({ canManage }: { canManage: boolean }) {
           ))}
         </div>
       )}
+
+      <Dialog
+        open={!!templateToDelete}
+        onClose={() => setTemplateToDelete(null)}
+        title="Delete checklist template?"
+        description="Current onboarding and offboarding checklists keep their tasks. Deleting this template only affects future checklists."
+        size="sm"
+      >
+        {templateToDelete && (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
+              <p className="font-semibold text-gray-900">{templateToDelete.name}</p>
+              <p className="mt-1">{templateToDelete._count.tasks} tasks · used {templateToDelete._count.instances ?? 0} time(s)</p>
+              {templateToDelete.isActive && templates.length > 1 && (
+                <p className="mt-2 text-emerald-700">Another {tab.toLowerCase()} template will be activated automatically.</p>
+              )}
+              {templates.length <= 1 && (
+                <p className="mt-2 text-amber-700">This is the last template. Create another template and activate it before deleting this one.</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setTemplateToDelete(null)}>Cancel</Button>
+              <Button
+                variant="danger"
+                loading={busyId === templateToDelete.id}
+                disabled={templates.length <= 1}
+                onClick={() => void remove()}
+              >
+                Delete template
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
 
       <Dialog
         open={createOpen}
