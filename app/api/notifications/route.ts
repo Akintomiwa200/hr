@@ -12,6 +12,7 @@ export async function GET() {
     items: feed.items,
     unread: feed.unreadCount,
     pendingLeaveCount: feed.pendingLeaveCount,
+    pendingResignationCount: feed.pendingResignationCount,
   });
 }
 

@@ -16,6 +16,7 @@ import {
   Megaphone,
   Medal,
   RefreshCw,
+  UserMinus,
   Wallet,
 } from "lucide-react";
 import { useNavSummary } from "@/components/layout/nav-provider";
@@ -73,6 +74,12 @@ const TYPE_META: Record<string, TypeMeta> = {
     icon: HandCoins,
     tile: "bg-teal-50 text-teal-600",
     chip: "bg-teal-50 text-teal-700 ring-teal-100",
+  },
+  resignation: {
+    label: "Resignation",
+    icon: UserMinus,
+    tile: "bg-orange-50 text-orange-600",
+    chip: "bg-orange-50 text-orange-700 ring-orange-100",
   },
   subscription: {
     label: "Subscription",

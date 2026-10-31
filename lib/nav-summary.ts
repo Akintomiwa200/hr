@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { SessionUser } from "@/lib/auth";
 import {
@@ -21,6 +22,8 @@ import {
   notificationToNavItem,
   parseUserPreferences,
 } from "@/lib/notifications";
+import { isResignationAdmin } from "@/lib/resignation/access";
+import { resignationStatusLabel } from "@/lib/resignation/service";
 
 export type { NavNotification, NavSummary, NavTeamMember } from "@/lib/nav-summary-types";
 
@@ -44,6 +47,7 @@ export type NotificationFeed = {
   items: NavNotification[];
   unreadCount: number;
   pendingLeaveCount: number;
+  pendingResignationCount: number;
 };
 
 /**
@@ -60,6 +64,33 @@ export async function getNotificationFeed(session: SessionUser): Promise<Notific
   const today = startOfDay();
   const isApprover = canApproveLeave(role);
   const teamScope = canViewTeamScope(role) && session.employeeId;
+  const isResignationApprover =
+    isResignationAdmin(role) ||
+    ((role === "MANAGER" || role === "SUPERVISOR") && Boolean(session.employeeId));
+
+  const pendingResignationWhere: Prisma.ResignationWhereInput | null = !isResignationApprover
+    ? null
+    : isResignationAdmin(role)
+      ? {
+          status: { in: ["PENDING_MANAGER", "PENDING_HR"] },
+          ...(session.companyId ? { companyId: session.companyId } : {}),
+        }
+      : session.employeeId
+        ? {
+            status: "PENDING_MANAGER" as const,
+            OR: [
+              { managerId: session.employeeId },
+              {
+                employee: {
+                  OR: [
+                    { managerId: session.employeeId },
+                    { managers: { some: { id: session.employeeId } } },
+                  ],
+                },
+              },
+            ],
+          }
+        : null;
 
   const userPrefs = await prisma.user.findUnique({
     where: { id: session.id },
@@ -83,6 +114,8 @@ export async function getNotificationFeed(session: SessionUser): Promise<Notific
     teamLateToday,
     pendingManagerAppraisals,
     myAppraisalUpdates,
+    pendingResignations,
+    myResignationUpdates,
   ] = await Promise.all([
     getUserNotifications(session.id, FEED_LIMIT),
     getUnreadNotificationCount(session.id),
@@ -179,6 +212,25 @@ export async function getNotificationFeed(session: SessionUser): Promise<Notific
             status: { in: ["MANAGER_REVIEW", "COMPLETED"] },
           },
           include: { cycle: true },
+          orderBy: { updatedAt: "desc" },
+          take: 3,
+        })
+      : Promise.resolve([]),
+    pendingResignationWhere
+      ? prisma.resignation.findMany({
+          where: pendingResignationWhere,
+          include: { employee: true },
+          orderBy: { createdAt: "desc" },
+          take: 8,
+        })
+      : Promise.resolve([]),
+    session.employeeId
+      ? prisma.resignation.findMany({
+          where: {
+            employeeId: session.employeeId,
+            updatedAt: { gte: since },
+            status: { in: ["APPROVED", "REJECTED", "WITHDRAWN", "COMPLETED"] },
+          },
           orderBy: { updatedAt: "desc" },
           take: 3,
         })
@@ -296,6 +348,37 @@ export async function getNotificationFeed(session: SessionUser): Promise<Notific
     }
   }
 
+  for (const resignation of pendingResignations) {
+    const managerStage = resignation.status === "PENDING_MANAGER";
+    addComputed({
+      id: `resignation-${resignation.id}`,
+      type: "resignation",
+      title: managerStage
+        ? "Resignation endorsement needed"
+        : "Resignation approval needed",
+      message: `${fullName(
+        resignation.employee.firstName,
+        resignation.employee.lastName,
+        resignation.employee.middleName
+      )} resigned — last working day ${resignation.lastWorkingDay.toLocaleDateString()}`,
+      href: `/resignation/${resignation.id}`,
+      createdAt: resignation.createdAt.toISOString(),
+    });
+  }
+
+  for (const resignation of myResignationUpdates) {
+    addComputed({
+      id: `my-resignation-${resignation.id}`,
+      type: "resignation",
+      title: `Resignation ${resignationStatusLabel(resignation.status).toLowerCase()}`,
+      message: `Your resignation request is now ${resignationStatusLabel(
+        resignation.status
+      ).toLowerCase()}`,
+      href: `/resignation/${resignation.id}`,
+      createdAt: resignation.updatedAt.toISOString(),
+    });
+  }
+
   const computedKeys = notifications.filter((n) => !n.persistent).map((n) => n.id);
   if (computedKeys.length > 0) {
     const reads = await getComputedNotificationReads(session.id, computedKeys);
@@ -316,6 +399,7 @@ export async function getNotificationFeed(session: SessionUser): Promise<Notific
     items: notifications,
     unreadCount: unreadDbCount + unreadComputed,
     pendingLeaveCount: pendingLeaves.length,
+    pendingResignationCount: pendingResignations.length,
   };
 }
 
@@ -379,6 +463,7 @@ export async function getNavSummary(session: SessionUser): Promise<NavSummary> {
     teamMembers: previewMembers.slice(0, 3),
     teamOverflowCount,
     pendingLeaveCount: feed.pendingLeaveCount,
+    pendingResignationCount: feed.pendingResignationCount,
     inviteHref: canInvite ? "/checklist/onboarding" : null,
     canInvite,
     messagesHref: "/help/contact",

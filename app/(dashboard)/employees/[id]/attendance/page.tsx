@@ -72,6 +72,7 @@ export default async function EmployeeAttendancePage({
         showCheckIn={session.employeeId === id}
         canManageManual={canManageEmployees(session.role)}
         showPayrollTab={showPayrollTab}
+        showResignationTab
         stats={stats}
       />
     </div>

@@ -52,6 +52,7 @@ export default async function EmployeeLeavePage({
         showRequestForm={session.employeeId === id}
         canApprove={canApprove}
         showPayrollTab={showPayrollTab}
+        showResignationTab
       />
     </div>
   );

@@ -30,6 +30,7 @@ const REFRESH_EVENT_TYPES = new Set([
   "appraisal_updated",
   "department_updated",
   "checklist_updated",
+  "resignation_updated",
   "holiday_updated",
   "notification_updated",
 ]);

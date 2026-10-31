@@ -44,6 +44,16 @@ enum AttendanceStatus {
   HALF_DAY
 }
 
+/** Employee-initiated resignation lifecycle. */
+enum ResignationStatus {
+  PENDING_MANAGER
+  PENDING_HR
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  COMPLETED
+}
+
 enum AttendanceMethod {
   WEB
   DEVICE
@@ -164,6 +174,8 @@ model Company {
   payrollRuns       PayrollRun[]
   attendanceArchives AttendanceArchive[]
   offboardingSettings OffboardingSettings[]
+  resignationSettings ResignationSettings?
+  resignations      Resignation[]
   performanceSettings PerformanceSettings[]
   kpiDefinitions    KpiDefinition[]
   appraisalCycles   AppraisalCycle[]
@@ -446,6 +458,9 @@ model Employee {
   dailyReports         DailyReport[]
   loans                Loan[]
   bonusAwards          BonusAward[]
+  resignations         Resignation[] @relation("ResignationEmployee")
+  managedResignations  Resignation[] @relation("ResignationManager")
+  reviewedResignations Resignation[] @relation("ResignationReviewer")
 
   @@index([branchId])
   @@index([biometricPin])
@@ -574,6 +589,78 @@ model OffboardingSettings {
   updatedAt   DateTime @updatedAt
 
   company Company? @relation(fields: [companyId], references: [id])
+}
+
+/**
+ * Company-wide resignation policy: statutory/contractual notice period and
+ * which approval stages are required before an exit is accepted.
+ */
+model ResignationSettings {
+  id                         String   @id @default(cuid())
+  companyId                  String?  @unique
+  noticePeriodDays           Int      @default(30)
+  managerEndorsementRequired Boolean  @default(true)
+  hrApprovalRequired         Boolean  @default(true)
+  autoStartOffboarding       Boolean  @default(true)
+  allowWithdrawal            Boolean  @default(true)
+  updatedAt                  DateTime @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id])
+}
+
+/**
+ * An employee's resignation request. Moves through manager endorsement, HR
+ * approval, and completion (which starts the exit checklist and offboards).
+ */
+model Resignation {
+  id                      String            @id @default(cuid())
+  companyId               String?
+  employeeId              String
+  status                  ResignationStatus @default(PENDING_MANAGER)
+  reason                  String
+  noticePeriodDays        Int
+  requestedLastWorkingDay DateTime
+  lastWorkingDay          DateTime
+  managerId               String?
+  managerNote             String?
+  managerReviewedAt       DateTime?
+  hrReviewerId            String?
+  hrNote                  String?
+  hrReviewedAt            DateTime?
+  decidedAt               DateTime?
+  completedAt             DateTime?
+  withdrawnAt             DateTime?
+  offboardingInstanceId   String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  company    Company?           @relation(fields: [companyId], references: [id])
+  employee   Employee           @relation("ResignationEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  manager    Employee?          @relation("ResignationManager", fields: [managerId], references: [id], onDelete: SetNull)
+  hrReviewer Employee?          @relation("ResignationReviewer", fields: [hrReviewerId], references: [id], onDelete: SetNull)
+  events     ResignationEvent[]
+
+  @@index([companyId, status])
+  @@index([employeeId, createdAt])
+  @@index([managerId])
+}
+
+/** Immutable audit trail of every resignation decision and status change. */
+model ResignationEvent {
+  id            String   @id @default(cuid())
+  resignationId String
+  actorUserId   String?
+  actorName     String
+  actorRole     String?
+  action        String
+  fromStatus    String?
+  toStatus      String?
+  note          String?
+  createdAt     DateTime @default(now())
+
+  resignation Resignation @relation(fields: [resignationId], references: [id], onDelete: Cascade)
+
+  @@index([resignationId, createdAt])
 }
 
 /**

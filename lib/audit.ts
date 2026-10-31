@@ -24,6 +24,7 @@ export const auditModules = [
   "integrations",
   "subscription",
   "offboarding",
+  "resignation",
   "reports",
   "bulk-messaging",
   "bonuses",

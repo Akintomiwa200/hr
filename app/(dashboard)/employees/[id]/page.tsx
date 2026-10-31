@@ -54,6 +54,7 @@ export default async function EmployeeDetailPage({
           "payroll_updated",
           "performance_updated",
           "checklist_updated",
+          "resignation_updated",
         ]}
       />
       <EmployeeDetailContent employee={employee} canViewSalary={canViewSalary} />

@@ -431,6 +431,16 @@ export const dashboardNavSections: NavSection[] = [
           pathname === "/checklist/offboarding" || pathname.startsWith("/checklist/offboarding/"),
       },
       {
+        id: "resignation",
+        href: "/resignation",
+        label: "Resignation",
+        pageTitle: "Resignation",
+        icon: UserMinus,
+        roles: ALL_STAFF,
+        match: (pathname) =>
+          pathname === "/resignation" || pathname.startsWith("/resignation/"),
+      },
+      {
         id: "checklist-todos",
         href: "/checklist/todos",
         label: "To-Dos",
@@ -704,6 +714,10 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
     title: "Employee Payroll",
   },
   {
+    test: (p) => /^\/employees\/[^/]+\/resignation/.test(p),
+    title: "Employee Resignation",
+  },
+  {
     test: (p) => p.startsWith("/payroll/runs"),
     title: "Payroll runs",
   },
@@ -858,6 +872,14 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
   {
     test: (p) => p === "/attendance/devices",
     title: "Attendance Devices",
+  },
+  {
+    test: (p) => /^\/resignation\/[^/]+$/.test(p),
+    title: "Resignation Details",
+  },
+  {
+    test: (p) => p === "/settings/resignation",
+    title: "Resignation settings",
   },
   {
     test: (p) => p === "/settings/subscription",

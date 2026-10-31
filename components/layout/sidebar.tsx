@@ -204,6 +204,7 @@ function NavSection({
   bonusesEnabled,
   notificationCount,
   pendingLeaveCount,
+  pendingResignationCount,
   collapsed,
   onNavigate,
 }: {
@@ -215,6 +216,7 @@ function NavSection({
   bonusesEnabled: boolean;
   notificationCount: number;
   pendingLeaveCount: number;
+  pendingResignationCount: number;
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
@@ -237,7 +239,9 @@ function NavSection({
               ? notificationCount
               : item.id === "leave" && pendingLeaveCount > 0
                 ? pendingLeaveCount
-                : undefined;
+                : item.id === "resignation" && pendingResignationCount > 0
+                  ? pendingResignationCount
+                  : undefined;
 
           if (item.subItems && item.subItems.length > 0) {
             return (
@@ -391,6 +395,7 @@ export function Sidebar({
             bonusesEnabled={bonusesEnabled}
             notificationCount={summary.notificationCount}
             pendingLeaveCount={summary.pendingLeaveCount}
+            pendingResignationCount={summary.pendingResignationCount}
             collapsed={collapsed}
             onNavigate={onCloseMobile}
           />

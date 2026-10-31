@@ -25,6 +25,7 @@ export function EmployeeLeaveModule({
   showRequestForm,
   canApprove,
   showPayrollTab = false,
+  showResignationTab = false,
 }: {
   employeeId: string;
   employeeName: string;
@@ -32,6 +33,7 @@ export function EmployeeLeaveModule({
   showRequestForm: boolean;
   canApprove: boolean;
   showPayrollTab?: boolean;
+  showResignationTab?: boolean;
 }) {
   const pending = leaves.filter((l) => l.status === "PENDING").length;
   const approved = leaves.filter((l) => l.status === "APPROVED").length;
@@ -39,7 +41,12 @@ export function EmployeeLeaveModule({
 
   return (
     <div>
-      <EmployeeTimeNav employeeId={employeeId} active="leave" showPayrollTab={showPayrollTab} />
+      <EmployeeTimeNav
+        employeeId={employeeId}
+        active="leave"
+        showPayrollTab={showPayrollTab}
+        showResignationTab={showResignationTab}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total" value={leaves.length} icon={CalendarDays} />

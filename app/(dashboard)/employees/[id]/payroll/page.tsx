@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession, canManagePayroll } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canViewEmployee, getEmployeeOrNull } from "@/lib/employee-access";
+import { canViewEmployee, canViewEmployeeTimeData, getEmployeeOrNull } from "@/lib/employee-access";
 import { requirePeoplePage } from "@/lib/page-access";
 import { canViewEmployeePayroll } from "@/lib/payroll-access";import { EmployeeSubpageHeader } from "@/components/employees/employee-subpage-header";
 import { EmployeePayrollModule } from "@/components/payroll/employee-payroll-module";
@@ -24,6 +24,7 @@ export default async function EmployeePayrollPage({
 
   const canViewSalary = await canViewEmployeePayroll(session, id);
   if (!canViewSalary) redirect(`/employees/${id}`);
+  const showResignationTab = await canViewEmployeeTimeData(session, id);
 
   const records = await prisma.payrollRecord.findMany({
     where: { employeeId: id },
@@ -47,6 +48,7 @@ export default async function EmployeePayrollPage({
         employeeName={fullName(employee.firstName, employee.lastName, employee.middleName)}
         baseSalary={employee.salary}
         records={records}
+        showResignationTab={showResignationTab}
       />
     </div>
   );

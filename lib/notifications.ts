@@ -14,6 +14,8 @@ export type NotificationType =
 
   | "general"
 
+  | "resignation"
+
   | "loan";
 export type NotificationRecord = {
   id: string;
@@ -44,6 +46,7 @@ subscription: "announcements",
   integration: "announcements",
   checklist: "checklist",
   general: "announcements",
+  resignation: "announcements",
   loan: "payroll",
 };
 
@@ -87,6 +90,8 @@ const COMPUTED_NOTIFICATION_PREFIXES = [
   "performance-",
   "my-performance-",
   "checklist-",
+  "resignation-",
+  "my-resignation-",
   "loan-",
   "general-",
   "subscription-",

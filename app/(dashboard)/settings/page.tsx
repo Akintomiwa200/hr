@@ -18,6 +18,7 @@ import {
   Link2,
   MessageSquare,
   Shield,
+  UserMinus,
   UserRound,
   Wallet,
 } from "lucide-react";
@@ -77,6 +78,14 @@ export default async function SettingsPage() {
   }
 
   if (canManageEmployees(session.role)) {
+    cards.push({
+      id: "resignation",
+      title: "Resignation settings",
+      description: "Set notice periods and choose the manager and HR approval stages.",
+      href: "/settings/resignation",
+      icon: UserMinus,
+      accent: "text-amber-600 bg-amber-50",
+    });
     cards.push({
       id: "retention",
       title: "Retention settings",

@@ -16,6 +16,7 @@ import {
   PenLine,
   Search,
   Settings,
+  UserMinus,
   Users,
   Wallet,
 } from "lucide-react";
@@ -318,6 +319,64 @@ export const helpArticles: HelpArticle[] = [
       },
     ],
     relatedSlugs: ["getting-started", "leave", "attendance"],
+  },
+  {
+    slug: "resignation",
+    title: "Resignation & exit",
+    description: "Submit a resignation, track approvals, and hand over to offboarding.",
+    category: "people",
+    icon: UserMinus,
+    roles: ALL_STAFF,
+    moduleHref: "/resignation",
+    sections: [
+      {
+        heading: "Submitting a resignation",
+        body: "Open Resignation from the sidebar. Every employee can submit one active resignation at a time with a reason and a requested last working day. The last working day cannot be in the past and defaults to the company notice period.",
+      },
+      {
+        heading: "Approval chain",
+        body: "Depending on company settings, a resignation goes to your manager for endorsement, then to HR for approval. HR and company admins can also approve directly from either pending stage.",
+        bullets: [
+          "Pending manager — waiting for your reporting line to endorse",
+          "Pending HR — endorsed and waiting for the final decision",
+          "Approved — notice period confirmed and the exit checklist starts",
+          "Completed — your final working day has passed and access is deactivated",
+        ],
+      },
+      {
+        heading: "Changing the last working day",
+        body: "You can request a different last working day while your resignation is pending or approved. HR can adjust it at any time before completion.",
+      },
+      {
+        heading: "Withdrawing",
+        body: "While your resignation is still pending, you can withdraw it if your company allows withdrawal. Withdrawn and rejected requests stay in your history so you can see what happened.",
+      },
+      {
+        heading: "Offboarding handoff",
+        body: "Approving a resignation starts the standard offboarding checklist so equipment, documents, and access are wrapped up. Completing the resignation deactivates the employee and links the exit checklist from both the resignation page and the employee profile.",
+      },
+    ],
+    steps: [
+      { title: "Open Resignation", body: "Choose Resignation under Workspace in the sidebar." },
+      { title: "Submit your notice", body: "Add a reason and confirm your last working day, then send the request." },
+      { title: "Track approvals", body: "Watch the status badge and activity timeline for manager and HR decisions." },
+      { title: "Finish your exit", body: "Work through the linked offboarding checklist before your last day." },
+    ],
+    faqs: [
+      {
+        question: "Can I resign if I do not have a manager?",
+        answer: "Yes. If no manager exists, the request skips the manager stage and goes straight to HR (or is approved immediately when HR approval is disabled).",
+      },
+      {
+        question: "Who can see my resignation?",
+        answer: "You, your manager and reporting line, HR, and company admins. Other employees cannot see your resignation.",
+      },
+      {
+        question: "Does resigning deactivate my account immediately?",
+        answer: "No. Access stays active until HR completes the resignation, which deactivates the account as part of offboarding.",
+      },
+    ],
+    relatedSlugs: ["employees", "leave", "settings"],
   },
   {
     slug: "teams",

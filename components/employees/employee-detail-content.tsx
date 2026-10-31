@@ -10,6 +10,7 @@ import {
   Phone,
   ShieldCheck,
   Star,
+  UserMinus,
   Users,
   Wallet,
 } from "lucide-react";
@@ -172,6 +173,13 @@ export function EmployeeDetailContent({
           >
             <CalendarDays className="w-4 h-4" />
             Leave
+          </Link>
+          <Link
+            href={`/employees/${employee.id}/resignation`}
+            className="inline-flex items-center gap-2 px-4 py-2 text-[13px] bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50"
+          >
+            <UserMinus className="w-4 h-4" />
+            Resignation
           </Link>
           {canViewSalary && (
             <Link

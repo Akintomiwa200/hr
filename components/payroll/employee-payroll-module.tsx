@@ -23,11 +23,13 @@ export function EmployeePayrollModule({
   employeeName,
   baseSalary,
   records,
+  showResignationTab = false,
 }: {
   employeeId: string;
   employeeName: string;
   baseSalary: number;
   records: PayrollRecord[];
+  showResignationTab?: boolean;
 }) {
   const formatCurrency = useFormatCurrency();
   const totalNet = records.reduce((sum, r) => sum + r.netPay, 0);
@@ -36,7 +38,13 @@ export function EmployeePayrollModule({
 
   return (
     <div>
-      <EmployeeTimeNav employeeId={employeeId} active="payroll" showPayrollTab showTimeTabs />
+      <EmployeeTimeNav
+        employeeId={employeeId}
+        active="payroll"
+        showPayrollTab
+        showTimeTabs
+        showResignationTab={showResignationTab}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Base salary" value={formatCurrency(baseSalary)} icon={Wallet} />

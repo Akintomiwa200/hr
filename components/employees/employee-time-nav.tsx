@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, Clock, User, Wallet } from "lucide-react";
+import { CalendarDays, Clock, User, UserMinus, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -9,6 +9,7 @@ const tabs = [
   { id: "leave", label: "Leave", href: (id: string) => `/employees/${id}/leave`, icon: CalendarDays },
   { id: "attendance", label: "Attendance", href: (id: string) => `/employees/${id}/attendance`, icon: Clock },
   { id: "payroll", label: "Payroll", href: (id: string) => `/employees/${id}/payroll`, icon: Wallet },
+  { id: "resignation", label: "Resignation", href: (id: string) => `/employees/${id}/resignation`, icon: UserMinus },
 ] as const;
 
 export function EmployeeTimeNav({
@@ -16,15 +17,18 @@ export function EmployeeTimeNav({
   active,
   showTimeTabs = true,
   showPayrollTab = false,
+  showResignationTab = false,
 }: {
   employeeId: string;
-  active: "profile" | "leave" | "attendance" | "payroll";
+  active: "profile" | "leave" | "attendance" | "payroll" | "resignation";
   showTimeTabs?: boolean;
   showPayrollTab?: boolean;
+  showResignationTab?: boolean;
 }) {
   const visible = tabs.filter((tab) => {
     if (tab.id === "profile") return true;
     if (tab.id === "payroll") return showPayrollTab;
+    if (tab.id === "resignation") return showResignationTab;
     return showTimeTabs;
   });
 

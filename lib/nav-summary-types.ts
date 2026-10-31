@@ -1,6 +1,6 @@
 export type NavNotification = {
   id: string;
-  type: "leave" | "announcement" | "payroll" | "attendance" | "performance" | "subscription" | "integration" | "checklist" | "general" | "loan";
+  type: "leave" | "announcement" | "payroll" | "attendance" | "performance" | "subscription" | "integration" | "checklist" | "general" | "loan" | "resignation";
   title: string;
   message: string;
   href: string;
@@ -23,6 +23,7 @@ export type NavSummary = {
   teamMembers: NavTeamMember[];
   teamOverflowCount: number;
   pendingLeaveCount: number;
+  pendingResignationCount: number;
   inviteHref: string | null;
   canInvite: boolean;
   messagesHref: string;

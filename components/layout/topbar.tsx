@@ -18,6 +18,7 @@ import {
   PanelLeft,
   Plus,
   Search,
+  UserMinus,
   UserRound,
   Settings,
   Wallet,
@@ -42,6 +43,7 @@ const notificationIcons: Record<NavNotification["type"], typeof Bell> = {
   checklist: ClipboardList,
   general: Bell,
   loan: HandCoins,
+  resignation: UserMinus,
 };
 
 const notificationTypeLabels: Record<NavNotification["type"], string> = {
@@ -55,6 +57,7 @@ const notificationTypeLabels: Record<NavNotification["type"], string> = {
   checklist: "Checklist",
   general: "Update",
   loan: "Loan",
+  resignation: "Resignation",
 };
 
 function NotificationsMenu() {

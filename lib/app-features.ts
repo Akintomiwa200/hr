@@ -165,6 +165,16 @@ export const appFeatures: AppFeature[] = [
     helpSlug: "employees",
   },
   {
+    id: "resignation",
+    label: "Resignation",
+    description: "Submit resignations and manage notice periods and approvals",
+    href: "/resignation",
+    section: "People",
+    icon: UserMinus,
+    roles: ALL_STAFF,
+    helpSlug: "resignation",
+  },
+  {
     id: "checklist-todos",
     label: "To-Dos",
     description: "Onboarding and offboarding task board",
