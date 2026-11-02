@@ -6,6 +6,7 @@ import { requirePeoplePage } from "@/lib/page-access";
 import { canViewEmployeePayroll } from "@/lib/payroll-access";
 import { EmployeeDetailContent } from "@/components/employees/employee-detail-content";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
+import { canManageDocuments } from "@/lib/documents/access";
 
 export default async function EmployeeDetailPage({
   params,
@@ -57,7 +58,7 @@ export default async function EmployeeDetailPage({
           "resignation_updated",
         ]}
       />
-      <EmployeeDetailContent employee={employee} canViewSalary={canViewSalary} />
+      <EmployeeDetailContent employee={employee} canViewSalary={canViewSalary} canViewDocuments={canManageDocuments(session) || session.employeeId === employee.id} />
     </div>
   );
 }

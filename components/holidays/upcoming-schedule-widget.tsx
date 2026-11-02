@@ -1,9 +1,12 @@
 import Link from "next/link";
 import {
   Briefcase,
+  Cake,
+  CalendarClock,
   CalendarCheck2,
   CalendarDays,
   ChevronRight,
+  StickyNote,
   UserRound,
   Wallet,
 } from "lucide-react";
@@ -15,6 +18,9 @@ const kindStyles = {
   leave: { icon: UserRound, bg: "bg-sky-50", color: "text-sky-600" },
   payroll: { icon: Wallet, bg: "bg-emerald-50", color: "text-emerald-600" },
   interview: { icon: Briefcase, bg: "bg-orange-50", color: "text-orange-600" },
+  personal: { icon: StickyNote, bg: "bg-pink-50", color: "text-pink-600" },
+  birthday: { icon: Cake, bg: "bg-rose-50", color: "text-rose-600" },
+  shifts: { icon: CalendarClock, bg: "bg-amber-50", color: "text-amber-700" },
 };
 
 function formatEventDate(value: string) {

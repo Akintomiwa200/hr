@@ -41,6 +41,7 @@ function isPrismaClientFresh(client: PrismaClient) {
     hasDelegate(client, "leaveAllocation", "findMany") &&
     hasDelegate(client, "resignation", "findMany") &&
     hasDelegate(client, "resignationSettings", "findMany") &&
+    hasDelegate(client, "calendarEvent", "findMany") &&
     hasDelegate(client, "auditLog", "findMany")
   );
 }

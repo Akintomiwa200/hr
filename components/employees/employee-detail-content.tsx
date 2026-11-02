@@ -4,6 +4,7 @@ import {
   Briefcase,
   CalendarDays,
   Clock,
+  FileText,
   Landmark,
   Mail,
   MapPin,
@@ -110,9 +111,11 @@ function InfoRow({
 export function EmployeeDetailContent({
   employee,
   canViewSalary,
+  canViewDocuments,
 }: {
   employee: EmployeeDetail;
   canViewSalary: boolean;
+  canViewDocuments: boolean;
 }) {
   const employmentType = resolveEmploymentType(employee);
   const presentCount = employee.attendanceRecords.filter((r) =>
@@ -160,6 +163,15 @@ export function EmployeeDetailContent({
         </div>
 
         <div className="flex flex-wrap gap-2 shrink-0">
+          {canViewDocuments && (
+            <Link
+              href={`/documents?employeeId=${employee.id}`}
+              className="inline-flex items-center gap-2 px-4 py-2 text-[13px] bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50"
+            >
+              <FileText className="w-4 h-4" />
+              Documents
+            </Link>
+          )}
           <Link
             href={`/employees/${employee.id}/attendance`}
             className="inline-flex items-center gap-2 px-4 py-2 text-[13px] bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50"

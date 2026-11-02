@@ -38,6 +38,7 @@ export default async function DashboardPage({
     role: session.role,
     employeeId: session.employeeId,
     companyId: session.companyId,
+    userId: session.id,
   };
 
   if (session.role === "SUPER_ADMIN") {

@@ -74,6 +74,14 @@ export function isNoteModelReady() {
   return hasDelegate(getPrismaClient(), "note", "findMany");
 }
 
+export function isCalendarEventModelReady() {
+  return hasDelegate(getPrismaClient(), "calendarEvent", "findMany");
+}
+
+export function isShiftAssignmentModelReady() {
+  return hasDelegate(getPrismaClient(), "shiftAssignment", "findMany");
+}
+
 export function isDailyReportModelReady() {
   return hasDelegate(getPrismaClient(), "dailyReport", "findMany");
 }

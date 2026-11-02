@@ -1,5 +1,5 @@
 import type { Prisma, Role } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma, isCalendarEventModelReady, isShiftAssignmentModelReady } from "@/lib/prisma";
 import { employeeCompanyWhere } from "@/lib/company-scope";
 import { isSuperAdmin } from "@/lib/roles";
 import { getHolidays } from "@/lib/holidays-data";
@@ -40,6 +40,29 @@ export type CalendarPayroll = {
   status: string;
 };
 
+export type CalendarPersonalEvent = {
+  id: string;
+  title: string;
+  notes: string | null;
+  startAt: string;
+  endAt: string | null;
+  allDay: boolean;
+  color: string;
+  visibility: string;
+  sharedWith: string[];
+  canEdit: boolean;
+};
+
+export type CalendarShift = {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  title: string;
+  notes: string | null;
+  startAt: string;
+  endAt: string;
+};
+
 export type CalendarAttendanceRow = {
   id: string;
   employeeId: string;
@@ -58,12 +81,44 @@ export async function getCalendarData(session: {
   role: Role;
   employeeId?: string;
   companyId?: string | null;
+  userId?: string;
 }) {
   const holidays = await getHolidays();
   const orgEmployee = employeeCompanyWhere({
     companyId: session.companyId ?? null,
     isPlatformAdmin: isSuperAdmin(session.role),
   });
+
+  const personalEventsPromise =
+    session.userId && isCalendarEventModelReady()
+      ? prisma.calendarEvent.findMany({
+          where: {
+            OR: [
+              { userId: session.userId },
+              ...(session.companyId ? [{ companyId: session.companyId, visibility: "PUBLIC" }] : []),
+              ...(session.userId ? [{ sharedWith: { contains: session.userId } }] : []),
+            ],
+          },
+          orderBy: { startAt: "asc" },
+          take: 500,
+        })
+      : Promise.resolve([]);
+
+  const shiftsPromise = isShiftAssignmentModelReady()
+    ? prisma.shiftAssignment.findMany({
+        where: {
+          ...(session.companyId ? { companyId: session.companyId } : {}),
+          ...(session.role === "EMPLOYEE" && session.employeeId
+            ? { employeeId: session.employeeId }
+            : session.role === "EMPLOYEE"
+              ? { id: "__none__" }
+              : {}),
+        },
+        include: { employee: { select: { firstName: true, lastName: true } } },
+        orderBy: { startAt: "asc" },
+        take: 1000,
+      })
+    : Promise.resolve([]);
 
   const leaveWhere: Prisma.LeaveRequestWhereInput =
     session.role === "EMPLOYEE" && session.employeeId
@@ -76,7 +131,7 @@ export async function getCalendarData(session: {
           employee: orgEmployee,
         };
 
-  const [leaveRequests, interviews, payrollRecords, employees, attendanceRecords] =
+  const [leaveRequests, interviews, payrollRecords, employees, attendanceRecords, personalEvents, shifts] =
     await Promise.all([
     prisma.leaveRequest.findMany({
       where: leaveWhere,
@@ -111,15 +166,20 @@ export async function getCalendarData(session: {
           orderBy: { periodStart: "desc" },
           take: 24,
         }),
-    session.role === "EMPLOYEE" && session.employeeId
-      ? prisma.employee.findMany({
-          where: { id: session.employeeId },
-          orderBy: { firstName: "asc" },
-        })
-      : prisma.employee.findMany({
-          where: { status: "ACTIVE", ...orgEmployee },
-          orderBy: { firstName: "asc" },
-        }),
+    prisma.employee.findMany({
+      where: { status: "ACTIVE", ...orgEmployee },
+      select: {
+        id: true,
+        userId: true,
+        firstName: true,
+        lastName: true,
+        avatar: true,
+        jobTitle: true,
+        employeeCode: true,
+        dateOfBirth: true,
+      },
+      orderBy: { firstName: "asc" },
+    }),
     session.role === "EMPLOYEE" && session.employeeId
       ? prisma.attendance.findMany({
           where: { employeeId: session.employeeId },
@@ -133,6 +193,8 @@ export async function getCalendarData(session: {
           orderBy: { date: "desc" },
           take: 200,
         }),
+    personalEventsPromise,
+    shiftsPromise,
   ]);
 
   const attendanceRows: CalendarAttendanceRow[] = attendanceRecords.flatMap((record) => {
@@ -190,9 +252,34 @@ export async function getCalendarData(session: {
       periodEnd: p.periodEnd.toISOString(),
       status: p.status,
     })),
+    personalEvents: personalEvents.filter((event) => {
+      if (event.userId === session.userId || event.visibility === "PUBLIC") return true;
+      return safeUserIds(event.sharedWith).includes(session.userId ?? "");
+    }).map((event) => ({
+      id: event.id,
+      title: event.title,
+      notes: event.notes,
+      startAt: event.startAt.toISOString(),
+      endAt: event.endAt?.toISOString() ?? null,
+      allDay: event.allDay,
+      color: event.color,
+      visibility: event.visibility,
+      sharedWith: safeUserIds(event.sharedWith),
+      canEdit: event.userId === session.userId,
+    })),
+    shifts: shifts.map((shift) => ({
+      id: shift.id,
+      employeeId: shift.employeeId,
+      employeeName: fullName(shift.employee.firstName, shift.employee.lastName),
+      title: shift.title,
+      notes: shift.notes,
+      startAt: shift.startAt.toISOString(),
+      endAt: shift.endAt.toISOString(),
+    })),
     attendanceRows,
     employees: employees.map((e) => ({
       id: e.id,
+      userId: e.userId,
       firstName: e.firstName,
       lastName: e.lastName,
       avatar: e.avatar,
@@ -201,4 +288,13 @@ export async function getCalendarData(session: {
       dateOfBirth: e.dateOfBirth?.toISOString() ?? null,
     })),
   };
+}
+
+function safeUserIds(value: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
 }

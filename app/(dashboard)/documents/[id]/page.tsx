@@ -5,16 +5,19 @@ import { canManageDocuments, canViewSharedResource, formatFileSize } from "@/lib
 import { shareScopeLabel } from "@/lib/documents/share-groups";
 import { PageHeader } from "@/components/ui";
 import { FolderDetailModule } from "@/components/documents/folder-detail-module";
+import { canViewDocument } from "@/lib/documents/access";
 
 export default async function FolderDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ employeeId?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const { id } = await params;
+  const [{ id }, { employeeId }] = await Promise.all([params, searchParams]);
   const folder = await prisma.documentFolder.findUnique({
     where: { id },
     include: { documents: { orderBy: { createdAt: "desc" } } },
@@ -32,26 +35,36 @@ export default async function FolderDetailPage({
     redirect("/documents");
   }
 
-  const totalSize = folder.documents.reduce((sum, d) => sum + (d.fileSize ?? 0), 0);
+  const companyEmployees = await prisma.employee.findMany({
+    where: { status: "ACTIVE", user: { companyId: session.companyId ?? undefined } },
+    select: { id: true, firstName: true, lastName: true },
+    orderBy: { firstName: "asc" },
+  });
+  const visibleDocuments = folder.documents.filter((document) =>
+    canViewDocument(session, document, employee, folder) && (!employeeId || document.employeeId === employeeId)
+  );
 
   return (
     <div>
       <PageHeader title="Documents" description={folder.description ?? "Folder documents"} />
       <FolderDetailModule
         canManage={canManageDocuments(session)}
+        employees={companyEmployees}
+        employeeFilterId={employeeId}
         folder={{
           id: folder.id,
           name: folder.name,
           description: folder.description,
           sharedLabel: shareScopeLabel(folder.shareScope, folder.shareTargets),
-          documents: folder.documents.map((d) => ({
+          documents: visibleDocuments.map((d) => ({
             id: d.id,
             title: d.title,
             fileName: d.fileName ?? d.title,
-            fileUrl: d.fileUrl,
+            fileUrl: d.publicId ? `/api/documents/${d.id}/file` : d.fileUrl,
             fileSizeLabel: formatFileSize(d.fileSize),
             uploadedBy: d.uploadedBy,
             createdAt: d.createdAt.toISOString(),
+            visibility: d.visibility,
           })),
         }}
       />

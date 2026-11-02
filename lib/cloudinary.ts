@@ -80,6 +80,7 @@ export async function uploadToCloudinary(input: CloudinaryUploadInput) {
     url?: string;
     public_id?: string;
     bytes?: number;
+    resource_type?: "image" | "raw" | "video";
     error?: { message?: string };
   };
   if (!res.ok || (!data.secure_url && !data.url)) {
@@ -90,6 +91,7 @@ export async function uploadToCloudinary(input: CloudinaryUploadInput) {
     url: data.secure_url || data.url!,
     publicId: data.public_id || input.publicId,
     bytes: data.bytes ?? input.buffer.length,
+    resourceType: data.resource_type || resourceType,
   };
 }
 

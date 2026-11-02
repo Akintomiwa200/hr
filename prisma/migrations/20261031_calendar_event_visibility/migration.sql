@@ -1,0 +1,5 @@
+ALTER TABLE "CalendarEvent"
+ADD COLUMN "visibility" TEXT NOT NULL DEFAULT 'PRIVATE';
+
+ALTER TABLE "CalendarEvent"
+ADD COLUMN "sharedWith" TEXT NOT NULL DEFAULT '[]';

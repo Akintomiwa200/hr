@@ -67,6 +67,20 @@ export function canViewSharedResource(
   return true;
 }
 
+export function canViewDocument(
+  session: SessionUser,
+  document: Shareable & { visibility: string; employeeId?: string | null; uploadedById?: string | null },
+  employee: EmployeeContext | null,
+  folder?: Shareable | null
+): boolean {
+  if (document.visibility === "PRIVATE") {
+    return document.uploadedById === session.id || Boolean(document.employeeId && document.employeeId === session.employeeId) || (!document.uploadedById && canManageDocuments(session));
+  }
+  if (canManageDocuments(session)) return true;
+  if (!canViewSharedResource(session, document, employee)) return false;
+  return !folder || canViewSharedResource(session, folder, employee);
+}
+
 export function formatFileSize(bytes: number | null | undefined): string {
   if (!bytes || bytes <= 0) return "—";
   if (bytes < 1024) return `${bytes} B`;

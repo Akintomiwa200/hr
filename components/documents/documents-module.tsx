@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FolderOpen, Plus, Share2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Copy, FolderOpen, MoreHorizontal, Pencil, Plus, Share2, Trash2 } from "lucide-react";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { Sheet } from "@/components/ui/sheet";
+import { Dialog } from "@/components/ui/dialog";
 import { ShareFolderDialog } from "@/components/documents/share-folder-dialog";import { notify, readApiError } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 import { isSseHandshake } from "@/lib/events";
@@ -30,15 +32,21 @@ export function DocumentsModule({
   folders: initial,
   canManage,
   departments,
+  employeeId,
 }: {
   folders: FolderRow[];
   canManage: boolean;
   departments: { id: string; name: string }[];
+  employeeId?: string;
 }) {
   const router = useRouter();
   const [folders, setFolders] = useState(initial);
   const [createOpen, setCreateOpen] = useState(false);
   const [shareFolder, setShareFolder] = useState<FolderRow | null>(null);
+  const [editFolder, setEditFolder] = useState<FolderRow | null>(null);
+  const [deleteFolder, setDeleteFolder] = useState<FolderRow | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [form, setForm] = useState({ name: "", description: "" });
   const [loading, setLoading] = useState(false);
 
@@ -70,11 +78,11 @@ export function DocumentsModule({
     return () => es.close();
   }, [router]);
 
-  const createFolder = async () => {
+  const saveFolder = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/document-folders", {
-        method: "POST",
+      const res = await fetch(editFolder ? `/api/document-folders/${editFolder.id}` : "/api/document-folders", {
+        method: editFolder ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
@@ -82,8 +90,9 @@ export function DocumentsModule({
         notify.error(await readApiError(res, "Failed to create folder"));
         return;
       }
-      notify.success("Folder created");
+      notify.success(editFolder ? "Folder updated" : "Folder created");
       setCreateOpen(false);
+      setEditFolder(null);
       setForm({ name: "", description: "" });
       router.refresh();
     } catch {
@@ -91,6 +100,35 @@ export function DocumentsModule({
     } finally {
       setLoading(false);
     }
+  };
+
+  const removeFolder = async () => {
+    if (!deleteFolder) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/document-folders/${deleteFolder.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to delete folder"));
+        return;
+      }
+      notify.success("Folder and its files deleted");
+      setDeleteFolder(null);
+      router.refresh();
+    } catch {
+      notify.error("Failed to delete folder");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyFolderLink = async (folder: FolderRow) => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/documents/${folder.id}`);
+      notify.success("Folder link copied");
+    } catch {
+      notify.error("Could not copy the folder link");
+    }
+    setOpenMenuId(null);
   };
 
   return (
@@ -110,7 +148,7 @@ export function DocumentsModule({
           <EmptyState
             icon={FolderOpen}
             title="No folders yet"
-            description={canManage ? "Create a folder to organize company documents." : "No shared folders are available yet."}
+            description={employeeId ? "No folders contain documents filed for this employee." : canManage ? "Create a folder to organize company documents." : "No shared folders are available yet."}
           />
         </Card>
       ) : (
@@ -134,7 +172,7 @@ export function DocumentsModule({
                   <tr key={folder.id} className="hover:bg-gray-50/50">
                     <td className="px-5 py-4">
                       <Link
-                        href={`/documents/${folder.id}`}
+                        href={`/documents/${folder.id}${employeeId ? `?employeeId=${employeeId}` : ""}`}
                         className="inline-flex items-center gap-2 font-medium text-gray-900 hover:text-brand-600"
                       >
                         <FolderOpen className="w-4 h-4 text-brand-500" />
@@ -155,11 +193,23 @@ export function DocumentsModule({
                       <td className="px-5 py-4">
                         <button
                           type="button"
-                          onClick={() => setShareFolder(folder)}
+                          onClick={(event) => {
+                            if (openMenuId === folder.id) {
+                              setOpenMenuId(null);
+                              return;
+                            }
+                            const rect = event.currentTarget.getBoundingClientRect();
+                            const menuHeight = 220;
+                            setMenuPosition({
+                              top: rect.bottom + menuHeight > window.innerHeight ? Math.max(8, rect.top - menuHeight) : rect.bottom + 4,
+                              left: Math.max(8, Math.min(rect.right - 176, window.innerWidth - 184)),
+                            });
+                            setOpenMenuId(folder.id);
+                          }}
                           className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700"
                         >
-                          <Share2 className="w-3.5 h-3.5" />
-                          Share
+                          <MoreHorizontal className="w-4 h-4" />
+                          Actions
                         </button>
                       </td>
                     )}
@@ -171,14 +221,34 @@ export function DocumentsModule({
         </Card>
       )}
 
-      <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title="Add New Folder" width="md">
+      {openMenuId && typeof document !== "undefined" && createPortal(
+        <>
+          <button type="button" aria-label="Close folder actions" className="fixed inset-0 z-[100] cursor-default" onClick={() => setOpenMenuId(null)} />
+          {(() => {
+            const folder = folders.find((item) => item.id === openMenuId);
+            if (!folder) return null;
+            return (
+              <div style={{ top: menuPosition.top, left: menuPosition.left }} className="fixed z-[101] w-44 rounded-xl border border-gray-200 bg-white p-1 shadow-xl">
+                <Link href={`/documents/${folder.id}${employeeId ? `?employeeId=${employeeId}` : ""}`} onClick={() => setOpenMenuId(null)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><FolderOpen className="h-4 w-4" />Open</Link>
+                <button type="button" onClick={() => { setShareFolder(folder); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><Share2 className="h-4 w-4" />Share</button>
+                <button type="button" onClick={() => { setEditFolder(folder); setForm({ name: folder.name, description: folder.description ?? "" }); setCreateOpen(true); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><Pencil className="h-4 w-4" />Edit</button>
+                <button type="button" onClick={() => void copyFolderLink(folder)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><Copy className="h-4 w-4" />Copy link</button>
+                <button type="button" onClick={() => { setDeleteFolder(folder); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" />Delete</button>
+              </div>
+            );
+          })()}
+        </>,
+        document.body
+      )}
+
+      <Sheet open={createOpen} onClose={() => { setCreateOpen(false); setEditFolder(null); }} title={editFolder ? "Edit Folder" : "Add New Folder"} width="md">
         <div className="flex flex-col h-full min-h-0">
           <div className="flex-1 p-6 space-y-5 overflow-y-auto">
             <div>
               <label className="text-xs font-semibold text-gray-500 uppercase mb-1.5 block">Name</label>
               <input
                 className={inputClass}
-                placeholder="Designer Essential"
+              placeholder="Folder name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
@@ -198,8 +268,8 @@ export function DocumentsModule({
             <Button variant="secondary" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button loading={loading} onClick={createFolder}>
-              Create
+            <Button loading={loading} onClick={saveFolder}>
+              {editFolder ? "Save changes" : "Create"}
             </Button>
           </div>
         </div>
@@ -215,6 +285,10 @@ export function DocumentsModule({
           }}
         />
       )}
+      <Dialog open={!!deleteFolder} onClose={() => setDeleteFolder(null)} title="Delete folder">
+        <p className="mb-5 text-sm text-gray-600">Delete <strong>{deleteFolder?.name}</strong> and all files inside it? This cannot be undone.</p>
+        <div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setDeleteFolder(null)}>Cancel</Button><Button variant="danger" loading={loading} onClick={removeFolder}>Delete folder</Button></div>
+      </Dialog>
     </>
   );
 }

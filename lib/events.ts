@@ -30,6 +30,8 @@ export type RealtimeEventType =
   | "loan_updated"
   | "bonus_updated"
   | "resignation_updated"
+  | "calendar_event_updated"
+  | "shift_updated"
   | "audit_updated";
 
 export type RealtimeEvent = {

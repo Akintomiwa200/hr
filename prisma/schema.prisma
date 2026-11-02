@@ -167,6 +167,8 @@ model Company {
   departments   Department[]
   announcements Announcement[]
   holidays      Holiday[]
+  calendarEvents CalendarEvent[]
+  shiftAssignments ShiftAssignment[]
   branches          Branch[]
   attendanceDevices AttendanceDevice[]
   payrollSettings   PayrollSettings[]
@@ -312,6 +314,7 @@ model User {
   notifications   Notification[]
   notificationReads NotificationRead[]
   notes           Note[]
+  calendarEvents  CalendarEvent[]
   dailyReports    DailyReport[]
   supportTicketsCreated  SupportTicket[]   @relation("SupportTicketsAuthored")
   supportTicketsAssigned SupportTicket[]   @relation("SupportTicketsAssigned")
@@ -455,6 +458,8 @@ model Employee {
   completedChecklistTasks ChecklistTask[] @relation("ChecklistTaskCompleter")
   portalDocuments      PortalDocument[]
   notes                Note[]
+  calendarEvents       CalendarEvent[]
+  shiftAssignments    ShiftAssignment[]
   dailyReports         DailyReport[]
   loans                Loan[]
   bonusAwards          BonusAward[]
@@ -1417,8 +1422,14 @@ model Document {
   category      String
   fileUrl       String?
   fileName      String?
+  mimeType      String?
+  publicId      String?
+  storageType   String?
   fileSize      Int?
   uploadedBy    String
+  uploadedById  String?
+  visibility    String   @default("PRIVATE") // PRIVATE | PUBLIC
+  protectionHash String?
   shareScope    String   @default("EVERYONE")
   shareTargets  String?
   createdAt     DateTime @default(now())
@@ -1551,6 +1562,54 @@ model Holiday {
   createdAt DateTime @default(now())
 
   company Company? @relation(fields: [companyId], references: [id])
+}
+
+/**
+ * Personal calendar event. Owned by a single user and visible only to that
+ * user, so every role can keep their own schedule alongside the shared
+ * company calendar (holidays, leave, payroll, interviews).
+ */
+model CalendarEvent {
+  id         String    @id @default(cuid())
+  companyId  String?
+  userId     String
+  employeeId String?
+  title      String
+  visibility String    @default("PRIVATE") // PRIVATE | PUBLIC
+  sharedWith String   @default("[]") // JSON array of user IDs for selected visibility
+  notes      String?
+  startAt    DateTime
+  endAt      DateTime?
+  allDay     Boolean   @default(false)
+  color      String    @default("violet")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  company  Company?  @relation(fields: [companyId], references: [id])
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, startAt])
+  @@index([companyId, startAt])
+}
+
+model ShiftAssignment {
+  id          String   @id @default(cuid())
+  companyId   String
+  employeeId  String
+  title       String   @default("Shift")
+  notes       String?
+  startAt     DateTime
+  endAt       DateTime
+  assignedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, startAt])
+  @@index([employeeId, startAt])
 }
 
 /**

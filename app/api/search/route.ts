@@ -9,6 +9,7 @@ import {
   portalTemplateCompanyWhere,
 } from "@/lib/company-scope";
 import { canManageLetters } from "@/lib/letters/access";
+import { canViewDocument } from "@/lib/documents/access";
 
 export async function GET(request: NextRequest) {
   const session = await requireSession();
@@ -55,15 +56,13 @@ export async function GET(request: NextRequest) {
           ],
         };
 
-  const documentWhere =
-    session.role === "EMPLOYEE" && session.employeeId
-      ? {
-          OR: [
-            { employeeId: null, title: contains },
-            { employeeId: session.employeeId, title: contains },
-          ],
-        }
-      : { title: contains };
+  const documentWhere = {
+    ...(scope.companyId ? { companyId: scope.companyId } : {}),
+    title: contains,
+    ...(session.role === "EMPLOYEE" && session.employeeId
+      ? { OR: [{ employeeId: null }, { employeeId: session.employeeId }] }
+      : {}),
+  };
 
   const [employees, documents, jobs, announcements, allHolidays, letters] = await Promise.all([
     prisma.employee.findMany({
@@ -74,8 +73,8 @@ export async function GET(request: NextRequest) {
     }),
     prisma.document.findMany({
       where: documentWhere,
-      include: { employee: true },
-      take: 6,
+      include: { employee: true, folder: true },
+      take: 20,
       orderBy: { createdAt: "desc" },
     }),
     session.role === "EMPLOYEE"
@@ -124,5 +123,16 @@ export async function GET(request: NextRequest) {
       type: holiday.type,
     }));
 
-  return NextResponse.json({ employees, documents, jobs, announcements, holidays, letters });
+  const employeeContext = session.employeeId
+    ? await prisma.employee.findUnique({
+        where: { id: session.employeeId },
+        select: { id: true, departmentId: true, hireDate: true, status: true, managerId: true },
+      })
+    : null;
+  const visibleDocuments = documents
+    .filter((doc) => canViewDocument(session, doc, employeeContext, doc.folder))
+    .slice(0, 6)
+    .map(({ protectionHash: _protectionHash, fileUrl: _fileUrl, ...doc }) => doc);
+
+  return NextResponse.json({ employees, documents: visibleDocuments, jobs, announcements, holidays, letters });
 }

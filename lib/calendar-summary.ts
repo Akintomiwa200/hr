@@ -6,7 +6,7 @@ export type UpcomingCalendarEvent = {
   title: string;
   date: string;
   time: string;
-  kind: "holiday" | "leave" | "payroll" | "interview";
+  kind: "holiday" | "leave" | "payroll" | "interview" | "personal" | "birthday" | "shifts";
   href: string;
 };
 
@@ -22,8 +22,15 @@ function formatTime(hour: number) {
   return `${h}:00 ${period}`;
 }
 
+function formatClock(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 export async function getUpcomingCalendarEvents(
-  session: { role: Role; employeeId?: string; companyId?: string | null },
+  session: { role: Role; employeeId?: string; companyId?: string | null; userId?: string },
   limit = 5
 ): Promise<UpcomingCalendarEvent[]> {
   const data = await getCalendarData(session);
@@ -33,6 +40,22 @@ export async function getUpcomingCalendarEvents(
   horizon.setDate(horizon.getDate() + 30);
 
   const events: UpcomingCalendarEvent[] = [];
+
+  for (const employee of data.employees) {
+    if (!employee.dateOfBirth) continue;
+    const birthDate = new Date(employee.dateOfBirth);
+    const nextBirthday = new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate());
+    if (nextBirthday < today) nextBirthday.setFullYear(nextBirthday.getFullYear() + 1);
+    if (nextBirthday > horizon) continue;
+    events.push({
+      id: `birthday-${employee.id}`,
+      title: `${employee.firstName} ${employee.lastName}’s birthday`,
+      date: nextBirthday.toISOString(),
+      time: "All day",
+      kind: "birthday",
+      href: `/holidays?date=${nextBirthday.toISOString().slice(0, 10)}&category=birthday`,
+    });
+  }
 
   for (const holiday of data.holidays) {
     const date = parseDate(holiday.date);
@@ -88,6 +111,39 @@ export async function getUpcomingCalendarEvents(
       time: formatTime(scheduled.getHours()),
       kind: "interview",
       href: `/recruitment/candidates/${interview.applicationId}`,
+    });
+  }
+
+  for (const shift of data.shifts) {
+    const date = parseDate(shift.startAt);
+    if (date < today || date > horizon) continue;
+    events.push({
+      id: `shift-${shift.id}`,
+      title: `${shift.employeeName} — ${shift.title}`,
+      date: shift.startAt,
+      time: `${formatClock(shift.startAt)} – ${formatClock(shift.endAt)}`,
+      kind: "shifts",
+      href: `/holidays?date=${shift.startAt.slice(0, 10)}&category=shifts`,
+    });
+  }
+
+  for (const event of data.personalEvents) {
+    const start = parseDate(event.startAt);
+    const end = event.endAt ? parseDate(event.endAt) : start;
+    if (end < today || start > horizon) continue;
+    const eventDate = start < today ? today : start;
+    const time = event.allDay
+      ? "All day"
+      : event.endAt
+        ? `${formatClock(event.startAt)} – ${formatClock(event.endAt)}`
+        : formatClock(event.startAt);
+    events.push({
+      id: `personal-${event.id}`,
+      title: event.title,
+      date: eventDate.toISOString(),
+      time,
+      kind: "personal",
+      href: `/holidays?date=${eventDate.toISOString().slice(0, 10)}&category=personal`,
     });
   }
 

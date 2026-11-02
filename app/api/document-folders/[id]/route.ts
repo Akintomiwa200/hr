@@ -4,8 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { serializeShareTargets } from "@/lib/documents/share-groups";
-import { canManageDocuments, canViewSharedResource, formatFileSize } from "@/lib/documents/access";
+import { canManageDocuments, canViewDocument, canViewSharedResource, formatFileSize } from "@/lib/documents/access";
 import { shareScopeLabel } from "@/lib/documents/share-groups";
+import { deleteCloudinaryFile } from "@/lib/cloudinary";
 
 async function getEmployeeContext(session: NonNullable<Awaited<ReturnType<typeof requireSession>>>) {
   if (!session.employeeId) return null;
@@ -47,11 +48,12 @@ export async function GET(
     sharedLabel: shareScopeLabel(folder.shareScope, folder.shareTargets),
     fileCount: folder.documents.length,
     totalSizeLabel: formatFileSize(totalSize),
-    documents: folder.documents.map((d) => ({
+    documents: folder.documents.filter((d) => canViewDocument(session, d, employee, folder)).map((d) => ({
       id: d.id,
       title: d.title,
       fileName: d.fileName ?? d.title,
-      fileUrl: d.fileUrl,
+      fileUrl: d.publicId ? `/api/documents/${d.id}/file` : d.fileUrl,
+      visibility: d.visibility,
       fileSize: d.fileSize,
       fileSizeLabel: formatFileSize(d.fileSize),
       uploadedBy: d.uploadedBy,
@@ -100,10 +102,15 @@ export async function DELETE(
   if (!session || !canManageDocuments(session)) return unauthorized();
 
   const { id } = await params;
-  const existing = await prisma.documentFolder.findUnique({ where: { id } });
+  const existing = await prisma.documentFolder.findUnique({ where: { id }, include: { documents: { select: { publicId: true, storageType: true } } } });
   if (!existing) return notFound();
 
   await prisma.documentFolder.delete({ where: { id } });
+  await Promise.all(existing.documents.flatMap((document) =>
+    document.publicId && (document.storageType === "image" || document.storageType === "raw")
+      ? [deleteCloudinaryFile(document.publicId, document.storageType)]
+      : []
+  ));
   broadcastAppEvent("folder_updated", { id, action: "deleted" });
   revalidatePath("/documents");
   return NextResponse.json({ success: true });

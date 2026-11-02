@@ -37,7 +37,7 @@ export function NotesPageHeader({
   return (
     <PageHeader
       title="Notes"
-      description="Capture, pin, and organize your notes — your personal note taker."
+      description="Capture notes and run your personal to-do board — private to you."
       action={
         <NotesFilterButton
           typeFilter={typeFilter}

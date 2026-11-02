@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Download, FileText, Trash2, Upload } from "lucide-react";
+import { ChevronRight, Download, Eye, EyeOff, FileText, LockKeyhole, Trash2, Upload } from "lucide-react";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
@@ -18,6 +18,7 @@ type DocFile = {
   fileSizeLabel: string;
   uploadedBy: string;
   createdAt: string;
+  visibility: string;
 };
 
 type FolderDetail = {
@@ -34,15 +35,22 @@ const inputClass =
 export function FolderDetailModule({
   folder,
   canManage,
+  employees,
+  employeeFilterId,
 }: {
   folder: FolderDetail;
   canManage: boolean;
+  employees: { id: string; firstName: string; lastName: string }[];
+  employeeFilterId?: string;
 }) {
   const router = useRouter();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [deleteDoc, setDeleteDoc] = useState<DocFile | null>(null);
+  const [pinDoc, setPinDoc] = useState<DocFile | null>(null);
+  const [pinMode, setPinMode] = useState<"open" | "protect">("open");
+  const [pinValue, setPinValue] = useState("");
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ title: "", fileUrl: "", fileName: "", fileSize: "" });
+  const [form, setForm] = useState({ title: "", file: null as File | null, employeeId: "", visibility: "PRIVATE", protectionPin: "" });
 
   useEffect(() => {
     const es = new EventSource("/api/events");
@@ -71,25 +79,25 @@ export function FolderDetailModule({
   const upload = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: form.title,
-          category: folder.name,
-          fileUrl: form.fileUrl,
-          fileName: form.fileName || form.title,
-          fileSize: form.fileSize ? Number(form.fileSize) : undefined,
-          folderId: folder.id,
-        }),
-      });
+      if (!form.file) {
+        notify.error("Choose a file to upload");
+        return;
+      }
+      const payload = new FormData();
+      payload.set("title", form.title);
+      payload.set("folderId", folder.id);
+      payload.set("file", form.file);
+      payload.set("employeeId", form.employeeId);
+      payload.set("visibility", form.visibility);
+      if (form.visibility === "PROTECTED") payload.set("protectionPin", form.protectionPin);
+      const res = await fetch("/api/documents", { method: "POST", body: payload });
       if (!res.ok) {
         notify.error(await readApiError(res, "Failed to upload file"));
         return;
       }
       notify.success("File uploaded");
       setUploadOpen(false);
-      setForm({ title: "", fileUrl: "", fileName: "", fileSize: "" });
+      setForm({ title: "", file: null, employeeId: "", visibility: "PRIVATE", protectionPin: "" });
       router.refresh();
     } catch {
       notify.error("Failed to upload file");
@@ -117,10 +125,82 @@ export function FolderDetailModule({
     }
   };
 
+  const toggleVisibility = async (doc: DocFile) => {
+    setLoading(true);
+    try {
+      const visibility = doc.visibility === "PUBLIC" ? "PRIVATE" : doc.visibility === "PROTECTED" ? "PRIVATE" : "PUBLIC";
+      const res = await fetch(`/api/documents/${doc.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visibility }),
+      });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Failed to update document visibility"));
+        return;
+      }
+      notify.success(visibility === "PUBLIC" ? "Document is public" : "Document is private and protected");
+      router.refresh();
+    } catch {
+      notify.error("Failed to update document visibility");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openPinDialog = (doc: DocFile, mode: "open" | "protect") => {
+    setPinDoc(doc);
+    setPinMode(mode);
+    setPinValue("");
+  };
+
+  const submitPin = async () => {
+    if (!pinDoc || pinValue.length < 4) {
+      notify.error("Enter a PIN or password with at least 4 characters");
+      return;
+    }
+    setLoading(true);
+    try {
+      const protect = pinMode === "protect";
+      const res = protect
+        ? await fetch(`/api/documents/${pinDoc.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ visibility: "PROTECTED", protectionPin: pinValue }),
+          })
+        : await fetch(`/api/documents/${pinDoc.id}/file`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pin: pinValue }),
+          });
+      if (!res.ok) {
+        notify.error(await readApiError(res, protect ? "Could not protect the file" : "Could not open the file"));
+        return;
+      }
+      if (protect) {
+        notify.success("File is now protected");
+        setPinDoc(null);
+        router.refresh();
+      } else {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = pinDoc.fileName;
+        anchor.click();
+        URL.revokeObjectURL(url);
+        setPinDoc(null);
+      }
+    } catch {
+      notify.error("Could not complete that action");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-        <Link href="/documents" className="hover:text-brand-600">
+        <Link href={employeeFilterId ? `/documents?employeeId=${employeeFilterId}` : "/documents"} className="hover:text-brand-600">
           List Document
         </Link>
         <ChevronRight className="w-4 h-4" />
@@ -170,12 +250,15 @@ export function FolderDetailModule({
             <tbody className="divide-y divide-gray-50">
               {folder.documents.map((doc) => (
                 <tr key={doc.id}>
-                  <td className="px-5 py-4 font-medium text-gray-900">{doc.fileName}</td>
+                  <td className="px-5 py-4 font-medium text-gray-900">{doc.fileName}<span className={`ml-2 text-[10px] uppercase ${doc.visibility === "PUBLIC" ? "text-emerald-600" : "text-amber-600"}`}>{doc.visibility === "PUBLIC" ? "Public" : doc.visibility === "PROTECTED" ? "Protected" : "Private"}</span></td>
                   <td className="px-5 py-4 text-gray-500">{doc.fileSizeLabel}</td>
                   <td className="px-5 py-4 text-gray-500">{formatDate(doc.createdAt)}</td>
                   <td className="px-5 py-4">
                     <div className="flex gap-1">
-                      {doc.fileUrl && (
+                      {doc.fileUrl && doc.visibility === "PROTECTED" && (
+                        <button type="button" onClick={() => openPinDialog(doc, "open")} title="Enter PIN to open" className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50"><Download className="w-4 h-4" /></button>
+                      )}
+                      {doc.fileUrl && doc.visibility !== "PROTECTED" && (
                         <a
                           href={doc.fileUrl}
                           target="_blank"
@@ -186,6 +269,13 @@ export function FolderDetailModule({
                         </a>
                       )}
                       {canManage && (
+                        <>
+                        {doc.visibility === "PRIVATE" && <button type="button" onClick={() => openPinDialog(doc, "protect")} title="Convert private file to protected" className="p-2 rounded-lg text-amber-600 hover:bg-amber-50"><LockKeyhole className="w-4 h-4" /></button>}
+                        <button type="button" onClick={() => toggleVisibility(doc)} disabled={loading}
+                          title={doc.visibility === "PUBLIC" ? "Make private" : doc.visibility === "PROTECTED" ? "Remove protection and make private" : "Make public"}
+                          className="p-2 rounded-lg text-violet-600 hover:bg-violet-50">
+                          {doc.visibility === "PUBLIC" ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
                         <button
                           type="button"
                           onClick={() => setDeleteDoc(doc)}
@@ -193,6 +283,7 @@ export function FolderDetailModule({
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                        </>
                       )}
                     </div>
                   </td>
@@ -205,10 +296,23 @@ export function FolderDetailModule({
 
       <Dialog open={uploadOpen} onClose={() => setUploadOpen(false)} title="Upload File">
         <div className="space-y-4">
-          <input className={inputClass} placeholder="Document title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-          <input className={inputClass} placeholder="File name" value={form.fileName} onChange={(e) => setForm({ ...form, fileName: e.target.value })} />
-          <input className={inputClass} placeholder="File URL" value={form.fileUrl} onChange={(e) => setForm({ ...form, fileUrl: e.target.value })} />
-          <input className={inputClass} placeholder="File size (bytes)" value={form.fileSize} onChange={(e) => setForm({ ...form, fileSize: e.target.value })} />
+          <input className={inputClass} placeholder="Document title (optional)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          <input className={inputClass} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.rtf,.odt,.ods,.jpg,.jpeg,.png,.gif,.webp" onChange={(e) => setForm({ ...form, file: e.target.files?.[0] ?? null })} />
+          <p className="text-xs text-gray-500">PDF, Office, OpenDocument, CSV, text, or image files up to 20 MB.</p>
+          <label className="block text-sm text-gray-700">Visibility
+            <select className={`${inputClass} mt-1`} value={form.visibility} onChange={(e) => setForm({ ...form, visibility: e.target.value })}>
+              <option value="PRIVATE">Private — uploader and assigned employee</option>
+              <option value="PUBLIC">Public — everyone allowed into this folder</option>
+              <option value="PROTECTED">Protected — requires a PIN/password</option>
+            </select>
+          </label>
+          {form.visibility === "PROTECTED" && <input className={inputClass} type="password" autoComplete="new-password" placeholder="PIN or password (min 4 characters)" value={form.protectionPin} onChange={(e) => setForm({ ...form, protectionPin: e.target.value })} />}
+          <label className="block text-sm text-gray-700">Attach to employee (optional)
+            <select className={`${inputClass} mt-1`} value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })}>
+              <option value="">Company document</option>
+              {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.firstName} {employee.lastName}</option>)}
+            </select>
+          </label>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setUploadOpen(false)}>Cancel</Button>
             <Button loading={loading} onClick={upload}>Upload</Button>
@@ -221,6 +325,13 @@ export function FolderDetailModule({
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setDeleteDoc(null)}>Cancel</Button>
           <Button variant="danger" loading={loading} onClick={remove}>Delete</Button>
+        </div>
+      </Dialog>
+      <Dialog open={!!pinDoc} onClose={() => setPinDoc(null)} title={pinMode === "protect" ? "Protect document" : "Open protected document"}>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">{pinMode === "protect" ? `Set a PIN or password for ${pinDoc?.fileName}. You will need it each time the file is opened.` : `Enter the PIN or password for ${pinDoc?.fileName}.`}</p>
+          <input className={inputClass} type="password" autoComplete={pinMode === "protect" ? "new-password" : "current-password"} value={pinValue} onChange={(event) => setPinValue(event.target.value)} placeholder="PIN or password" onKeyDown={(event) => { if (event.key === "Enter") void submitPin(); }} />
+          <div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setPinDoc(null)}>Cancel</Button><Button loading={loading} onClick={submitPin}>{pinMode === "protect" ? "Protect file" : "Open file"}</Button></div>
         </div>
       </Dialog>
     </>

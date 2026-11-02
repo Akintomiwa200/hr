@@ -107,7 +107,7 @@ export const appFeatures: AppFeature[] = [
   {
     id: "calendar",
     label: "Calendar",
-    description: "Company holidays and attendance calendar",
+    description: "Company calendar, employee shifts, and attendance scheduling",
     href: "/holidays",
     section: "Main",
     icon: Calendar,
@@ -277,11 +277,12 @@ export const appFeatures: AppFeature[] = [
   {
     id: "notes",
     label: "Notes",
-    description: "Personal and company note taker for every role",
+    description: "Personal to-do board and notes for every role",
     href: "/notes",
     section: "Workspace",
     icon: StickyNote,
     roles: ALL_ROLES,
+    helpSlug: "notes",
   },
   {
     id: "documents",

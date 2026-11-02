@@ -16,6 +16,7 @@ import {
   PenLine,
   Search,
   Settings,
+  StickyNote,
   UserMinus,
   Users,
   Wallet,
@@ -112,7 +113,7 @@ export const helpArticles: HelpArticle[] = [
   {
     slug: "calendar",
     title: "Calendar & schedule",
-    description: "View holidays, leave, payroll runs, interviews, and attendance by day.",
+    description: "View holidays, leave, payroll runs, interviews, and your own personal events by day.",
     category: "time",
     icon: Calendar,
     roles: ALL_STAFF,
@@ -138,11 +139,19 @@ export const helpArticles: HelpArticle[] = [
         heading: "Islamic holidays",
         body: "Eid dates follow published federal calendars and may shift by one day after official moon-sighting announcements from the Ministry of Interior.",
       },
+      {
+        heading: "Your personal calendar",
+        body: "Everyone can add private events under the My calendar tab. Use Add event to set a title, date, optional times, a color, and notes. Personal events only appear for you; HR and managers cannot see them. Switch back to Holidays to see company-wide days managed by HR.",
+      },
     ],
     faqs: [
       {
         question: "Why can't I edit a holiday?",
         answer: "Only admins can manage holidays. Static seed holidays also cannot be edited until the database is fully synced.",
+      },
+      {
+        question: "Can I add my own events?",
+        answer: "Yes. Open the My calendar tab and choose Add event. Your events stay private and can be edited or deleted by you at any time.",
       },
       {
         question: "Why is Labor Day not in September?",
@@ -153,7 +162,50 @@ export const helpArticles: HelpArticle[] = [
         answer: "Use links from Search, the dashboard Upcoming Schedule widget, or open /holidays?date=YYYY-MM-DD directly.",
       },
     ],
-    relatedSlugs: ["leave", "attendance", "payroll"],
+    relatedSlugs: ["leave", "attendance", "payroll", "notes"],
+  },
+  {
+    slug: "notes",
+    title: "Notes & to-dos",
+    description: "Use the Notes board as a personal to-do list, and share company notes when needed.",
+    category: "workspace",
+    icon: StickyNote,
+    roles: ALL_STAFF,
+    moduleHref: "/notes",
+    sections: [
+      {
+        heading: "Notes for everyone",
+        body: "Every role has a Notes tab in the sidebar. Personal notes are private to you, so you can capture meeting notes, reminders, or a simple to-do list without HR or managers seeing them.",
+      },
+      {
+        heading: "To-do board",
+        body: "Board view organises notes into To Do, In Progress, and Done. Drag a card between columns, or open a note and change its column. Use Grid view when you prefer reading notes as cards.",
+      },
+      {
+        heading: "Organise and find",
+        body: "Pin important notes to the top, assign a color, move notes into folders, and filter by personal or company notes, folder, or date. Search checks titles, content, and folder names.",
+      },
+      {
+        heading: "Company notes",
+        body: "Company Admin and HR can share a note with the whole company using the Company scope. Everyone else can read shared notes but only the author or an org admin can edit them.",
+      },
+    ],
+    steps: [
+      { title: "Open Notes", body: "Choose Notes under Workspace in the sidebar." },
+      { title: "Add a to-do", body: "Click New note, add a title, and leave the column as To Do." },
+      { title: "Move it along", body: "Drag the card to In Progress, then Done when the task is complete." },
+    ],
+    faqs: [
+      {
+        question: "Can my manager see my personal notes?",
+        answer: "No. Private notes belong to you and are never shown to other staff. Only notes deliberately shared as Company notes are visible to the organisation.",
+      },
+      {
+        question: "Can I use Notes as a to-do list?",
+        answer: "Yes. Board view gives you To Do, In Progress, and Done columns, and you can drag notes between them.",
+      },
+    ],
+    relatedSlugs: ["calendar", "getting-started", "announcements"],
   },
   {
     slug: "leave",
