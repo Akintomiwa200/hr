@@ -23,7 +23,7 @@ export default async function IntegrationsSettingsPage() {
       </Link>
       <PageHeader
         title="Integrations"
-        description="Google Workspace and Zoho — real-time sync for HR, payroll, recruitment, and mail"
+        description="Connect office, HRIS, and finance platforms, then track live sync activity."
         action={<ModulePageActions helpSlug="settings" helpLabel="Integration guide" />}
       />
       <IntegrationsHub />

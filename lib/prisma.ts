@@ -78,6 +78,10 @@ export function isCalendarEventModelReady() {
   return hasDelegate(getPrismaClient(), "calendarEvent", "findMany");
 }
 
+export function isBirthdayWishModelReady() {
+  return hasDelegate(getPrismaClient(), "birthdayWish", "findMany");
+}
+
 export function isShiftAssignmentModelReady() {
   return hasDelegate(getPrismaClient(), "shiftAssignment", "findMany");
 }

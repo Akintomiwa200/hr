@@ -1,9 +1,47 @@
-import { prisma, isNotificationModelReady, isPortalTemplateModelReady } from "@/lib/prisma";
+import {
+  prisma,
+  isBirthdayWishModelReady,
+  isNotificationModelReady,
+  isPortalTemplateModelReady,
+} from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications";
 import { deliverMail, emailFromAddress, isEmailConfigured } from "@/lib/email";
 import { getAppCurrencyCode } from "@/lib/currency-server";
+import { getAppUrl } from "@/lib/constants/auth";
 import { formatDate } from "@/lib/utils";
 import { buildMergeValues, renderLetterBody } from "@/lib/letters/render";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+
+/** Normalise a date to midnight UTC so birthday comparisons ignore time-of-day. */
+export function startOfUtcDay(value: Date = new Date()) {
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+}
+
+/**
+ * The date a birthday falls on in a given year. Feb 29 is celebrated on Feb 28
+ * in non-leap years so leap-day employees still get a greeting every year.
+ */
+export function birthdayOnForYear(dateOfBirth: Date, year: number) {
+  const month = dateOfBirth.getUTCMonth();
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const day = Math.min(dateOfBirth.getUTCDate(), lastDay);
+  return new Date(Date.UTC(year, month, day));
+}
+
+/** The next occurrence of a birthday, including today when it is their day. */
+export function nextBirthdayOn(dateOfBirth: Date, from: Date = new Date()) {
+  const today = startOfUtcDay(from);
+  let occurrence = birthdayOnForYear(dateOfBirth, today.getUTCFullYear());
+  if (occurrence.getTime() < today.getTime()) {
+    occurrence = birthdayOnForYear(dateOfBirth, today.getUTCFullYear() + 1);
+  }
+  return occurrence;
+}
+
+export function isBirthdayToday(dateOfBirth: Date, on: Date = new Date()) {
+  const today = startOfUtcDay(on);
+  return birthdayOnForYear(dateOfBirth, today.getUTCFullYear()).getTime() === today.getTime();
+}
 
 /**
  * Run birthday celebrations for every company in the system. Used by the
@@ -94,8 +132,6 @@ export async function findBirthdayCelebrants(
   on?: Date
 ): Promise<BirthdayCelebrant[]> {
   const day = on ?? new Date();
-  const month = day.getUTCMonth() + 1;
-  const date = day.getUTCDate();
 
   const employees = await prisma.employee.findMany({
     where: {
@@ -125,9 +161,8 @@ export async function findBirthdayCelebrants(
 
   return employees.flatMap((e) => {
     if (!e.dateOfBirth) return [];
-    const b = e.dateOfBirth;
-    if (!(b.getUTCMonth() + 1 === month && b.getUTCDate() === date)) return [];
-    return [{ ...e, dateOfBirth: b }];
+    if (!isBirthdayToday(e.dateOfBirth, day)) return [];
+    return [{ ...e, dateOfBirth: e.dateOfBirth }];
   });
 }
 
@@ -176,9 +211,13 @@ export async function runBirthdayCelebrations(companyId: string, on?: Date) {
   let notifiedColleagues = 0;
 
   for (const celebrant of celebrants) {
-    await celebrateOne(companyId, celebrant, companyName, emailConfigured, currency);
+    const result = await celebrateOne(companyId, celebrant, companyName, emailConfigured, currency);
     celebrated += 1;
-    if (celebrant.userId) notifiedColleagues += 1;
+    notifiedColleagues += result.notifiedColleagues;
+  }
+
+  if (celebrated > 0) {
+    broadcastAppEvent("birthday_updated", { companyId });
   }
 
   return { celebrated, notifiedColleagues };
@@ -191,38 +230,70 @@ async function celebrateOne(
   emailConfigured: boolean,
   currency: string
 ) {
-  const docId = await issueBirthdayLetter(companyId, celebrant, companyName, currency);
+  const birthdayOn = birthdayOnForYear(celebrant.dateOfBirth, new Date().getUTCFullYear());
+  const existingDocId = await findTodaysBirthdayLetter(celebrant.id);
+  const celebrantAlreadyNotified = celebrant.userId
+    ? await hasNotificationToday(celebrant.userId, "Happy Birthday! 🎉")
+    : false;
+  const docId = existingDocId ?? (await issueBirthdayLetter(companyId, celebrant, companyName, currency));
+  const wishCount = await countWishesFor(celebrant.id, birthdayOn);
 
-  if (celebrant.userId && !(await hasNotificationToday(celebrant.userId, "Happy Birthday! 🎉"))) {
+  if (celebrant.userId && !celebrantAlreadyNotified) {
     await createNotification({
       userId: celebrant.userId,
-      type: "general",
+      type: "birthday",
       title: "Happy Birthday! 🎉",
-      message: `We're celebrating your birthday today. A special letter from ${companyName} is waiting for you.`,
-      href: docId ? `/letters/documents/${docId}` : `/reports/employee-data/birthday`,
+      message: `We're celebrating your birthday today. A special letter from ${companyName} is waiting for you${
+        wishCount > 0 ? `, along with ${wishCount} wish${wishCount === 1 ? "" : "es"} from your colleagues` : ""
+      }.`,
+      href: "/birthdays",
     });
   }
 
-  if (emailConfigured && celebrant.email) {
+  if (emailConfigured && celebrant.email && !existingDocId && !celebrantAlreadyNotified) {
     try {
       await deliverMail({
         from: emailFromAddress(),
         to: celebrant.email,
         subject: `Happy Birthday, ${celebrant.firstName}! 🎂`,
-        html: birthdayEmailHtml(celebrant, companyName),
-        text: renderLetterBody(
-          BIRTHDAY_LETTER_BODY,
-          mergeValuesFor(celebrant, companyName, currency)
-        ),
+        html: birthdayEmailHtml(celebrant, companyName, wishCount),
+        text: [
+          renderLetterBody(
+            BIRTHDAY_LETTER_BODY,
+            mergeValuesFor(celebrant, companyName, currency)
+          ),
+          "",
+          "See the birthday wishes from your colleagues:",
+          `${getAppUrl()}/birthdays`,
+        ].join("\n"),
       });
     } catch {
       // best-effort; ignore email failures
     }
   }
 
-  if (celebrant.userId) {
-    await notifyColleagues(companyId, celebrant, celebrant.userId);
-  }
+  const notifiedColleagues = await notifyColleagues(companyId, celebrant);
+  return { docId, notifiedColleagues };
+}
+
+async function findTodaysBirthdayLetter(employeeId: string): Promise<string | null> {
+  if (!isPortalTemplateModelReady()) return null;
+  const doc = await prisma.portalDocument.findFirst({
+    where: {
+      employeeId,
+      kind: "LETTER",
+      title: "Birthday wishes",
+      issuedAt: { gte: startOfUtcDay() },
+    },
+    select: { id: true },
+    orderBy: { issuedAt: "desc" },
+  });
+  return doc?.id ?? null;
+}
+
+async function countWishesFor(employeeId: string, birthdayOn: Date) {
+  if (!isBirthdayWishModelReady()) return 0;
+  return prisma.birthdayWish.count({ where: { recipientId: employeeId, birthdayOn } });
 }
 
 async function issueBirthdayLetter(
@@ -253,53 +324,124 @@ async function issueBirthdayLetter(
 
 async function notifyColleagues(
   companyId: string,
-  celebrant: BirthdayCelebrant,
-  celebrantUserId: string
-) {
-  if (!isNotificationModelReady()) return;
+  celebrant: BirthdayCelebrant
+): Promise<number> {
+  if (!isNotificationModelReady()) return 0;
   const name = `${celebrant.firstName} ${celebrant.lastName}`;
+  const title = `🎉 ${name} is celebrating a birthday`;
   const colleagueUsers = await prisma.user.findMany({
     where: {
       companyId,
-      id: { not: celebrantUserId },
+      isActive: true,
+      archivedAt: null,
+      ...(celebrant.userId ? { id: { not: celebrant.userId } } : {}),
     },
-    select: { id: true, preferences: true },
+    select: { id: true },
   });
 
+  let notified = 0;
   for (const user of colleagueUsers) {
-    const title = `🎉 ${name} is celebrating a birthday`;
     if (await hasNotificationToday(user.id, title)) continue;
     await createNotification({
       userId: user.id,
-      type: "general",
+      type: "birthday",
       title,
-      message: `Wish ${celebrant.firstName} a happy birthday today!`,
-      href: "/reports/employee-data/birthday",
+      message: `Wish ${celebrant.firstName} a happy birthday today — leave a message on the birthday wall.`,
+      href: "/birthdays",
     });
+    notified += 1;
   }
+  return notified;
 }
 
 async function hasNotificationToday(userId: string, title: string): Promise<boolean> {
   if (!isNotificationModelReady()) return false;
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
   const existing = await prisma.notification.count({
     where: {
       userId,
       title,
-      createdAt: { gte: start },
+      createdAt: { gte: startOfUtcDay() },
     },
   });
   return existing > 0;
 }
 
-function birthdayEmailHtml(celebrant: BirthdayCelebrant, companyName: string): string {
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => {
+    const map: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return map[char] ?? char;
+  });
+}
+
+function yearsOfService(hireDate: Date, at: Date = new Date()) {
+  let years = at.getUTCFullYear() - hireDate.getUTCFullYear();
+  const monthDiff = at.getUTCMonth() - hireDate.getUTCMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && at.getUTCDate() < hireDate.getUTCDate())) {
+    years -= 1;
+  }
+  return Math.max(0, years);
+}
+
+function birthdayEmailHtml(
+  celebrant: BirthdayCelebrant,
+  companyName: string,
+  wishCount: number
+): string {
   const today = formatDate(new Date());
-  return `<div style="font-family:Arial,sans-serif;padding:24px;border:1px solid #eee;border-radius:12px;max-width:560px">
-  <h1 style="margin:0 0 8px;color:#111">Happy Birthday, ${celebrant.firstName}! 🎉</h1>
-  <p style="color:#555;margin:0 0 16px">${today}</p>
-  <p style="color:#333">On behalf of everyone at <strong>${companyName}</strong>, we'd like to wish you a very happy birthday. We appreciate your hard work and the energy you bring to the team.</p>
-  <p style="color:#333">May your day be filled with joy, and the year ahead bring success, good health, and happiness.</p>
-  <p style="color:#333;margin-top:16px">Best regards,<br/>Human Resources<br/><strong>${companyName}</strong></p>
-</div>`;
+  const firstName = escapeHtml(celebrant.firstName);
+  const company = escapeHtml(companyName);
+  const jobTitle = escapeHtml(celebrant.jobTitle);
+  const department = celebrant.department?.name ? escapeHtml(celebrant.department.name) : "";
+  const roleLine = department ? `${jobTitle} · ${department}` : jobTitle;
+  const tenure = yearsOfService(celebrant.hireDate);
+  const birthdayUrl = `${getAppUrl()}/birthdays`;
+  const wishLine =
+    wishCount > 0
+      ? `Your colleagues have already left <strong>${wishCount}</strong> birthday wish${
+          wishCount === 1 ? "" : "es"
+        } for you.`
+      : "Your colleagues are waiting to celebrate you — open the birthday wall to see their messages.";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><title>Happy Birthday, ${firstName}!</title></head>
+<body style="margin:0;padding:0;background:#f7f5ff;font-family:Arial,sans-serif;color:#111827;">
+  <div style="max-width:600px;margin:0 auto;padding:24px;">
+    <div style="background:linear-gradient(135deg,#7c3aed 0%,#db2777 100%);border-radius:20px;padding:32px 24px;text-align:center;color:#ffffff;">
+      <div style="font-size:40px;line-height:1;">🎂</div>
+      <h1 style="margin:14px 0 6px;font-size:28px;line-height:1.2;">Happy Birthday, ${firstName}!</h1>
+      <p style="margin:0;font-size:15px;opacity:.9;">${company} is celebrating you today.</p>
+    </div>
+    <div style="background:#ffffff;border-radius:16px;padding:24px;margin-top:16px;">
+      <p style="margin:0 0 12px;color:#555;">${today}</p>
+      <p style="margin:0 0 12px;">Dear ${firstName},</p>
+      <p style="margin:0 0 12px;">On behalf of everyone at <strong>${company}</strong>, we would like to wish you a very happy birthday. Thank you for your hard work, dedication, and the positive energy you bring to the team every day.</p>
+      <div style="background:#faf5ff;border:1px solid #ede9fe;border-radius:12px;padding:14px 16px;margin:18px 0;">
+        <p style="margin:0;font-size:13px;color:#6b7280;">Celebrating</p>
+        <p style="margin:4px 0 0;font-weight:700;color:#4c1d95;">${roleLine}</p>
+        ${
+          tenure > 0
+            ? `<p style="margin:6px 0 0;font-size:13px;color:#6b7280;">${tenure} year${
+                tenure === 1 ? "" : "s"
+              } with ${company}</p>`
+            : ""
+        }
+      </div>
+      <p style="margin:0 0 12px;">May your day be filled with joy, and may the year ahead bring you success, good health, and happiness both personally and professionally.</p>
+      <p style="margin:0 0 20px;color:#4c1d95;font-weight:600;">${wishLine}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="${birthdayUrl}" style="display:inline-block;background:#7c3aed;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:10px;font-weight:700;">See your birthday wishes</a>
+      </div>
+      <p style="margin:0;color:#374151;">Warm regards,<br/>Human Resources<br/><strong>${company}</strong></p>
+    </div>
+    <p style="margin:16px 0 0;text-align:center;font-size:12px;color:#9ca3af;">You are receiving this because today is your birthday.</p>
+  </div>
+</body>
+</html>`;
 }

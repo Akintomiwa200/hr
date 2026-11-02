@@ -16,6 +16,8 @@ export type NotificationType =
 
   | "resignation"
 
+  | "birthday"
+
   | "loan";
 export type NotificationRecord = {
   id: string;
@@ -47,6 +49,7 @@ subscription: "announcements",
   checklist: "checklist",
   general: "announcements",
   resignation: "announcements",
+  birthday: "announcements",
   loan: "payroll",
 };
 

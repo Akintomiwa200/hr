@@ -4,7 +4,11 @@ export type IntegrationProvider =
   | "ZOHO_RECRUIT"
   | "ZOHO_BOOKS"
   | "ZOHO_SIGN"
-  | "ZOHO_MAIL";
+  | "ZOHO_MAIL"
+  | "MICROSOFT_365"
+  | "BAMBOOHR"
+  | "QUICKBOOKS"
+  | "CUSTOM_WEBHOOK";
 
 export type IntegrationStatus = "DISCONNECTED" | "CONNECTED" | "ERROR" | "SYNCING";
 

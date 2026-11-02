@@ -19,6 +19,10 @@ import {
   resolveZohoPeopleFormCandidates,
 } from "@/lib/integrations/zoho/people";
 import { broadcastEvent } from "@/lib/events";
+import { syncMicrosoftDirectory } from "@/lib/integrations/microsoft";
+import { syncQuickBooks } from "@/lib/integrations/quickbooks";
+import { syncBambooHr } from "@/lib/integrations/bamboohr";
+import { syncCustomWebhook } from "@/lib/integrations/custom-webhook";
 
 type SyncResult = { synced: number; summary: string };
 
@@ -213,6 +217,10 @@ const SYNC_HANDLERS: Record<
   ZOHO_BOOKS: syncZohoBooks,
   ZOHO_SIGN: syncZohoSign,
   ZOHO_MAIL: syncZohoMail,
+  MICROSOFT_365: syncMicrosoftDirectory,
+  BAMBOOHR: syncBambooHr,
+  QUICKBOOKS: syncQuickBooks,
+  CUSTOM_WEBHOOK: syncCustomWebhook,
 };
 
 export async function runIntegrationSync(
@@ -239,13 +247,16 @@ export async function runIntegrationSync(
     });
 
     if (provider === "ZOHO_PEOPLE") {
-      broadcastEvent("employee_updated", { source: "zoho_people" });
+      broadcastEvent("employee_updated", { companyId: integration.companyId, source: "zoho_people" });
     }
     if (provider === "ZOHO_RECRUIT") {
-      broadcastEvent("job_updated", { source: "zoho_recruit" });
+      broadcastEvent("job_updated", { companyId: integration.companyId, source: "zoho_recruit" });
     }
     if (provider === "ZOHO_BOOKS") {
-      broadcastEvent("payroll_updated", { source: "zoho_books" });
+      broadcastEvent("payroll_updated", { companyId: integration.companyId, source: "zoho_books" });
+    }
+    if (provider === "MICROSOFT_365" || provider === "BAMBOOHR") {
+      broadcastEvent("employee_updated", { companyId: integration.companyId, source: provider.toLowerCase() });
     }
 
     return result;
@@ -280,6 +291,19 @@ export async function runAllIntegrationSyncs(companyId?: string | null) {
   return results;
 }
 
+export async function runAllIntegrationSyncsAcrossCompanies() {
+  const tenants = await prisma.integration.findMany({
+    select: { companyId: true },
+    distinct: ["companyId"],
+  });
+  const results: Array<{ companyId: string | null; provider: IntegrationProvider; ok: boolean; summary?: string }> = [];
+  for (const tenant of tenants) {
+    const companyResults = await runAllIntegrationSyncs(tenant.companyId);
+    results.push(...companyResults.map((result) => ({ companyId: tenant.companyId, ...result })));
+  }
+  return results;
+}
+
 export async function handleZohoWebhook(
   product: "people" | "recruit" | "books" | "sign" | "mail",
   payload: Record<string, unknown>,
@@ -300,21 +324,21 @@ export async function handleZohoWebhook(
   const eventType = String(payload.event || payload.action || "webhook");
 
   if (product === "people") {
-    broadcastEvent("employee_updated", { source: "zoho_webhook", eventType });
+    broadcastEvent("employee_updated", { companyId: integration.companyId, source: "zoho_webhook", eventType });
     if (eventType.includes("leave")) {
-      broadcastEvent("leave_updated", { source: "zoho_webhook" });
+      broadcastEvent("leave_updated", { companyId: integration.companyId, source: "zoho_webhook" });
     }
     if (eventType.includes("attendance")) {
-      broadcastEvent("attendance_updated", { source: "zoho_webhook" });
+      broadcastEvent("attendance_updated", { companyId: integration.companyId, source: "zoho_webhook" });
     }
   }
 
   if (product === "recruit") {
-    broadcastEvent("job_updated", { source: "zoho_webhook", eventType });
+    broadcastEvent("job_updated", { companyId: integration.companyId, source: "zoho_webhook", eventType });
   }
 
   if (product === "books") {
-    broadcastEvent("payroll_updated", { source: "zoho_webhook", eventType });
+    broadcastEvent("payroll_updated", { companyId: integration.companyId, source: "zoho_webhook", eventType });
   }
 
   await recordAndBroadcast(integration.id, provider, {

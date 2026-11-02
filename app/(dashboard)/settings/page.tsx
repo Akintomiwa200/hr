@@ -130,8 +130,8 @@ export default async function SettingsPage() {
   if (hasRole(session.role, INTEGRATION_ADMIN_ROLES)) {
     cards.push({
       id: "integrations",
-      title: "Google & Zoho integrations",
-      description: "Connect Google Workspace and Zoho apps for real-time sync.",
+      title: "Office, HRIS & finance integrations",
+      description: "Connect Google, Microsoft 365, BambooHR, QuickBooks Online, and Zoho.",
       href: "/settings/integrations",
       icon: Link2,
       accent: "text-violet-600 bg-violet-50",

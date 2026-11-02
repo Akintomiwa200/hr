@@ -25,7 +25,7 @@ type IntegrationItem = {
   provider: string;
   slug: string;
   name: string;
-  vendor: "Google" | "Zoho";
+  vendor: string;
   description: string;
   modules: string[];
   webhookPath?: string;
@@ -57,6 +57,9 @@ const VENDOR_ICONS: Record<string, typeof Calendar> = {
   ZOHO_BOOKS: BookOpen,
   ZOHO_SIGN: FileSignature,
   ZOHO_MAIL: Mail,
+  MICROSOFT_365: Users,
+  BAMBOOHR: Users,
+  QUICKBOOKS: BookOpen,
 };
 
 function statusBadge(item: IntegrationItem) {
@@ -111,6 +114,13 @@ export function IntegrationsHub() {
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [googleRedirectUri, setGoogleRedirectUri] = useState<string | null>(null);
   const [zohoRedirectUri, setZohoRedirectUri] = useState<string | null>(null);
+  const [microsoftRedirectUri, setMicrosoftRedirectUri] = useState<string | null>(null);
+  const [quickBooksRedirectUri, setQuickBooksRedirectUri] = useState<string | null>(null);
+  const [bambooDomain, setBambooDomain] = useState("");
+  const [bambooKey, setBambooKey] = useState("");
+  const [customName, setCustomName] = useState("");
+  const [customEndpoint, setCustomEndpoint] = useState("");
+  const [customSecret, setCustomSecret] = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch("/api/integrations", { cache: "no-store" });
@@ -123,11 +133,15 @@ export function IntegrationsHub() {
       logs: SyncLog[];
       googleRedirectUri?: string;
       zohoRedirectUri?: string;
+      microsoftRedirectUri?: string;
+      quickBooksRedirectUri?: string;
     };
     setItems(data.items);
     setLogs(data.logs);
     setGoogleRedirectUri(data.googleRedirectUri ?? null);
     setZohoRedirectUri(data.zohoRedirectUri ?? null);
+    setMicrosoftRedirectUri(data.microsoftRedirectUri ?? null);
+    setQuickBooksRedirectUri(data.quickBooksRedirectUri ?? null);
   }, []);
 
   useEffect(() => {
@@ -165,6 +179,38 @@ export function IntegrationsHub() {
 
   const connect = (slug: string) => {
     window.location.href = `/api/integrations/${slug}/connect`;
+  };
+
+  const connectBambooHr = async () => {
+    setBusySlug("bamboohr");
+    const res = await fetch("/api/integrations/bamboohr/connect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companyDomain: bambooDomain, apiKey: bambooKey }),
+    });
+    if (!res.ok) notify.error(await readApiError(res, "Could not connect BambooHR"));
+    else {
+      notify.success("BambooHR connected and employee sync completed");
+      setBambooKey("");
+      await load();
+    }
+    setBusySlug(null);
+  };
+
+  const connectCustomWebhook = async () => {
+    setBusySlug("custom-webhook");
+    const res = await fetch("/api/integrations/custom-webhook/connect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: customName, endpointUrl: customEndpoint, secret: customSecret }),
+    });
+    if (!res.ok) notify.error(await readApiError(res, "Could not connect the custom webhook"));
+    else {
+      notify.success("Custom webhook connected and test event delivered");
+      setCustomSecret("");
+      await load();
+    }
+    setBusySlug(null);
   };
 
   const disconnect = async (slug: string) => {
@@ -220,7 +266,7 @@ export function IntegrationsHub() {
       <Card>
         <CardHeader
           title="Office integrations"
-          description="Connect Google Workspace and Zoho apps for real-time two-way sync via webhooks and live SSE updates."
+          description="Connect Google Workspace, Microsoft 365, BambooHR, QuickBooks Online, and Zoho. Sync status and events update live."
           action={
             <div className="flex items-center gap-2">
               {liveStatus && (
@@ -247,15 +293,13 @@ export function IntegrationsHub() {
         />
       </Card>
 
-      {(googleRedirectUri || zohoRedirectUri) && (
+      {(googleRedirectUri || zohoRedirectUri || microsoftRedirectUri || quickBooksRedirectUri) && (
         <Card className="p-4 bg-gray-50 border-dashed">
           <p className="text-sm font-medium text-gray-900">OAuth redirect URIs</p>
           <p className="text-xs text-gray-500 mt-1">
-            Add these exact URLs under Authorized redirect URIs in Google Cloud Console and Zoho API
-            Console. Smart HR uses <code className="text-[11px]">/api/google/callback</code> (not
-            NextAuth&apos;s <code className="text-[11px]">/api/auth/callback/google</code>). Include
-            the full path on production, e.g.{" "}
-            <code className="text-[11px]">https://your-app.vercel.app/api/google/callback</code>.
+            Register each callback URL in its provider&apos;s developer console. Configure the OAuth
+            client credentials in the server environment before connecting. Smart HR uses its
+            dedicated integration callback endpoints.
           </p>
           <dl className="mt-3 space-y-2 text-xs">
             {googleRedirectUri && (
@@ -269,6 +313,12 @@ export function IntegrationsHub() {
                 <dt className="font-medium text-gray-700">Zoho</dt>
                 <dd className="font-mono text-gray-600 break-all">{zohoRedirectUri}</dd>
               </div>
+            )}
+            {microsoftRedirectUri && (
+              <div><dt className="font-medium text-gray-700">Microsoft Entra</dt><dd className="font-mono text-gray-600 break-all">{microsoftRedirectUri}</dd></div>
+            )}
+            {quickBooksRedirectUri && (
+              <div><dt className="font-medium text-gray-700">Intuit / QuickBooks</dt><dd className="font-mono text-gray-600 break-all">{quickBooksRedirectUri}</dd></div>
             )}
           </dl>
         </Card>
@@ -316,6 +366,9 @@ export function IntegrationsHub() {
                     Connected as {item.accountEmail} · Last sync {formatWhen(item.lastSyncAt)}
                   </p>
                 )}
+                {item.connected && item.webhookPath && (
+                  <p className="text-[11px] text-gray-500">Webhook endpoint: <code>{item.webhookPath}</code></p>
+                )}
                 {item.lastError && (
                   <p className="text-xs text-amber-700">
                     Last sync failed. Use Sync now to retry
@@ -326,7 +379,11 @@ export function IntegrationsHub() {
                 <div className="flex flex-wrap gap-2 mt-auto pt-2">
                   {!item.configured ? (
                     <p className="text-xs text-gray-500">
-                      Add OAuth credentials to <code className="text-[11px]">.env</code> to enable.
+                      {item.provider === "QUICKBOOKS"
+                        ? "Set INTUIT_CLIENT_ID, INTUIT_CLIENT_SECRET, and INTUIT_WEBHOOK_VERIFIER_TOKEN to enable."
+                        : item.provider === "MICROSOFT_365"
+                          ? "Set MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET to enable."
+                          : "Add provider credentials to the server environment to enable."}
                     </p>
                   ) : item.connected ? (
                     <>
@@ -349,6 +406,26 @@ export function IntegrationsHub() {
                         Disconnect
                       </Button>
                     </>
+                  ) : item.provider === "BAMBOOHR" ? (
+                    <div className="grid w-full gap-2 sm:grid-cols-[1fr_1.5fr_auto]">
+                      <input value={bambooDomain} onChange={(event) => setBambooDomain(event.target.value)} placeholder="Company subdomain" aria-label="BambooHR company subdomain" className="min-w-0 rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                      <input value={bambooKey} onChange={(event) => setBambooKey(event.target.value)} placeholder="API key" aria-label="BambooHR API key" type="password" autoComplete="off" className="min-w-0 rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                      <Button size="sm" onClick={() => void connectBambooHr()} disabled={busy || !bambooDomain || !bambooKey}>
+                        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                        Connect
+                      </Button>
+                    </div>
+                  ) : item.provider === "CUSTOM_WEBHOOK" ? (
+                    <div className="grid w-full gap-2 sm:grid-cols-2">
+                      <input value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Platform name" aria-label="Custom platform name" className="min-w-0 rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                      <input value={customEndpoint} onChange={(event) => setCustomEndpoint(event.target.value)} placeholder="https://your-platform.example/webhook" aria-label="Custom webhook endpoint" type="url" className="min-w-0 rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                      <input value={customSecret} onChange={(event) => setCustomSecret(event.target.value)} placeholder="Signing secret (24+ characters)" aria-label="Custom webhook signing secret" type="password" autoComplete="new-password" className="min-w-0 rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                      <Button size="sm" onClick={() => void connectCustomWebhook()} disabled={busy || !customName || !customEndpoint || customSecret.length < 24}>
+                        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                        Connect & test
+                      </Button>
+                      <p className="text-[11px] text-gray-500 sm:col-span-2">Sends company-scoped event names as JSON. Verify X-SmartHR-Signature as HMAC-SHA256 of timestamp + a dot + raw body using your signing secret.</p>
+                    </div>
                   ) : (
                     <Button size="sm" onClick={() => connect(item.slug)} disabled={busy}>
                       <Link2 className="w-4 h-4" />

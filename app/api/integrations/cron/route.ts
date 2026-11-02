@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runAllIntegrationSyncs } from "@/lib/integrations/sync";
+import { runAllIntegrationSyncsAcrossCompanies } from "@/lib/integrations/sync";
 
 export async function POST(request: Request) {
   const secret = request.headers.get("x-cron-secret");
@@ -9,6 +9,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const results = await runAllIntegrationSyncs(null);
+  const results = await runAllIntegrationSyncsAcrossCompanies();
   return NextResponse.json({ success: true, results, at: new Date().toISOString() });
 }

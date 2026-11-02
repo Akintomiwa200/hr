@@ -31,6 +31,7 @@ export type RealtimeEventType =
   | "bonus_updated"
   | "resignation_updated"
   | "calendar_event_updated"
+  | "birthday_updated"
   | "shift_updated"
   | "audit_updated";
 

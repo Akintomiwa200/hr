@@ -9,9 +9,15 @@ import { isZohoConfigured } from "@/lib/integrations/zoho/oauth";
 import { getZohoRedirectUri } from "@/lib/integrations/oauth-env";
 import { INTEGRATION_ADMIN_ROLES } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
+import { resolveAppUrl } from "@/lib/app-url";
+import { isMicrosoft365Configured } from "@/lib/integrations/microsoft";
+import { isQuickBooksConfigured } from "@/lib/integrations/quickbooks";
 
 function isProviderConfigured(provider: IntegrationProvider) {
   if (provider === "GOOGLE_WORKSPACE") return isGoogleWorkspaceConfigured();
+  if (provider === "MICROSOFT_365") return isMicrosoft365Configured();
+  if (provider === "QUICKBOOKS") return isQuickBooksConfigured();
+  if (provider === "BAMBOOHR" || provider === "CUSTOM_WEBHOOK") return true;
   return isZohoConfigured();
 }
 
@@ -61,6 +67,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     googleRedirectUri: getGoogleRedirectUri(ctx),
     zohoRedirectUri: getZohoRedirectUri(undefined, ctx),
+    microsoftRedirectUri: `${resolveAppUrl(ctx)}/api/integrations/microsoft-365/callback`,
+    quickBooksRedirectUri: `${resolveAppUrl(ctx)}/api/integrations/quickbooks/callback`,
     items,
     logs: recentLogs.map((log) => ({
       id: log.id,

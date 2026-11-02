@@ -8,6 +8,8 @@ import { isZohoConfigured } from "@/lib/integrations/zoho/oauth";
 import { INTEGRATION_ADMIN_ROLES } from "@/lib/roles";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { audit } from "@/lib/audit";
+import { isMicrosoft365Configured } from "@/lib/integrations/microsoft";
+import { isQuickBooksConfigured } from "@/lib/integrations/quickbooks";
 
 export async function GET(
   _request: Request,
@@ -23,10 +25,15 @@ export async function GET(
   if (error || !session) return error ?? unauthorized();
 
   const integration = await getIntegration(provider, session.companyId ?? null);
-  const configured =
-    provider === "GOOGLE_WORKSPACE"
-      ? isGoogleWorkspaceConfigured()
-      : isZohoConfigured();
+  const configured = provider === "GOOGLE_WORKSPACE"
+    ? isGoogleWorkspaceConfigured()
+    : provider === "MICROSOFT_365"
+      ? isMicrosoft365Configured()
+      : provider === "QUICKBOOKS"
+        ? isQuickBooksConfigured()
+        : provider === "BAMBOOHR" || provider === "CUSTOM_WEBHOOK"
+          ? true
+          : isZohoConfigured();
 
   return NextResponse.json({
     provider,

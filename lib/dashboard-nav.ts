@@ -39,6 +39,7 @@ import {
   Headset,
   ScrollText,
   NotebookPen,
+  Cake,
 } from "lucide-react";
 import { CHECKLIST_ADMIN_ROLES, CHECKLIST_TEMPLATE_ROLES, CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
 import {
@@ -408,6 +409,14 @@ export const dashboardNavSections: NavSection[] = [
         label: "Notes",
         pageTitle: "Notes",
         icon: StickyNote,
+        roles: ALL_STAFF,
+      },
+      {
+        id: "birthdays",
+        href: "/birthdays",
+        label: "Birthdays",
+        pageTitle: "Birthday celebrations",
+        icon: Cake,
         roles: ALL_STAFF,
       },
       {

@@ -3,7 +3,7 @@ import type { IntegrationProvider } from "@/lib/integrations/types";
 export type IntegrationCatalogItem = {
   provider: IntegrationProvider;
   name: string;
-  vendor: "Google" | "Zoho";
+  vendor: "Google" | "Zoho" | "Microsoft" | "BambooHR" | "Intuit" | "Custom";
   description: string;
   modules: string[];
   scopes: string[];
@@ -90,6 +90,45 @@ export const INTEGRATION_CATALOG: IntegrationCatalogItem[] = [
     scopes: ["ZohoMail.accounts.READ", "ZohoMail.messages.CREATE", "ZohoMail.messages.READ"],
     webhookPath: "/api/webhooks/zoho/mail",
     docsUrl: "https://www.zoho.com/mail/help/api/",
+  },
+  {
+    provider: "MICROSOFT_365",
+    name: "Microsoft 365",
+    vendor: "Microsoft",
+    description: "Microsoft Entra sign-in, Microsoft 365 directory, and employee profile sync.",
+    modules: ["Microsoft Entra", "Employee directory", "Profile sync"],
+    scopes: ["openid", "profile", "email", "offline_access", "User.Read", "User.Read.All"],
+    webhookPath: "/api/webhooks/microsoft-365",
+    docsUrl: "https://learn.microsoft.com/graph/",
+  },
+  {
+    provider: "BAMBOOHR",
+    name: "BambooHR",
+    vendor: "BambooHR",
+    description: "Employee directory sync from BambooHR using a company API key and live webhooks.",
+    modules: ["Employees", "Departments", "Job titles"],
+    scopes: [],
+    webhookPath: "/api/webhooks/bamboohr",
+    docsUrl: "https://documentation.bamboohr.com/",
+  },
+  {
+    provider: "QUICKBOOKS",
+    name: "QuickBooks Online",
+    vendor: "Intuit",
+    description: "Connect your accounting company and verify payroll finance integration access.",
+    modules: ["Company connection", "Payroll finance"],
+    scopes: ["com.intuit.quickbooks.accounting"],
+    webhookPath: "/api/webhooks/quickbooks",
+    docsUrl: "https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api",
+  },
+  {
+    provider: "CUSTOM_WEBHOOK",
+    name: "Custom webhook",
+    vendor: "Custom",
+    description: "Send signed Smart HR change notifications to your own platform or middleware endpoint.",
+    modules: ["Signed event delivery", "Custom platforms", "Live notifications"],
+    scopes: [],
+    docsUrl: "https://developer.mozilla.org/docs/Web/HTTP/Methods/POST",
   },
 ];
 

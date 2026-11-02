@@ -404,6 +404,10 @@ GET ${base}/api/documents`}
                     ["zoho-books", "Zoho Books", "Payroll contacts", "/api/webhooks/zoho/books"],
                     ["zoho-sign", "Zoho Sign", "E-sign docs", "/api/webhooks/zoho/sign"],
                     ["zoho-mail", "Zoho Mail", "Announcement emails", "/api/webhooks/zoho/mail"],
+                    ["microsoft-365", "Microsoft 365", "Employee directory", "/api/webhooks/microsoft-365"],
+                    ["bamboohr", "BambooHR", "Employee profiles", "/api/webhooks/bamboohr"],
+                    ["quickbooks", "QuickBooks Online", "Company access", "—"],
+                    ["custom-webhook", "Custom webhook", "Signed event delivery", "HTTPS endpoint"],
                   ].map(([slug, name, sync, webhook]) => (
                     <tr key={slug}>
                       <td className="px-4 py-2 font-mono text-brand-700">{slug}</td>
@@ -437,9 +441,16 @@ GOOGLE_REDIRECT_URI=${base}/api/google/callback
 ZOHO_CLIENT_ID=
 ZOHO_CLIENT_SECRET=
 ZOHO_REDIRECT_URI=${base}/api/integrations/zoho/callback
-ZOHO_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+MICROSOFT_TENANT_ID=common
+INTUIT_CLIENT_ID=
+INTUIT_CLIENT_SECRET=
+INTUIT_ENVIRONMENT=production
+INTUIT_WEBHOOK_VERIFIER_TOKEN=
+APP_URL=${base} # public HTTPS URL for BambooHR and Microsoft webhooks
 INTEGRATION_CRON_SECRET=
-APP_URL=${base}`}
+`}
           />
           <p className="text-xs text-gray-500">
             SSE: integration_sync, integration_updated, employee_updated (after Zoho People sync)

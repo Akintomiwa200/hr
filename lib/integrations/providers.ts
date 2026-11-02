@@ -7,6 +7,10 @@ const SLUG_TO_PROVIDER: Record<string, IntegrationProvider> = {
   "zoho-books": "ZOHO_BOOKS",
   "zoho-sign": "ZOHO_SIGN",
   "zoho-mail": "ZOHO_MAIL",
+  "microsoft-365": "MICROSOFT_365",
+  bamboohr: "BAMBOOHR",
+  quickbooks: "QUICKBOOKS",
+  "custom-webhook": "CUSTOM_WEBHOOK",
 };
 
 export function providerToSlug(provider: IntegrationProvider) {

@@ -4,9 +4,9 @@ import { canViewTeamReports } from "@/lib/reports/access";
 import { parseReportFiltersFromRecord } from "@/lib/reports/scope";
 import { getBirthdayReport, getReportFilterOptions } from "@/lib/reports/data";
 import { PageHeader } from "@/components/ui";
-import { formatDate } from "@/lib/utils";
-import { ReportsBreadcrumb, ReportsDataTable } from "@/components/reports/reports-data-table";
+import { ReportsBreadcrumb } from "@/components/reports/reports-data-table";
 import { ReportsFiltersBar } from "@/components/reports/reports-filters-bar";
+import { BirthdayReportSheet } from "@/components/reports/birthday-report-sheet";
 
 export default async function BirthdayReportPage({
   searchParams,
@@ -34,21 +34,7 @@ export default async function BirthdayReportPage({
       />
       <PageHeader title="Birthday" description="Employee birthdays and ages" />
       <ReportsFiltersBar departments={departments} showType={false} exportSlug="birthday" />
-      <ReportsDataTable
-        columns={[
-          { key: "name", label: "Employee Name" },
-          { key: "employeeCode", label: "Employee ID" },
-          { key: "department", label: "Department" },
-          { key: "jobTitle", label: "Job Title" },
-          {
-            key: "dateOfBirth",
-            label: "Date Of Birth",
-            render: (r) => formatDate(String(r.dateOfBirth)),
-          },
-          { key: "age", label: "Age" },
-        ]}
-        rows={rows}
-      />
+      <BirthdayReportSheet rows={rows} />
     </div>
   );
 }

@@ -5,6 +5,9 @@ import { exchangeGoogleCode } from "@/lib/integrations/google/workspace";
 import { exchangeZohoCode } from "@/lib/integrations/zoho/oauth";
 import { runIntegrationSync } from "@/lib/integrations/sync";
 import type { IntegrationProvider } from "@/lib/integrations/types";
+import { exchangeMicrosoft365Code } from "@/lib/integrations/microsoft";
+import { exchangeQuickBooksCode } from "@/lib/integrations/quickbooks";
+import { resolveAppUrl } from "@/lib/app-url";
 
 export async function GET(
   request: NextRequest,
@@ -36,6 +39,12 @@ export async function GET(
     const ctx = { request };
     if (provider === "GOOGLE_WORKSPACE") {
       await exchangeGoogleCode(code!, companyId, ctx);
+    } else if (provider === "MICROSOFT_365") {
+      await exchangeMicrosoft365Code(code!, companyId, resolveAppUrl({ request }));
+    } else if (provider === "QUICKBOOKS") {
+      const realmId = request.nextUrl.searchParams.get("realmId");
+      if (!realmId) throw new Error("QuickBooks did not return a company ID");
+      await exchangeQuickBooksCode(code!, realmId, companyId, resolveAppUrl({ request }));
     } else {
       await exchangeZohoCode(provider, code!, companyId, {
         location: request.nextUrl.searchParams.get("location"),

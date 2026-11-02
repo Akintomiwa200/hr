@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   Bell,
+  Cake,
   CalendarOff,
   Check,
   CheckCheck,
@@ -44,6 +45,7 @@ const notificationIcons: Record<NavNotification["type"], typeof Bell> = {
   general: Bell,
   loan: HandCoins,
   resignation: UserMinus,
+  birthday: Cake,
 };
 
 const notificationTypeLabels: Record<NavNotification["type"], string> = {
@@ -58,6 +60,7 @@ const notificationTypeLabels: Record<NavNotification["type"], string> = {
   general: "Update",
   loan: "Loan",
   resignation: "Resignation",
+  birthday: "Birthday",
 };
 
 function NotificationsMenu() {

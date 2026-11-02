@@ -168,6 +168,7 @@ model Company {
   announcements Announcement[]
   holidays      Holiday[]
   calendarEvents CalendarEvent[]
+  birthdayWishes BirthdayWish[]
   shiftAssignments ShiftAssignment[]
   branches          Branch[]
   attendanceDevices AttendanceDevice[]
@@ -315,6 +316,7 @@ model User {
   notificationReads NotificationRead[]
   notes           Note[]
   calendarEvents  CalendarEvent[]
+  birthdayWishes  BirthdayWish[] @relation("BirthdayWishAuthor")
   dailyReports    DailyReport[]
   supportTicketsCreated  SupportTicket[]   @relation("SupportTicketsAuthored")
   supportTicketsAssigned SupportTicket[]   @relation("SupportTicketsAssigned")
@@ -459,6 +461,7 @@ model Employee {
   portalDocuments      PortalDocument[]
   notes                Note[]
   calendarEvents       CalendarEvent[]
+  birthdayWishesReceived BirthdayWish[] @relation("BirthdayWishRecipient")
   shiftAssignments    ShiftAssignment[]
   dailyReports         DailyReport[]
   loans                Loan[]
@@ -1218,6 +1221,10 @@ enum IntegrationProvider {
   ZOHO_BOOKS
   ZOHO_SIGN
   ZOHO_MAIL
+  MICROSOFT_365
+  BAMBOOHR
+  QUICKBOOKS
+  CUSTOM_WEBHOOK
 }
 
 enum IntegrationStatus {
@@ -1591,6 +1598,31 @@ model CalendarEvent {
 
   @@index([userId, startAt])
   @@index([companyId, startAt])
+}
+
+/**
+ * A birthday message from one colleague to another. Wishes are tied to the
+ * recipient's birthday for the current cycle, so each colleague can leave one
+ * message per birthday and edit it later. Every member of the company can see
+ * the company wish wall.
+ */
+model BirthdayWish {
+  id          String   @id @default(cuid())
+  companyId   String?
+  recipientId String
+  authorId    String
+  message     String
+  birthdayOn  DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company   Company? @relation(fields: [companyId], references: [id])
+  recipient Employee @relation("BirthdayWishRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  author    User     @relation("BirthdayWishAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@unique([recipientId, authorId, birthdayOn])
+  @@index([companyId, birthdayOn])
+  @@index([recipientId, birthdayOn])
 }
 
 model ShiftAssignment {

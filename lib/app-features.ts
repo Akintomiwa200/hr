@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   StickyNote,
   Headset,
+  Cake,
 } from "lucide-react";
 import {
   ALL_STAFF,
@@ -285,6 +286,16 @@ export const appFeatures: AppFeature[] = [
     helpSlug: "notes",
   },
   {
+    id: "birthdays",
+    label: "Birthdays",
+    description: "Celebrate colleagues with company-wide birthday wishes and live notifications",
+    href: "/birthdays",
+    section: "Workspace",
+    icon: Cake,
+    roles: ALL_STAFF,
+    helpSlug: "birthdays",
+  },
+  {
     id: "documents",
     label: "Documents",
     description: "HR document library and file links",
@@ -307,7 +318,7 @@ export const appFeatures: AppFeature[] = [
   {
     id: "integrations",
     label: "Integrations",
-    description: "Google Workspace and Zoho products",
+    description: "Google, Microsoft 365, BambooHR, QuickBooks Online, and Zoho products",
     href: "/settings/integrations",
     section: "Administration",
     icon: Plug2,

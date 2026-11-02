@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ArrowRight,
   Bell,
+  Cake,
   CalendarOff,
   Check,
   CheckCheck,
@@ -80,6 +81,12 @@ const TYPE_META: Record<string, TypeMeta> = {
     icon: UserMinus,
     tile: "bg-orange-50 text-orange-600",
     chip: "bg-orange-50 text-orange-700 ring-orange-100",
+  },
+  birthday: {
+    label: "Birthday",
+    icon: Cake,
+    tile: "bg-pink-50 text-pink-600",
+    chip: "bg-pink-50 text-pink-700 ring-pink-100",
   },
   subscription: {
     label: "Subscription",

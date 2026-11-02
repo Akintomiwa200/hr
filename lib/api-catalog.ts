@@ -1387,6 +1387,63 @@ export function buildApiCatalog(baseUrl: string): ApiCatalog {
           tags: ["organization", "calendar"],
         },
         {
+          id: "birthday-wishes-list",
+          method: "GET",
+          path: "/api/birthday-wishes",
+          title: "List birthday wishes",
+          description:
+            "Returns the company birthday wall, newest first, scoped to the signed-in user's company. Optionally filter to one recipient. Authors can delete their own wishes; HR and company admins can moderate any wish.",
+          auth: "session",
+          query: [{ name: "recipientId", description: "Employee id to limit wishes to one celebrant" }],
+          response: [
+            {
+              id: "bw_001",
+              recipientId: "emp_001",
+              authorId: "usr_001",
+              authorName: "Alex Morgan",
+              recipientName: "Jamie Lee",
+              message: "Happy birthday, Jamie! Have a fantastic year ahead.",
+              birthdayOn: "2026-11-02T00:00:00.000Z",
+              createdAt: "2026-11-02T08:15:00.000Z",
+              canDelete: true,
+              isMine: true,
+            },
+          ],
+          tags: ["organization", "birthdays"],
+        },
+        {
+          id: "birthday-wishes-create",
+          method: "POST",
+          path: "/api/birthday-wishes",
+          title: "Send a birthday wish",
+          description:
+            "Creates or updates the signed-in user's wish for a colleague's current birthday. One wish per author, recipient, and birthday cycle. Notifies the celebrant and broadcasts birthday_updated.",
+          auth: "session",
+          body: {
+            recipientId: "emp_001",
+            message: "Happy birthday, Jamie! Have a fantastic year ahead.",
+          },
+          response: {
+            id: "bw_001",
+            recipientId: "emp_001",
+            authorId: "usr_001",
+            message: "Happy birthday, Jamie! Have a fantastic year ahead.",
+            birthdayOn: "2026-11-02T00:00:00.000Z",
+          },
+          tags: ["organization", "birthdays"],
+        },
+        {
+          id: "birthday-wishes-delete",
+          method: "DELETE",
+          path: "/api/birthday-wishes/:id",
+          title: "Delete a birthday wish",
+          description:
+            "Removes a wish from the company birthday wall. Authors can delete their own wishes; HR and company admins can moderate. Broadcasts birthday_updated.",
+          auth: "session",
+          response: { success: true },
+          tags: ["organization", "birthdays"],
+        },
+        {
           id: "announcements-list",
           method: "GET",
           path: "/api/announcements",
@@ -1602,11 +1659,11 @@ export function buildApiCatalog(baseUrl: string): ApiCatalog {
           path: "/api/integrations/:slug/connect",
           title: "Connect integration (OAuth start)",
           description:
-            "Starts the OAuth flow for a provider. Responds with HTTP 302 redirect to Google or Zoho. Google redirect_uri is taken from GOOGLE_REDIRECT_URI or APP_URL in .env (not the request host) so it matches Google Cloud Console. State is base64url-encoded JSON containing userId and companyId. Requires OAuth app credentials in .env.",
+            "Starts an OAuth flow for Google Workspace, Microsoft 365, QuickBooks Online, or Zoho. BambooHR uses a company subdomain and API key. Requires provider credentials in .env where applicable.",
           auth: "session",
           roles: ["COMPANY_ADMIN", "HR"],
           query: [
-            { name: "slug", description: "google-workspace | zoho-people | zoho-recruit | zoho-books | zoho-sign | zoho-mail" },
+            { name: "slug", description: "google-workspace | microsoft-365 | bamboohr | quickbooks | zoho-people | zoho-recruit | zoho-books | zoho-sign | zoho-mail" },
           ],
           response: { redirect: "https://accounts.google.com/o/oauth2/v2/auth?…" },
           tags: ["integrations", "oauth"],

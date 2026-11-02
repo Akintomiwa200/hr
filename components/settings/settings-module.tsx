@@ -362,7 +362,7 @@ export function SettingsModule({
                   <Link2 className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Google & Zoho integrations</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Office, HRIS & finance integrations</h3>
                   <p className="text-xs text-gray-500 leading-relaxed max-w-xl">
                     Connect Google Workspace and all Zoho apps for real-time sync — employees, leave, jobs, payroll, e-sign, and mail.
                   </p>

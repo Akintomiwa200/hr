@@ -20,6 +20,7 @@ import {
   UserMinus,
   Users,
   Wallet,
+  Cake,
 } from "lucide-react";
 
 export type HelpSection = {
@@ -206,6 +207,63 @@ export const helpArticles: HelpArticle[] = [
       },
     ],
     relatedSlugs: ["calendar", "getting-started", "announcements"],
+  },
+  {
+    slug: "birthdays",
+    title: "Birthday celebrations",
+    description: "Send birthday wishes and follow every company celebration in real time.",
+    category: "workspace",
+    icon: Cake,
+    roles: ALL_STAFF,
+    moduleHref: "/birthdays",
+    sections: [
+      {
+        heading: "Everyone gets celebrated",
+        body: "On the morning of an employee's birthday, Smart HR sends them a personalised birthday email, adds a birthday letter to their documents, and notifies the rest of the company. Colleagues can then leave a message on the birthday wall.",
+      },
+      {
+        heading: "The birthday wall",
+        body: "Open Birthdays under Workspace to see who is celebrating today, who is coming up, and every wish sent this year. The wall updates in real time as colleagues post, edit, or remove their messages.",
+      },
+      {
+        heading: "One wish per birthday",
+        body: "Each colleague can leave one message per person per birthday. Posting again edits your existing wish, so you can add a detail or correct a typo without creating a duplicate.",
+      },
+      {
+        heading: "Privacy and moderation",
+        body: "Wishes are visible to everyone in the company. You can delete your own messages, while HR and company admins can remove inappropriate wishes. Personal dates of birth are never shown on the wall — only the celebration date.",
+      },
+    ],
+    steps: [
+      { title: "Open Birthdays", body: "Choose Birthdays under Workspace in the sidebar." },
+      {
+        title: "Find a celebrant",
+        body: "Pick someone from Celebrating today or Coming up, then click Send wish.",
+      },
+      {
+        title: "Post your message",
+        body: "Write your wish and click Post to wall. It appears live for the whole company.",
+      },
+      {
+        title: "Edit or remove",
+        body: "Use the pencil and bin icons on your own wish to update or delete it later.",
+      },
+    ],
+    faqs: [
+      {
+        question: "Who receives the birthday email?",
+        answer: "The employee celebrating their birthday receives a personalised email and an in-app birthday letter. If email is not configured, the in-app letter and notification are still delivered.",
+      },
+      {
+        question: "Will I be notified about colleagues' birthdays?",
+        answer: "Yes. Everyone in the company receives a notification on the day a colleague celebrates a birthday, linking straight to the birthday wall so they can leave a wish.",
+      },
+      {
+        question: "Why can't I see a colleague's date of birth?",
+        answer: "The wall only shows the celebration date and age milestone, never the stored date of birth. Personal details stay private.",
+      },
+    ],
+    relatedSlugs: ["notes", "announcements", "getting-started"],
   },
   {
     slug: "leave",
