@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getSession, canManageEmployees } from "@/lib/auth";
-import { LINE_MANAGER_ROLES, assignableRolesFor } from "@/lib/roles";
+import { LINE_MANAGER_ROLES, PEOPLE_DIRECTORY_ROLES, assignableRolesFor, hasRole } from "@/lib/roles";
 import { requirePeoplePage } from "@/lib/page-access";
 import { prisma } from "@/lib/prisma";
 import {
@@ -16,6 +16,8 @@ import { EmployeesModule } from "@/components/employees/employees-module";
 
 export default async function EmployeesPage() {
   const session = requirePeoplePage(await getSession());
+  // Employees can open their own profile, but not the company directory.
+  if (!hasRole(session.role, PEOPLE_DIRECTORY_ROLES)) redirect("/dashboard");
 
   const workspace = getPeopleWorkspace(session.role);
   const scope = getCompanyScope(session);

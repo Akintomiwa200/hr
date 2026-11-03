@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { requirePeoplePage } from "@/lib/page-access";
+import { PEOPLE_DIRECTORY_ROLES, hasRole } from "@/lib/roles";
 import { getTeamsPageData } from "@/lib/teams-data";
 import { getCompanyScope } from "@/lib/company-scope";
 import { getTeamsWorkspace } from "@/lib/role-workspace";
@@ -11,6 +12,7 @@ import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function TeamsPage() {
   const session = requirePeoplePage(await getSession());
+  if (!hasRole(session.role, PEOPLE_DIRECTORY_ROLES)) redirect("/dashboard");
 
   const workspace = getTeamsWorkspace(session.role);
   const scope = getCompanyScope(session);

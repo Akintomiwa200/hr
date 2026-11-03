@@ -64,17 +64,7 @@ export async function canViewEmployee(
     return !!report;
   }
 
-  if (session.companyId && role === "EMPLOYEE") {
-    const peer = await prisma.employee.findFirst({
-      where: {
-        id: employeeId,
-        user: { companyId: session.companyId },
-      },
-      select: { id: true },
-    });
-    return !!peer;
-  }
-
+  // Employees are self-service: they can only open their own employee profile.
   return false;
 }
 

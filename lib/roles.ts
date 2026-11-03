@@ -22,12 +22,21 @@ export const ORG_ROLES: Role[] = [
 export const DASHBOARD_ROLES: Role[] = ALL_ROLES;
 export const ALL_STAFF: Role[] = ORG_ROLES;
 
-/** Can open People directory / teams (scoped further by page logic). */
-export const PEOPLE_VIEW_ROLES: Role[] = [
+/**
+ * Can open People directory / teams (scoped further by page logic).
+ * Employees are intentionally excluded from the company directory and team
+ * management; they only get their own profile through the sidebar.
+ */
+export const PEOPLE_DIRECTORY_ROLES: Role[] = [
   "COMPANY_ADMIN",
   "HR",
   "MANAGER",
   "SUPERVISOR",
+];
+
+/** Can open people pages — employees may only open their own profile. */
+export const PEOPLE_VIEW_ROLES: Role[] = [
+  ...PEOPLE_DIRECTORY_ROLES,
   "EMPLOYEE",
 ];
 
@@ -145,12 +154,17 @@ export const BONUS_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
 export const BONUS_APPROVER_ROLES: Role[] = ["COMPANY_ADMIN", "HR", "ACCOUNT_OFFICER"];
 /** Open the Bonuses module. Employees only ever see their own awards. */
 export const BONUS_VIEW_ROLES: Role[] = [...ORG_ROLES];
-/** Anyone who can open the Reports module. */
+/**
+ * Anyone who can open the Reports module. Employees are self-service only and
+ * get their attendance summary from the Logbook instead of HR metrics.
+ */
 export const REPORTS_VIEW_ROLES: Role[] = [
   ...REPORTS_ADMIN_ROLES,
   ...REPORTS_TEAM_ROLES,
-  "EMPLOYEE",
 ];
+
+/** Configure the Benefit & Welfare programmes shown to employees. */
+export const BENEFIT_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
 
 export function normalizeRole(role: string): Role {
   if (role === "ADMIN") return "COMPANY_ADMIN";
@@ -179,6 +193,10 @@ export function isManagerRole(role: Role) {
 
 export function isSupervisorRole(role: Role) {
   return normalizeRole(role) === "SUPERVISOR";
+}
+
+export function isEmployeeRole(role: Role) {
+  return normalizeRole(role) === "EMPLOYEE";
 }
 
 export function isTeamLeadRole(role: Role) {
@@ -249,6 +267,10 @@ export function canManageOrgContent(role: Role) {
 
 export function canManagePerformance(role: Role) {
   return hasRole(role, PERFORMANCE_ADMIN_ROLES);
+}
+
+export function canManageBenefitPrograms(role: Role) {
+  return hasRole(role, [...BENEFIT_ADMIN_ROLES, "SUPER_ADMIN"]);
 }
 
 export function isPeopleManager(role: Role) {

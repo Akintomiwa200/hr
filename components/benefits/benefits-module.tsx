@@ -290,6 +290,22 @@ export function BenefitsModule({
     },
   ];
 
+  const employeeView = access.role === "EMPLOYEE";
+  const visibleBenefits = employeeView
+    ? benefits.filter((benefit) => {
+        switch (benefit.id) {
+          case "medical": return live.medical.documentCount > 0;
+          case "pension": return live.pension.configured;
+          case "bonus": return live.bonuses.enabled;
+          case "professional": return live.training.activeCycles > 0 || live.training.completedReviews > 0;
+          case "salary": return live.bonuses.enabled && (live.bonuses.annualPlans > 0 || live.bonuses.holidayAllowanceEnabled);
+          case "family":
+          case "transfer": return false;
+          default: return true;
+        }
+      })
+    : benefits;
+
   const summary = [
     {
       label: "Annual leave balance",
@@ -311,11 +327,11 @@ export function BenefitsModule({
         ? `${live.bonuses.pending} pending approval`
         : "module not enabled",
     },
-    {
+    ...(!employeeView ? [{
       label: "Open internal roles",
       value: `${live.mobility.openRoles}`,
       hint: "internal mobility",
-    },
+    }] : []),
   ];
 
   return (
@@ -329,7 +345,7 @@ export function BenefitsModule({
             <div>
               <h2 className="text-sm font-semibold text-gray-900">Live benefits snapshot</h2>
               <p className="text-xs text-gray-500">
-                Pulled from Leave, Loans, Payroll, Bonuses and Recruitment in real time.
+                {employeeView ? "Your available programmes and personal balances." : "Pulled from Leave, Loans, Payroll, Bonuses and Recruitment in real time."}
               </p>
             </div>
           </div>
@@ -354,8 +370,8 @@ export function BenefitsModule({
         </dl>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {benefits.map((benefit) => {
+      {visibleBenefits.length === 0 ? <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center text-sm text-gray-500">No additional benefit programmes are currently available to you.</div> : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {visibleBenefits.map((benefit) => {
           const Icon = benefit.icon;
           return (
             <article
@@ -424,7 +440,7 @@ export function BenefitsModule({
             </article>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 }

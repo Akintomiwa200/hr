@@ -26,6 +26,11 @@ export async function recordChecklistTaskDocument(opts: {
   uploadedByName: string;
 }) {
   const author = opts.uploadedByName.trim() || "Smart HR";
+  const existing = await prisma.document.findFirst({
+    where: opts.publicId ? { publicId: opts.publicId } : { fileUrl: opts.fileUrl, employeeId: opts.employeeId },
+  });
+  if (existing) return existing;
+
   const rootFolder = await ensureEmployeeDocumentFolder({
     companyId: opts.companyId,
     employeeId: opts.employeeId,
@@ -57,6 +62,83 @@ export async function recordChecklistTaskDocument(opts: {
       visibility: "PRIVATE",
     },
   });
+}
+
+/**
+ * Repair missing Documents mirrors for To-Do uploads. Older uploads, or an
+ * upload whose secondary mirror write failed, still live in ChecklistTaskFile.
+ */
+export async function syncChecklistTaskDocuments(companyId?: string | null, employeeId?: string) {
+  const files = await prisma.checklistTaskFile.findMany({
+    where: {
+      ...(employeeId || companyId
+        ? {
+            task: {
+              instance: {
+                ...(employeeId ? { employeeId } : {}),
+                ...(companyId ? { OR: [{ companyId }, { employee: { user: { companyId } } }] } : {}),
+              },
+            },
+          }
+        : {}),
+    },
+    include: {
+      task: {
+        include: {
+          instance: {
+            include: {
+              employee: {
+                select: {
+                  id: true,
+                  user: { select: { companyId: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!files.length) return;
+
+  const existing = await prisma.document.findMany({
+    where: {
+      OR: [
+        { publicId: { in: files.flatMap((file) => file.publicId ? [file.publicId] : []) } },
+        { fileUrl: { in: files.map((file) => file.fileUrl) } },
+      ],
+    },
+    select: { publicId: true, fileUrl: true },
+  });
+  const existingKeys = new Set(existing.flatMap((document) => [
+    ...(document.publicId ? [`id:${document.publicId}`] : []),
+    `url:${document.fileUrl}`,
+  ]));
+
+  for (const file of files) {
+    if ((file.publicId && existingKeys.has(`id:${file.publicId}`)) || existingKeys.has(`url:${file.fileUrl}`)) continue;
+    const employee = file.task.instance.employee;
+    try {
+      const document = await recordChecklistTaskDocument({
+        companyId: file.task.instance.companyId ?? employee.user.companyId,
+        employeeId: employee.id,
+        documentName: file.documentName,
+        fileName: file.fileName,
+        fileUrl: file.fileUrl,
+        publicId: file.publicId,
+        fileSize: file.fileSize,
+        mimeType: file.mimeType,
+        storageType: file.mimeType?.startsWith("image/") || file.mimeType === "application/pdf" ? "image" : "raw",
+        uploadedById: null,
+        uploadedByName: file.uploadedByName,
+      });
+      existingKeys.add(`url:${document.fileUrl}`);
+      if (document.publicId) existingKeys.add(`id:${document.publicId}`);
+    } catch (error) {
+      console.error("Could not repair To-Do document mirror", { fileId: file.id, error });
+    }
+  }
 }
 
 /** Remove the Documents copy of a checklist file, matched by Cloudinary id. */

@@ -10,14 +10,19 @@ export default async function BirthdaysPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const data = await getBirthdayPageData(session);
+  const rawData = await getBirthdayPageData(session);
+  const data = session.role === "EMPLOYEE" ? {
+    ...rawData,
+    today: rawData.today.map((person) => ({ ...person, turningAge: null, yearsOfService: null, jobTitle: "", department: null, branch: null })),
+    upcoming: rawData.upcoming.map((person) => ({ ...person, turningAge: null, yearsOfService: null, jobTitle: "", department: null, branch: null })),
+  } : rawData;
 
   return (
     <div className="pt-6 pb-8">
       <PageLiveRefresh types={["birthday_updated", "employee_updated"]} />
       <PageHeader
         title="Birthday celebrations"
-        description={`Celebrate your colleagues at ${data.companyName} and leave a wish on the company birthday wall.`}
+        description={session.role === "EMPLOYEE" ? `Send birthday wishes to your colleagues at ${data.companyName}.` : `Celebrate your colleagues at ${data.companyName} and leave a wish on the company birthday wall.`}
         action={<ModulePageActions helpSlug="birthdays" helpLabel="Birthday guide" />}
       />
       <BirthdayModule data={data} currentUserId={session.id} />

@@ -40,6 +40,7 @@ import {
   ScrollText,
   NotebookPen,
   Cake,
+  Target,
 } from "lucide-react";
 import { CHECKLIST_ADMIN_ROLES, CHECKLIST_TEMPLATE_ROLES, CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
 import {
@@ -54,7 +55,7 @@ import {
   PAYROLL_VIEW_ROLES,
   LOAN_VIEW_ROLES,
   PEOPLE_ADMIN_ROLES,
-  PEOPLE_VIEW_ROLES,
+  PEOPLE_DIRECTORY_ROLES,
   PERFORMANCE_VIEW_ROLES,
   CONTENT_ADMIN_ROLES,
   DAILY_REPORTING_ROLES,
@@ -67,6 +68,7 @@ import {
   REPORTS_VIEW_ROLES,
   hasRole,
   isSuperAdmin,
+  normalizeRole,
 } from "@/lib/roles";
 
 export type NavItem = {
@@ -134,7 +136,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Team Management",
         pageTitle: "Team Management",
         icon: UsersRound,
-        roles: PEOPLE_VIEW_ROLES,
+        roles: PEOPLE_DIRECTORY_ROLES,
       },
       {
         id: "logbook",
@@ -177,7 +179,7 @@ export const dashboardNavSections: NavSection[] = [
         label: "Employees",
         pageTitle: "Employees",
         icon: Users,
-        roles: PEOPLE_VIEW_ROLES,
+        roles: PEOPLE_DIRECTORY_ROLES,
         match: (pathname) =>
           pathname === "/employees" ||
           (pathname.startsWith("/employees/") &&
@@ -190,7 +192,7 @@ export const dashboardNavSections: NavSection[] = [
             href: "/employees",
             label: "Employee List",
             pageTitle: "Employees",
-            roles: PEOPLE_VIEW_ROLES,
+            roles: PEOPLE_DIRECTORY_ROLES,
             match: (pathname) =>
               pathname === "/employees" ||
               (pathname.startsWith("/employees/") &&
@@ -504,6 +506,169 @@ export const dashboardNavSections: NavSection[] = [
 ];
 
 /**
+ * Employees get a deliberately small self-service workspace. Everything that
+ * belongs to HR, finance, recruitment or org administration is left out so the
+ * sidebar matches the server-side access rules.
+ */
+export const employeeNavSections: NavSection[] = [
+  {
+    title: "PINNED",
+    items: [
+      {
+        id: "department-updates",
+        href: "/announcements",
+        label: "Department updates",
+        pageTitle: "Department updates",
+        icon: Megaphone,
+        roles: ALL_STAFF,
+      },
+    ],
+  },
+  {
+    title: "MAIN",
+    items: [
+      {
+        id: "dashboard",
+        href: "/dashboard",
+        label: "Dashboard",
+        pageTitle: "Dashboard",
+        icon: LayoutDashboard,
+        roles: DASHBOARD_ROLES,
+      },
+      {
+        id: "logbook",
+        href: "/attendance",
+        label: "Logbook",
+        pageTitle: "Logbook",
+        icon: FileText,
+        roles: ALL_STAFF,
+        subItems: [
+          {
+            id: "attendance",
+            href: "/attendance",
+            label: "Attendance summary",
+            pageTitle: "Attendance summary",
+            roles: ALL_STAFF,
+            match: (pathname) =>
+              pathname === "/attendance" ||
+              (pathname.startsWith("/attendance/") &&
+                !pathname.startsWith("/attendance/devices")),
+          },
+          {
+            id: "leave",
+            href: "/leave",
+            label: "Leave",
+            pageTitle: "Leave",
+            roles: ALL_STAFF,
+          },
+        ],
+      },
+      {
+        id: "payroll-compensation",
+        href: "/payroll",
+        label: "Payroll & Compensation",
+        pageTitle: "Payroll & Compensation",
+        icon: Wallet,
+        roles: PAYROLL_VIEW_ROLES,
+        subItems: [
+          {
+            id: "payroll",
+            href: "/payroll",
+            label: "Payroll & payslips",
+            pageTitle: "My payslips",
+            roles: PAYROLL_VIEW_ROLES,
+            match: (pathname) =>
+              pathname === "/payroll" || pathname.startsWith("/payroll/"),
+          },
+          {
+            id: "loans",
+            href: "/loans",
+            label: "Loans",
+            pageTitle: "Loans & repayment",
+            roles: LOAN_VIEW_ROLES,
+            match: (pathname) => pathname === "/loans" || pathname.startsWith("/loans/"),
+          },
+        ],
+      },
+      {
+        id: "kpi",
+        href: "/performance",
+        label: "KPI",
+        pageTitle: "KPI",
+        icon: Target,
+        roles: PERFORMANCE_VIEW_ROLES,
+        match: (pathname) =>
+          pathname === "/performance" || pathname.startsWith("/performance/"),
+      },
+      {
+        id: "benefits-welfare",
+        href: "/benefits",
+        label: "Benefits & Welfare",
+        pageTitle: "Benefits",
+        icon: Medal,
+        roles: ALL_STAFF,
+      },
+      {
+        id: "documents",
+        href: "/documents",
+        label: "Documents",
+        pageTitle: "Documents",
+        icon: FileText,
+        roles: ALL_STAFF,
+      },
+    ],
+  },
+  {
+    title: "WORKSPACE",
+    items: [
+      {
+        id: "notifications",
+        href: "/notifications",
+        label: "Notifications",
+        pageTitle: "Notifications",
+        icon: Bell,
+        roles: ALL_STAFF,
+      },
+      {
+        id: "notes",
+        href: "/notes",
+        label: "Notes",
+        pageTitle: "Notes",
+        icon: StickyNote,
+        roles: ALL_STAFF,
+      },
+      {
+        id: "birthdays",
+        href: "/birthdays",
+        label: "Birthdays",
+        pageTitle: "Birthday celebrations",
+        icon: Cake,
+        roles: ALL_STAFF,
+      },
+      {
+        id: "resignation",
+        href: "/resignation",
+        label: "Resignation",
+        pageTitle: "Resignation",
+        icon: UserMinus,
+        roles: ALL_STAFF,
+        match: (pathname) =>
+          pathname === "/resignation" || pathname.startsWith("/resignation/"),
+      },
+      {
+        id: "checklist-todos",
+        href: "/checklist/todos",
+        label: "To-Dos",
+        pageTitle: "To-Dos",
+        icon: ListTodo,
+        roles: CHECKLIST_VIEW_ROLES,
+        match: (pathname) => pathname === "/checklist/todos",
+      },
+    ],
+  },
+];
+
+/**
  * Super Admin works on the platform, not inside a single company, so the
  * sidebar swaps the company workspace for platform-owner tools.
  */
@@ -596,7 +761,9 @@ export const settingsNavItem: NavItem = {
 export const brandIcon = Activity;
 
 export function getNavSections(role: Role): NavSection[] {
-  return isSuperAdmin(role) ? superAdminNavSections : dashboardNavSections;
+  if (isSuperAdmin(role)) return superAdminNavSections;
+  if (normalizeRole(role) === "EMPLOYEE") return employeeNavSections;
+  return dashboardNavSections;
 }
 
 /** Platform admins get their settings entry from the PLATFORM SETTINGS section. */
@@ -920,7 +1087,20 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
   },
 ];
 
+function employeePageTitle(pathname: string): string | null {
+  if (pathname === "/performance" || pathname.startsWith("/performance/")) return "KPI";
+  if (pathname === "/attendance") return "Attendance summary";
+  if (pathname === "/payroll") return "My payslips";
+  if (pathname === "/loans" || pathname.startsWith("/loans/")) return "Loans & repayment";
+  return null;
+}
+
 export function getPageTitle(pathname: string, role: Role): string {
+  if (normalizeRole(role) === "EMPLOYEE") {
+    const title = employeePageTitle(pathname);
+    if (title) return title;
+  }
+
   for (const rule of nestedPageTitles) {
     if (rule.test(pathname)) return rule.title;
   }

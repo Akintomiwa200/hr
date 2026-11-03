@@ -7,27 +7,31 @@ type CloudinaryConfig = {
 };
 
 export function getCloudinaryConfig(): CloudinaryConfig | null {
-  const url = process.env.CLOUDINARY_URL;
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+  const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
+  const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
+  // Prefer an explicitly configured credential set over CLOUDINARY_URL. This
+  // avoids a stale URL shadowing valid credentials in local and hosted envs.
+  if (cloudName && apiKey && apiSecret) return { cloudName, apiKey, apiSecret };
+
+  const url = process.env.CLOUDINARY_URL?.trim();
   if (url?.startsWith("cloudinary://")) {
     try {
       const parsed = new URL(url);
       if (parsed.username && parsed.password && parsed.hostname) {
         return {
           cloudName: parsed.hostname,
-          apiKey: parsed.username,
-          apiSecret: parsed.password,
+          apiKey: decodeURIComponent(parsed.username),
+          apiSecret: decodeURIComponent(parsed.password),
         };
       }
     } catch {
-      return null;
+      // Fall through to the explicit Cloudinary variables. Some deployments
+      // keep a stale or malformed CLOUDINARY_URL alongside valid credentials.
     }
   }
 
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
-  if (!cloudName || !apiKey || !apiSecret) return null;
-  return { cloudName, apiKey, apiSecret };
+  return null;
 }
 
 function sign(params: Record<string, string | number>, apiSecret: string) {

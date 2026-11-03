@@ -15,7 +15,9 @@ export default async function LoansPage() {
   const scope = getCompanyScope(session);
   const canApprove = canApproveLoans(session.role);
   const employees = await prisma.employee.findMany({
-    where: { ...employeeCompanyWhere(scope), status: "ACTIVE" },
+    where: canApprove
+      ? { ...employeeCompanyWhere(scope), status: "ACTIVE" }
+      : { id: session.employeeId ?? "__none__", status: "ACTIVE", ...employeeCompanyWhere(scope) },
     select: { id: true, firstName: true, lastName: true, employeeCode: true },
     orderBy: { firstName: "asc" },
   });

@@ -10,6 +10,7 @@ import { HelpLink } from "@/components/help/help-link";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 import { canViewEmployee } from "@/lib/employee-access";
 import { EmployeeDocumentsList } from "@/components/documents/employee-documents-list";
+import { syncChecklistTaskDocuments } from "@/lib/checklist/task-documents";
 
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<{ employeeId?: string }> }) {
   const session = await getSession();
@@ -31,6 +32,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   }
 
   const scope = getCompanyScope(session);
+  if (employeeId) await syncChecklistTaskDocuments(scope.companyId, employeeId);
+  else if (canManageDocuments(session)) await syncChecklistTaskDocuments(scope.companyId);
+  else if (session.employeeId) await syncChecklistTaskDocuments(scope.companyId, session.employeeId);
   if (employeeId) {
     const documents = await prisma.document.findMany({
       where: { employeeId, ...(scope.companyId ? { companyId: scope.companyId } : scope.isPlatformAdmin ? {} : { companyId: "__none__" }) },
