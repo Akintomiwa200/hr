@@ -6,6 +6,7 @@ import { shareScopeLabel } from "@/lib/documents/share-groups";
 import { PageHeader } from "@/components/ui";
 import { FolderDetailModule } from "@/components/documents/folder-detail-module";
 import { canViewDocument } from "@/lib/documents/access";
+import { getCompanyScope } from "@/lib/company-scope";
 
 export default async function FolderDetailPage({
   params,
@@ -23,6 +24,8 @@ export default async function FolderDetailPage({
     include: { documents: { orderBy: { createdAt: "desc" } } },
   });
   if (!folder) notFound();
+  const companyScope = getCompanyScope(session);
+  if (!companyScope.isPlatformAdmin && folder.companyId !== companyScope.companyId) notFound();
 
   const employee = session.employeeId
     ? await prisma.employee.findUnique({

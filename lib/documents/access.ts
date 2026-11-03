@@ -69,12 +69,16 @@ export function canViewSharedResource(
 
 export function canViewDocument(
   session: SessionUser,
-  document: Shareable & { visibility: string; employeeId?: string | null; uploadedById?: string | null },
+  document: Shareable & { visibility: string; companyId?: string | null; employeeId?: string | null; uploadedById?: string | null },
   employee: EmployeeContext | null,
   folder?: Shareable | null
 ): boolean {
+  // Document records are tenant scoped. HR and company admins can see private
+  // employee uploads inside their own company; a role in another company must
+  // not grant access to the file or its preview/download endpoint.
+  if (normalizeRole(session.role) !== "SUPER_ADMIN" && document.companyId !== session.companyId) return false;
   if (document.visibility === "PRIVATE") {
-    return canManageDocuments(session) || document.uploadedById === session.id || Boolean(document.employeeId && document.employeeId === session.employeeId);
+    return (canManageDocuments(session) && document.companyId === session.companyId) || document.uploadedById === session.id || Boolean(document.employeeId && document.employeeId === session.employeeId);
   }
   if (canManageDocuments(session)) return true;
   if (!canViewSharedResource(session, document, employee)) return false;

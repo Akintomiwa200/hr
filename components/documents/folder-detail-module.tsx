@@ -287,21 +287,15 @@ export function FolderDetailModule({
         </div>
       )}
 
-      {folder.documents.length === 0 ? (
+      {folder.documents.length === 0 && folder.subfolders.length === 0 ? (
         <Card className="py-16 text-center">
           <EmptyState
             icon={FileText}
             title="There's no document here"
-            description='Add a document by clicking "Upload File" below.'
+            description="Documents uploaded to this folder will appear here."
           />
-          {canManage && (
-            <Button className="mt-4" onClick={() => setUploadOpen(true)}>
-              <Upload className="w-4 h-4" />
-              Upload File
-            </Button>
-          )}
         </Card>
-      ) : (
+      ) : folder.documents.length > 0 ? (
         <Card className="overflow-hidden p-0">
           <table className="w-full text-sm">
             <thead>
@@ -366,7 +360,7 @@ export function FolderDetailModule({
             </tbody>
           </table>
         </Card>
-      )}
+      ) : null}
 
       <Dialog open={uploadOpen} onClose={() => setUploadOpen(false)} title="Upload File">
         <div className="space-y-4">
