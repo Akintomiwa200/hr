@@ -12,7 +12,7 @@ import {
 } from "@/lib/checklist/task-documents";
 import { deleteCloudinaryFile, uploadChecklistFileToCloudinary } from "@/lib/cloudinary";
 
-const MAX_BYTES = 12 * 1024 * 1024;
+const MAX_BYTES = 100 * 1024 * 1024;
 
 function authorName(session: { firstName?: string; lastName?: string; email: string }) {
   const name = `${session.firstName ?? ""} ${session.lastName ?? ""}`.trim();
@@ -57,7 +57,7 @@ export async function POST(
   const documentName = String(form.get("documentName") || "").trim();
   if (!(file instanceof File) || !file.size) return badRequest("Choose a file to upload");
   if (!documentName) return badRequest("Document name is required");
-  if (file.size > MAX_BYTES) return badRequest("File is larger than 12 MB");
+  if (file.size > MAX_BYTES) return badRequest("Files must be 100 MB or smaller.");
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const employee = task.instance.employee;
@@ -166,7 +166,11 @@ export async function DELETE(
     employeeId: task.instance.employeeId,
   });
 
-  if (file.publicId) await deleteCloudinaryFile(file.publicId);
+  if (file.publicId) {
+    const extension = file.fileName.split(".").pop()?.toLowerCase() ?? "";
+    const imageFile = file.mimeType?.startsWith("image/") || ["pdf", "jpg", "jpeg", "png", "gif", "webp", "bmp", "tif", "tiff", "svg", "heic", "heif"].includes(extension);
+    await deleteCloudinaryFile(file.publicId, imageFile ? "image" : "raw");
+  }
   await deleteTaskFile(fileId);
 
   broadcastAppEvent("checklist_updated", { id, action: "document_deleted" });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { DIRECT_UPLOAD_EXTENSIONS, DIRECT_UPLOAD_MAX_BYTES } from "@/lib/cloudinary-direct-upload";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
@@ -53,11 +54,10 @@ export async function POST(request: NextRequest) {
   if (!form) return badRequest("Select a file to upload.");
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) return badRequest("Select a file to upload.");
-  if (file.size > 20 * 1024 * 1024) return badRequest("Files must be 20 MB or smaller.");
-  const allowedExtensions = new Set(["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "csv", "txt", "rtf", "odt", "ods", "jpg", "jpeg", "png", "gif", "webp"]);
+  if (file.size > DIRECT_UPLOAD_MAX_BYTES) return badRequest("Files must be 100 MB or smaller.");
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  if (!DIRECT_UPLOAD_EXTENSIONS.has(extension)) return badRequest("This file format is not supported.");
   const fileName = file.name.trim();
-  const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
-  if (!allowedExtensions.has(extension)) return badRequest("Use a PDF, Office, OpenDocument, CSV, text, or image file.");
   const titleInput = form.get("title");
   const title = typeof titleInput === "string" && titleInput.trim() ? titleInput.trim() : fileName;
   const folderIdInput = form.get("folderId");

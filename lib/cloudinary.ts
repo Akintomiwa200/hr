@@ -42,6 +42,10 @@ function sign(params: Record<string, string | number>, apiSecret: string) {
   return crypto.createHash("sha1").update(`${toSign}${apiSecret}`).digest("hex");
 }
 
+export function signCloudinaryUploadParams(params: Record<string, string | number>, apiSecret: string) {
+  return sign(params, apiSecret);
+}
+
 type CloudinaryUploadInput = {
   buffer: Buffer;
   filename: string;
@@ -105,7 +109,17 @@ export async function uploadChecklistFileToCloudinary(input: {
   mimeType?: string | null;
   publicId: string;
 }) {
-  return uploadToCloudinary({ ...input, resourceType: "auto" });
+  // Cloudinary's auto mode normally recognizes PDFs, but make their image
+  // resource type explicit so page previews can be transformed to JPG even
+  // when delivery of original PDF files is blocked by account settings.
+  const extension = input.filename.split(".").pop()?.toLowerCase() ?? "";
+  const resourceType = input.mimeType?.toLowerCase() === "application/pdf" || ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tif", "tiff", "svg", "heic", "heif"].includes(extension)
+    ? "image"
+    : "raw";
+  const publicId = resourceType === "raw" && !input.publicId.toLowerCase().endsWith(`.${extension}`)
+    ? `${input.publicId}.${extension}`
+    : input.publicId;
+  return uploadToCloudinary({ ...input, publicId, resourceType });
 }
 
 export async function uploadJsonToCloudinary(input: {

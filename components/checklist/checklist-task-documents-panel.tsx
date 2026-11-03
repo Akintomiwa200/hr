@@ -89,22 +89,92 @@ export function ChecklistTaskDocumentsPanel({
     await saveRequired(required.filter((item) => item !== name));
   };
 
-  const uploadFor = async (documentName: string, file: File) => {
-    setUploading(documentName);
-    try {
-      const data = new FormData();
-      data.append("file", file);
-      data.append("documentName", documentName);
-      const res = await fetch(`/api/checklist/tasks/${taskId}/files`, {
-        method: "POST",
-        body: data,
-      });
-      if (!res.ok) {
-        notify.error(await readApiError(res, "Upload failed"));
-        return;
+  const uploadOne = async (documentName: string, file: File, onProgress: (percent: number) => void) => {
+    const signResponse = await fetch(`/api/checklist/tasks/${taskId}/files/sign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documentName, fileName: file.name, mimeType: file.type, fileSize: file.size }),
+    });
+    if (!signResponse.ok) return await readApiError(signResponse, `Could not prepare ${file.name}`);
+    const signed = await signResponse.json() as {
+      ticket: string;
+      uploadUrl: string;
+      params: Record<string, string | number>;
+    };
+    const cloudinary = await new Promise<{ secure_url: string; public_id: string; resource_type: string; bytes: number }>((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open("POST", signed.uploadUrl);
+      request.upload.onprogress = (event) => {
+        if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+      };
+      request.onerror = () => reject(new Error("Network error while uploading to Cloudinary."));
+      request.onabort = () => reject(new Error("Upload was cancelled."));
+      request.onload = () => {
+        let result: { secure_url?: string; public_id?: string; resource_type?: string; bytes?: number; error?: { message?: string } };
+        try {
+          result = JSON.parse(request.responseText || "{}") as typeof result;
+        } catch {
+          reject(new Error("Cloudinary returned an unreadable upload response."));
+          return;
+        }
+        if (request.status < 200 || request.status >= 300 || !result.secure_url) {
+          reject(new Error(result.error?.message || `Cloudinary upload failed (${request.status}).`));
+          return;
+        }
+        resolve({ secure_url: result.secure_url, public_id: result.public_id ?? "", resource_type: result.resource_type ?? "", bytes: result.bytes ?? 0 });
+      };
+      const form = new FormData();
+      form.append("file", file, file.name);
+      for (const [key, value] of Object.entries(signed.params)) form.append(key, String(value));
+      request.send(form);
+    });
+    const completeResponse = await fetch(`/api/checklist/tasks/${taskId}/files/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket: signed.ticket, ...cloudinary }),
+    });
+    if (!completeResponse.ok) return await readApiError(completeResponse, `Could not save ${file.name}`);
+    onProgress(100);
+    return null;
+  };
+
+  const uploadFor = async (documentName: string, selectedFiles: File[]) => {
+    const queue = selectedFiles.filter((file) => file.size > 0);
+    if (queue.length === 0) return;
+    setUploading(`${documentName} · preparing ${queue.length} file${queue.length === 1 ? "" : "s"}`);
+    let next = 0;
+    let completed = 0;
+    let succeeded = 0;
+    const failures: string[] = [];
+    const worker = async () => {
+      while (next < queue.length) {
+        const index = next++;
+        const file = queue[index];
+        if (file.size > 100 * 1024 * 1024) {
+          failures.push(`${file.name}: files must be 100 MB or smaller`);
+          completed += 1;
+          continue;
+        }
+        try {
+          const error = await uploadOne(documentName, file, (percent) => {
+            setUploading(`${documentName} · ${completed}/${queue.length} files · ${percent}%`);
+          });
+          if (error) failures.push(`${file.name}: ${error}`);
+          else succeeded += 1;
+        } catch (error) {
+          failures.push(`${file.name}: ${error instanceof Error ? error.message : "Upload failed"}`);
+        }
+        completed += 1;
+        setUploading(`${documentName} · ${completed}/${queue.length} files`);
       }
-      notify.success(`${documentName} uploaded`);
-      onChanged();
+    };
+    try {
+      await Promise.all(Array.from({ length: Math.min(2, queue.length) }, () => worker()));
+      if (succeeded) {
+        notify.success(`${succeeded} file${succeeded === 1 ? "" : "s"} uploaded for ${documentName}`);
+        onChanged();
+      }
+      if (failures.length) notify.error(failures.slice(0, 3).join("\n"));
     } finally {
       setUploading(null);
     }
@@ -216,17 +286,19 @@ export function ChecklistTaskDocumentsPanel({
                       <label className="inline-flex">
                         <input
                           type="file"
+                          accept=".pdf,.doc,.docx,.docm,.xls,.xlsx,.xlsm,.ppt,.pptx,.pptm,.csv,.tsv,.txt,.rtf,.odt,.ods,.odp,.md,.json,.xml,.yaml,.yml,.eml,.msg,.zip,.7z,.rar,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.svg,.heic,.heif"
+                          multiple
                           className="hidden"
-                          disabled={uploading === name}
+                          disabled={Boolean(uploading)}
                           onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) void uploadFor(name, file);
+                            const selected = Array.from(e.currentTarget.files ?? []);
+                            if (selected.length) void uploadFor(name, selected);
                             e.currentTarget.value = "";
                           }}
                         />
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
                           <Upload className="w-3.5 h-3.5" />
-                          {uploading === name ? "Uploading…" : "Upload"}
+                          {uploading?.startsWith(`${name} ·`) ? "Uploading…" : "Upload"}
                         </span>
                       </label>
                     )}
@@ -278,12 +350,15 @@ export function ChecklistTaskDocumentsPanel({
           <input
             ref={extraInput}
             type="file"
+            accept=".pdf,.doc,.docx,.docm,.xls,.xlsx,.xlsm,.ppt,.pptx,.pptm,.csv,.tsv,.txt,.rtf,.odt,.ods,.odp,.md,.json,.xml,.yaml,.yml,.eml,.msg,.zip,.7z,.rar,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.svg,.heic,.heif"
+            multiple
+            disabled={Boolean(uploading)}
             className="hidden"
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              const name = extraName.trim() || file?.name || "Supporting document";
-              if (file) {
-                void uploadFor(name, file);
+              const selected = Array.from(e.currentTarget.files ?? []);
+              const name = extraName.trim() || selected[0]?.name || "Supporting document";
+              if (selected.length) {
+                void uploadFor(name, selected);
                 setExtraName("");
               }
               e.currentTarget.value = "";
@@ -292,7 +367,8 @@ export function ChecklistTaskDocumentsPanel({
           <Button
             size="sm"
             variant="secondary"
-            loading={uploading === (extraName.trim() || "Supporting document")}
+            loading={Boolean(uploading && uploading.startsWith(`${extraName.trim() || "Supporting document"} ·`))}
+            disabled={Boolean(uploading)}
             onClick={() => extraInput.current?.click()}
           >
             <Upload className="w-3.5 h-3.5" />

@@ -10,6 +10,8 @@ import { UploadLinksDialog } from "@/components/documents/upload-links-dialog";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 import { isSseHandshake } from "@/lib/events";
+import { DIRECT_UPLOAD_EXTENSIONS, DIRECT_UPLOAD_MAX_BYTES } from "@/lib/cloudinary-direct-upload";
+import { uploadCloudinaryFile } from "@/components/documents/cloudinary-browser-upload";
 
 type DocFile = {
   id: string;
@@ -55,7 +57,8 @@ export function FolderDetailModule({
   const [pinMode, setPinMode] = useState<"open" | "protect">("open");
   const [pinValue, setPinValue] = useState("");
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ title: "", file: null as File | null, employeeId: "", visibility: "PRIVATE", protectionPin: "" });
+  const [form, setForm] = useState({ title: "", files: [] as File[], employeeId: "", visibility: "PRIVATE", protectionPin: "" });
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const es = new EventSource("/api/events");
@@ -84,26 +87,38 @@ export function FolderDetailModule({
   const upload = async () => {
     setLoading(true);
     try {
-      if (!form.file) {
-        notify.error("Choose a file to upload");
+      if (!form.files.length) {
+        notify.error("Choose one or more files to upload");
         return;
       }
-      const payload = new FormData();
-      payload.set("title", form.title);
-      payload.set("folderId", folder.id);
-      payload.set("file", form.file);
-      payload.set("employeeId", form.employeeId);
-      payload.set("visibility", form.visibility);
-      if (form.visibility === "PROTECTED") payload.set("protectionPin", form.protectionPin);
-      const res = await fetch("/api/documents", { method: "POST", body: payload });
-      if (!res.ok) {
-        notify.error(await readApiError(res, "Failed to upload file"));
-        return;
+      const files = [...form.files];
+      let completed = 0;
+      const failures: string[] = [];
+      const worker = async () => {
+        while (files.length) {
+          const file = files.shift()!;
+          if (file.size > DIRECT_UPLOAD_MAX_BYTES) { failures.push(`${file.name}: exceeds 100 MB`); continue; }
+          const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+          if (!DIRECT_UPLOAD_EXTENSIONS.has(ext)) { failures.push(`${file.name}: format is not supported`); continue; }
+          try {
+            const sign = await fetch("/api/documents/upload-sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fileName: file.name, fileSize: file.size, mimeType: file.type, title: form.title.trim() ? `${form.title.trim()}${form.files.length > 1 ? ` - ${file.name}` : ""}` : file.name, folderId: folder.id, employeeId: form.employeeId, visibility: form.visibility, protectionPin: form.protectionPin }) });
+            if (!sign.ok) throw new Error(await readApiError(sign, "Could not prepare upload"));
+            const signed = await sign.json();
+            const uploaded = await uploadCloudinaryFile({ uploadUrl: signed.uploadUrl, params: signed.params, file, onProgress: (percent) => setUploadProgress((current) => ({ ...current, [file.name]: percent })) });
+            const complete = await fetch("/api/documents/upload-complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticket: signed.ticket, ...uploaded }) });
+            if (!complete.ok) throw new Error(await readApiError(complete, "Could not save uploaded file"));
+            completed++;
+          } catch (error) { failures.push(`${file.name}: ${error instanceof Error ? error.message : "upload failed"}`); }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(2, form.files.length) }, worker));
+      if (completed) {
+        notify.success(`${completed} file${completed === 1 ? "" : "s"} uploaded`);
+        setUploadOpen(false);
+        setForm({ title: "", files: [], employeeId: "", visibility: "PRIVATE", protectionPin: "" });
+        router.refresh();
       }
-      notify.success("File uploaded");
-      setUploadOpen(false);
-      setForm({ title: "", file: null, employeeId: "", visibility: "PRIVATE", protectionPin: "" });
-      router.refresh();
+      if (failures.length) notify.error(failures.slice(0, 3).join("; "));
     } catch {
       notify.error("Failed to upload file");
     } finally {
@@ -356,8 +371,9 @@ export function FolderDetailModule({
       <Dialog open={uploadOpen} onClose={() => setUploadOpen(false)} title="Upload File">
         <div className="space-y-4">
           <input className={inputClass} placeholder="Document title (optional)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-          <input className={inputClass} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.rtf,.odt,.ods,.jpg,.jpeg,.png,.gif,.webp" onChange={(e) => setForm({ ...form, file: e.target.files?.[0] ?? null })} />
-          <p className="text-xs text-gray-500">PDF, Office, OpenDocument, CSV, text, or image files up to 20 MB.</p>
+          <input className={inputClass} type="file" multiple accept={Array.from(DIRECT_UPLOAD_EXTENSIONS, (ext) => `.${ext}`).join(",")} onChange={(e) => setForm({ ...form, files: Array.from(e.target.files ?? []) })} />
+          <p className="text-xs text-gray-500">Up to 100 MB per file. Multiple files upload together.</p>
+          {form.files.map((file) => <div key={`${file.name}-${file.lastModified}`} className="text-xs text-gray-600">{file.name} · {uploadProgress[file.name] ?? 0}%</div>)}
           <label className="block text-sm text-gray-700">Visibility
             <select className={`${inputClass} mt-1`} value={form.visibility} onChange={(e) => setForm({ ...form, visibility: e.target.value })}>
               <option value="PRIVATE">Private — uploader and assigned employee</option>

@@ -3,28 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { getAppUrl } from "@/lib/app-url";
 import { slugDocumentName } from "@/lib/checklist/documents";
 import { insertTaskFile } from "@/lib/checklist/document-store";
+import { DIRECT_UPLOAD_EXTENSIONS, DIRECT_UPLOAD_MAX_BYTES } from "@/lib/cloudinary-direct-upload";
 
-export const UPLOAD_LINK_MAX_BYTES = 20 * 1024 * 1024;
-
-export const UPLOAD_LINK_ALLOWED_EXTENSIONS = new Set([
-  "pdf",
-  "doc",
-  "docx",
-  "xls",
-  "xlsx",
-  "ppt",
-  "pptx",
-  "csv",
-  "txt",
-  "rtf",
-  "odt",
-  "ods",
-  "jpg",
-  "jpeg",
-  "png",
-  "gif",
-  "webp",
-]);
+export const UPLOAD_LINK_MAX_BYTES = DIRECT_UPLOAD_MAX_BYTES;
+export const UPLOAD_LINK_ALLOWED_EXTENSIONS = DIRECT_UPLOAD_EXTENSIONS;
 
 export type UploadLinkState = "ACTIVE" | "REVOKED" | "EXPIRED" | "EXHAUSTED";
 
