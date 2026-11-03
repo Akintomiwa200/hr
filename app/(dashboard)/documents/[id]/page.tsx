@@ -35,14 +35,39 @@ export default async function FolderDetailPage({
     redirect("/documents");
   }
 
-  const companyEmployees = await prisma.employee.findMany({
-    where: { status: "ACTIVE", user: { companyId: session.companyId ?? undefined } },
-    select: { id: true, firstName: true, lastName: true },
-    orderBy: { firstName: "asc" },
-  });
+  const [companyEmployees, childFolders] = await Promise.all([
+    prisma.employee.findMany({
+      where: { status: "ACTIVE", user: { companyId: session.companyId ?? undefined } },
+      select: { id: true, firstName: true, lastName: true },
+      orderBy: { firstName: "asc" },
+    }),
+    prisma.documentFolder.findMany({
+      where: { parentId: folder.id },
+      include: { _count: { select: { documents: true } } },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
   const visibleDocuments = folder.documents.filter((document) =>
     canViewDocument(session, document, employee, folder) && (!employeeId || document.employeeId === employeeId)
   );
+
+  // Walk up the folder tree so HR can see the full storage path.
+  const path: Array<{ id: string; name: string }> = [];
+  let cursor: { id: string; name: string; parentId: string | null } | null = {
+    id: folder.id,
+    name: folder.name,
+    parentId: folder.parentId,
+  };
+  for (let depth = 0; cursor && depth < 20; depth += 1) {
+    path.unshift({ id: cursor.id, name: cursor.name });
+    cursor = cursor.parentId
+      ? await prisma.documentFolder.findUnique({
+          where: { id: cursor.parentId },
+          select: { id: true, name: true, parentId: true },
+        })
+      : null;
+  }
 
   return (
     <div>
@@ -55,6 +80,13 @@ export default async function FolderDetailPage({
           id: folder.id,
           name: folder.name,
           description: folder.description,
+          employeeId: folder.employeeId,
+          path,
+          subfolders: childFolders.map((child) => ({
+            id: child.id,
+            name: child.name,
+            fileCount: child._count.documents,
+          })),
           sharedLabel: shareScopeLabel(folder.shareScope, folder.shareTargets),
           documents: visibleDocuments.map((d) => ({
             id: d.id,

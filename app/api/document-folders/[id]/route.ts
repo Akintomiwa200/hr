@@ -102,11 +102,28 @@ export async function DELETE(
   if (!session || !canManageDocuments(session)) return unauthorized();
 
   const { id } = await params;
-  const existing = await prisma.documentFolder.findUnique({ where: { id }, include: { documents: { select: { publicId: true, storageType: true } } } });
+  const existing = await prisma.documentFolder.findUnique({ where: { id } });
   if (!existing) return notFound();
 
+  // Collect every nested subfolder so their Cloudinary files are cleaned up
+  // before the database cascade removes the folder tree.
+  const folderIds = [id];
+  let frontier = [id];
+  for (let depth = 0; frontier.length > 0 && depth < 20; depth += 1) {
+    const children = await prisma.documentFolder.findMany({
+      where: { parentId: { in: frontier } },
+      select: { id: true },
+    });
+    frontier = children.map((child) => child.id);
+    folderIds.push(...frontier);
+  }
+  const documents = await prisma.document.findMany({
+    where: { folderId: { in: folderIds } },
+    select: { publicId: true, storageType: true },
+  });
+
   await prisma.documentFolder.delete({ where: { id } });
-  await Promise.all(existing.documents.flatMap((document) =>
+  await Promise.all(documents.flatMap((document) =>
     document.publicId && (document.storageType === "image" || document.storageType === "raw")
       ? [deleteCloudinaryFile(document.publicId, document.storageType)]
       : []

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Download,
   FileText,
+  Link2,
   Plus,
   Trash2,
   Upload,
@@ -43,6 +44,7 @@ export function ChecklistTaskDocumentsPanel({
   const [newName, setNewName] = useState("");
   const [savingList, setSavingList] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [linking, setLinking] = useState<string | null>(null);
   const [extraName, setExtraName] = useState("");
   const extraInput = useRef<HTMLInputElement>(null);
 
@@ -120,13 +122,40 @@ export function ChecklistTaskDocumentsPanel({
     onChanged();
   };
 
+  const copyUploadLink = async (documentName: string) => {
+    setLinking(documentName);
+    try {
+      const res = await fetch("/api/document-upload-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId, documentName, reuse: true }),
+      });
+      if (!res.ok) {
+        notify.error(await readApiError(res, "Could not create the upload link"));
+        return;
+      }
+      const data = (await res.json()) as { url: string };
+      try {
+        await navigator.clipboard.writeText(data.url);
+        notify.success(`Upload link for ${documentName} copied. Send it to the staff member.`);
+      } catch {
+        notify.error(`Upload link: ${data.url}`);
+      }
+    } catch {
+      notify.error("Could not create the upload link");
+    } finally {
+      setLinking(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h4 className="text-sm font-semibold text-gray-900">Documents</h4>
           <p className="text-xs text-gray-500 mt-0.5">
-            HR and admins set the list. Anyone with access can upload, review, or download.
+            HR and admins set the list. Anyone with access can upload, review, or download. Managers can copy a
+            passwordless upload link so staff can file documents without signing in.
           </p>
         </div>
         <Link
@@ -171,6 +200,18 @@ export function ChecklistTaskDocumentsPanel({
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={() => void copyUploadLink(name)}
+                        disabled={linking === name}
+                        title={`Copy a passwordless upload link for ${name}`}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <Link2 className="w-3.5 h-3.5" />
+                        {linking === name ? "Creating…" : "Upload link"}
+                      </button>
+                    )}
                     {canUpload && (
                       <label className="inline-flex">
                         <input

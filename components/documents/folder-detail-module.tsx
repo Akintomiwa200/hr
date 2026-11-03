@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Download, Eye, EyeOff, FileText, LockKeyhole, Trash2, Upload } from "lucide-react";
+import { ChevronRight, Download, Eye, EyeOff, FileText, FolderOpen, Link2, LockKeyhole, Trash2, Upload } from "lucide-react";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
+import { UploadLinksDialog } from "@/components/documents/upload-links-dialog";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 import { isSseHandshake } from "@/lib/events";
@@ -25,6 +26,9 @@ type FolderDetail = {
   id: string;
   name: string;
   description: string | null;
+  employeeId: string | null;
+  path: { id: string; name: string }[];
+  subfolders: { id: string; name: string; fileCount: number }[];
   sharedLabel: string;
   documents: DocFile[];
 };
@@ -45,6 +49,7 @@ export function FolderDetailModule({
 }) {
   const router = useRouter();
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadLinksOpen, setUploadLinksOpen] = useState(false);
   const [deleteDoc, setDeleteDoc] = useState<DocFile | null>(null);
   const [pinDoc, setPinDoc] = useState<DocFile | null>(null);
   const [pinMode, setPinMode] = useState<"open" | "protect">("open");
@@ -199,12 +204,25 @@ export function FolderDetailModule({
 
   return (
     <>
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 mb-2">
         <Link href={employeeFilterId ? `/documents?employeeId=${employeeFilterId}` : "/documents"} className="hover:text-brand-600">
           List Document
         </Link>
-        <ChevronRight className="w-4 h-4" />
-        <span className="text-gray-800">{folder.name}</span>
+        {folder.path.map((item) => (
+          <span key={item.id} className="inline-flex items-center gap-2">
+            <ChevronRight className="w-4 h-4" />
+            {item.id === folder.id ? (
+              <span className="text-gray-800">{item.name}</span>
+            ) : (
+              <Link
+                href={`/documents/${item.id}${employeeFilterId ? `?employeeId=${employeeFilterId}` : ""}`}
+                className="hover:text-brand-600"
+              >
+                {item.name}
+              </Link>
+            )}
+          </span>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
@@ -213,14 +231,46 @@ export function FolderDetailModule({
           <Badge variant="info" className="mt-1">
             {folder.sharedLabel}
           </Badge>
+          <p className="mt-2 text-xs text-gray-400">
+            Storage path: <span className="font-medium text-gray-600">{folder.path.map((item) => item.name).join(" / ")}</span>
+          </p>
         </div>
         {canManage && (
-          <Button variant="secondary" onClick={() => setUploadOpen(true)}>
-            <Upload className="w-4 h-4" />
-            Upload File
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {folder.employeeId && (
+              <Button variant="secondary" onClick={() => setUploadLinksOpen(true)}>
+                <Link2 className="w-4 h-4" />
+                Upload link
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => setUploadOpen(true)}>
+              <Upload className="w-4 h-4" />
+              Upload File
+            </Button>
+          </div>
         )}
       </div>
+
+      {folder.subfolders.length > 0 && (
+        <div className="mb-6">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Subfolders</h3>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {folder.subfolders.map((subfolder) => (
+              <Link
+                key={subfolder.id}
+                href={`/documents/${subfolder.id}${employeeFilterId ? `?employeeId=${employeeFilterId}` : ""}`}
+                className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 text-sm hover:border-brand-200 hover:bg-brand-50/30"
+              >
+                <span className="inline-flex min-w-0 items-center gap-2 font-medium text-gray-800">
+                  <FolderOpen className="h-4 w-4 shrink-0 text-brand-500" />
+                  <span className="truncate">{subfolder.name}</span>
+                </span>
+                <span className="shrink-0 text-xs text-gray-400">{subfolder.fileCount} file{subfolder.fileCount === 1 ? "" : "s"}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {folder.documents.length === 0 ? (
         <Card className="py-16 text-center">
@@ -327,6 +377,14 @@ export function FolderDetailModule({
           <Button variant="danger" loading={loading} onClick={remove}>Delete</Button>
         </div>
       </Dialog>
+      <UploadLinksDialog
+        open={uploadLinksOpen}
+        onClose={() => setUploadLinksOpen(false)}
+        employees={employees}
+        initialEmployeeId={folder.employeeId}
+        initialDocumentName={folder.path.length > 1 ? folder.name : ""}
+        lockEmployee
+      />
       <Dialog open={!!pinDoc} onClose={() => setPinDoc(null)} title={pinMode === "protect" ? "Protect document" : "Open protected document"}>
         <div className="space-y-4">
           <p className="text-sm text-gray-600">{pinMode === "protect" ? `Set a PIN or password for ${pinDoc?.fileName}. You will need it each time the file is opened.` : `Enter the PIN or password for ${pinDoc?.fileName}.`}</p>

@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import { Copy, FolderOpen, MoreHorizontal, Pencil, Plus, Share2, Trash2 } from "lucide-react";
+import { Copy, FolderOpen, Link2, MoreHorizontal, Pencil, Plus, Share2, Trash2 } from "lucide-react";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { Sheet } from "@/components/ui/sheet";
 import { Dialog } from "@/components/ui/dialog";
-import { ShareFolderDialog } from "@/components/documents/share-folder-dialog";import { notify, readApiError } from "@/lib/toast";
+import { ShareFolderDialog } from "@/components/documents/share-folder-dialog";
+import { UploadLinksDialog } from "@/components/documents/upload-links-dialog";
+import { notify, readApiError } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 import { isSseHandshake } from "@/lib/events";
 
@@ -23,6 +25,8 @@ export type FolderRow = {
   sharedLabel: string;
   shareScope: string;
   shareTargets: string | null;
+  employeeId?: string | null;
+  subfolderCount?: number;
 };
 
 const inputClass =
@@ -32,27 +36,27 @@ export function DocumentsModule({
   folders: initial,
   canManage,
   departments,
+  employees,
   employeeId,
 }: {
   folders: FolderRow[];
   canManage: boolean;
   departments: { id: string; name: string }[];
+  employees: { id: string; firstName: string; lastName: string }[];
   employeeId?: string;
 }) {
   const router = useRouter();
-  const [folders, setFolders] = useState(initial);
+  const folders = initial;
   const [createOpen, setCreateOpen] = useState(false);
   const [shareFolder, setShareFolder] = useState<FolderRow | null>(null);
+  const [uploadLinkFolder, setUploadLinkFolder] = useState<FolderRow | null>(null);
+  const [uploadLinksOpen, setUploadLinksOpen] = useState(false);
   const [editFolder, setEditFolder] = useState<FolderRow | null>(null);
   const [deleteFolder, setDeleteFolder] = useState<FolderRow | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [form, setForm] = useState({ name: "", description: "" });
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setFolders(initial);
-  }, [initial]);
 
   useEffect(() => {
     const es = new EventSource("/api/events");
@@ -136,10 +140,16 @@ export function DocumentsModule({
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <p className="text-sm text-gray-500">These are the uploaded documents.</p>
         {canManage && (
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="w-4 h-4" />
-            New Folder
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={() => setUploadLinksOpen(true)}>
+              <Link2 className="w-4 h-4" />
+              Request upload
+            </Button>
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="w-4 h-4" />
+              New Folder
+            </Button>
+          </div>
         )}
       </div>
 
@@ -178,6 +188,9 @@ export function DocumentsModule({
                         <FolderOpen className="w-4 h-4 text-brand-500" />
                         {folder.name}
                       </Link>
+                      {folder.subfolderCount ? (
+                        <p className="mt-0.5 text-[11px] text-gray-400">{folder.subfolderCount} subfolder{folder.subfolderCount === 1 ? "" : "s"}</p>
+                      ) : null}
                     </td>
                     <td className="px-5 py-4 text-gray-600">{folder.createdByName}</td>
                     <td className="px-5 py-4 text-gray-500">{formatDate(folder.createdAt)}</td>
@@ -230,6 +243,9 @@ export function DocumentsModule({
             return (
               <div style={{ top: menuPosition.top, left: menuPosition.left }} className="fixed z-[101] w-44 rounded-xl border border-gray-200 bg-white p-1 shadow-xl">
                 <Link href={`/documents/${folder.id}${employeeId ? `?employeeId=${employeeId}` : ""}`} onClick={() => setOpenMenuId(null)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><FolderOpen className="h-4 w-4" />Open</Link>
+                {folder.employeeId && (
+                  <button type="button" onClick={() => { setUploadLinkFolder(folder); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><Link2 className="h-4 w-4" />Upload link</button>
+                )}
                 <button type="button" onClick={() => { setShareFolder(folder); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><Share2 className="h-4 w-4" />Share</button>
                 <button type="button" onClick={() => { setEditFolder(folder); setForm({ name: folder.name, description: folder.description ?? "" }); setCreateOpen(true); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><Pencil className="h-4 w-4" />Edit</button>
                 <button type="button" onClick={() => void copyFolderLink(folder)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><Copy className="h-4 w-4" />Copy link</button>
@@ -285,6 +301,17 @@ export function DocumentsModule({
           }}
         />
       )}
+      <UploadLinksDialog
+        open={uploadLinksOpen || !!uploadLinkFolder}
+        onClose={() => {
+          setUploadLinksOpen(false);
+          setUploadLinkFolder(null);
+        }}
+        employees={employees}
+        initialEmployeeId={uploadLinkFolder?.employeeId ?? employeeId ?? undefined}
+        initialDocumentName=""
+        lockEmployee={!!uploadLinkFolder}
+      />
       <Dialog open={!!deleteFolder} onClose={() => setDeleteFolder(null)} title="Delete folder">
         <p className="mb-5 text-sm text-gray-600">Delete <strong>{deleteFolder?.name}</strong> and all files inside it? This cannot be undone.</p>
         <div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setDeleteFolder(null)}>Cancel</Button><Button variant="danger" loading={loading} onClick={removeFolder}>Delete folder</Button></div>

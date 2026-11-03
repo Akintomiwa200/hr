@@ -8,6 +8,10 @@ import {
   setTasksRequiredDocumentsByTitle,
   setTemplateTaskRequiredDocuments,
 } from "@/lib/checklist/document-store";
+import {
+  ensureDocumentSubfolder,
+  ensureEmployeeDocumentFolder,
+} from "@/lib/documents/upload-links";
 
 async function resolveHrAssigneeId(companyId: string | null) {
   const preferRoles = ["HR", "COMPANY_ADMIN"] as const;
@@ -91,6 +95,7 @@ export async function createChecklistFromTemplate(opts: {
 
   const notifiedEmployeeIds = new Set<string>();
   const createdTaskRows: Array<{ id: string; title: string; assigneeId: string | null }> = [];
+  const allRequiredDocuments = new Set<string>();
 
   for (const task of template.tasks) {
     let assigneeId: string | null = null;
@@ -130,6 +135,7 @@ export async function createChecklistFromTemplate(opts: {
     });
     if (requiredDocuments.length) {
       await setTaskRequiredDocumentsById(createdTask.id, requiredDocuments, "DOCUMENT");
+      for (const documentName of requiredDocuments) allRequiredDocuments.add(documentName);
     }
     createdTaskRows.push({
       id: createdTask.id,
@@ -156,6 +162,36 @@ export async function createChecklistFromTemplate(opts: {
         message: `You've been assigned "${row.title}" on ${employee.firstName} ${employee.lastName}'s ${opts.type.toLowerCase()} checklist.`,
         href: "/checklist/todos",
       });
+    }
+  }
+
+  // Onboarding creates the employee's document folder by default, plus one
+  // subfolder per required document, so passwordless upload links always have
+  // a predictable destination that HR can browse in Documents.
+  if (opts.type === "ONBOARDING") {
+    try {
+      const rootFolder = await ensureEmployeeDocumentFolder({
+        companyId,
+        employeeId: employee.id,
+        createdByName: "Smart HR",
+      });
+      for (const documentName of allRequiredDocuments) {
+        await ensureDocumentSubfolder({
+          companyId,
+          employeeId: employee.id,
+          parentFolderId: rootFolder.id,
+          documentName,
+          createdByName: "Smart HR",
+        });
+      }
+      broadcastAppEvent("folder_updated", {
+        id: rootFolder.id,
+        employeeId: employee.id,
+        action: "employee_folder_created",
+      });
+    } catch (error) {
+      // Folder provisioning should never block onboarding task creation.
+      console.error("Could not provision employee document folder", error);
     }
   }
 

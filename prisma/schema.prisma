@@ -188,6 +188,7 @@ model Company {
   recruitmentEmailTemplates RecruitmentEmailTemplate[]
   jobs              Job[]
   documentFolders   DocumentFolder[]
+  documentUploadLinks DocumentUploadLink[]
   checklistTemplates ChecklistTemplate[]
   checklistInstances ChecklistInstance[]
   portalTemplates   PortalTemplate[]
@@ -449,6 +450,8 @@ model Employee {
   performanceReviews PerformanceReview[] @relation("ReviewEmployee")
   conductedReviews  PerformanceReview[] @relation("ReviewManager")
   documents         Document[]
+  documentFolders   DocumentFolder[]
+  documentUploadLinks DocumentUploadLink[]
   jobApplications   JobApplication[]   @relation("ApplicationReviewer")
   interviews        Interview[]        @relation("InterviewInterviewer")
   interviewReviews  InterviewReview[]  @relation("InterviewReviewAuthor")
@@ -1408,6 +1411,8 @@ model AppraisalKpiScore {
 model DocumentFolder {
   id            String   @id @default(cuid())
   companyId     String?
+  employeeId    String?
+  parentId      String?
   name          String
   description   String?
   createdByName String
@@ -1417,7 +1422,49 @@ model DocumentFolder {
   updatedAt     DateTime @default(now()) @updatedAt
 
   company   Company?   @relation(fields: [companyId], references: [id])
+  employee  Employee?  @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  parent    DocumentFolder?  @relation("DocumentFolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children  DocumentFolder[] @relation("DocumentFolderChildren")
   documents Document[]
+  uploadLinks DocumentUploadLink[] @relation("UploadLinkRootFolder")
+  uploadLinkSubfolders DocumentUploadLink[] @relation("UploadLinkSubfolder")
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([parentId])
+}
+
+/// A passwordless, expiring upload request. HR shares the public token URL and
+/// the staff member uploads straight into their own employee/document folder.
+model DocumentUploadLink {
+  id            String    @id @default(cuid())
+  token         String    @unique
+  companyId     String?
+  employeeId    String
+  folderId      String
+  subfolderId   String?
+  taskId        String?
+  documentName  String
+  createdById   String?
+  createdByName String
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  maxUploads    Int       @default(10)
+  uploadCount   Int       @default(0)
+  lastUsedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  company   Company?        @relation(fields: [companyId], references: [id])
+  employee  Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  folder    DocumentFolder  @relation("UploadLinkRootFolder", fields: [folderId], references: [id], onDelete: Cascade)
+  subfolder DocumentFolder? @relation("UploadLinkSubfolder", fields: [subfolderId], references: [id], onDelete: SetNull)
+  task      ChecklistTask?  @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([employeeId])
+  @@index([folderId])
+  @@index([subfolderId])
+  @@index([taskId])
 }
 
 model Document {
@@ -1517,6 +1564,7 @@ model ChecklistTask {
   completedBy Employee?              @relation("ChecklistTaskCompleter", fields: [completedById], references: [id], onDelete: SetNull)
   comments    ChecklistTaskComment[]
   files       ChecklistTaskFile[]
+  uploadLinks DocumentUploadLink[]
 }
 
 model ChecklistTaskFile {

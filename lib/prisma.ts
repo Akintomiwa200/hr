@@ -44,6 +44,14 @@ export function isDocumentFolderModelReady() {
   return hasDelegate(getPrismaClient(), "documentFolder", "findMany");
 }
 
+export function isDocumentUploadLinkModelReady() {
+  const client = getPrismaClient();
+  return (
+    hasDelegate(client, "documentUploadLink", "findMany") &&
+    hasDelegate(client, "documentFolder", "findMany")
+  );
+}
+
 export function isChecklistModelsReady() {
   const client = getPrismaClient();
   return (

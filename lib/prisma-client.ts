@@ -30,6 +30,7 @@ function isPrismaClientFresh(client: PrismaClient) {
     hasDelegate(client, "applicationActivity", "create") &&
     hasDelegate(client, "applicationEvaluation", "create") &&
     hasDelegate(client, "documentFolder", "findMany") &&
+    hasDelegate(client, "documentUploadLink", "findMany") &&
     hasDelegate(client, "checklistTemplate", "findMany") &&
     hasDelegate(client, "checklistInstance", "findMany") &&
     hasDelegate(client, "checklistTask", "findMany") &&
