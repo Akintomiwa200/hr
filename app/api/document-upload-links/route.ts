@@ -8,10 +8,15 @@ import { canManageDocuments } from "@/lib/documents/access";
 import { canManageChecklists } from "@/lib/checklist/access";
 import {
   createDocumentUploadLink,
+  findReusableUploadLink,
   uploadLinkState,
   uploadLinkStateLabel,
   uploadLinkUrl,
 } from "@/lib/documents/upload-links";
+import {
+  ensureUploadRequestTask,
+  type UploadRequestChecklistType,
+} from "@/lib/checklist/upload-request";
 
 function authorName(session: { firstName?: string; lastName?: string; email: string }) {
   const name = `${session.firstName ?? ""} ${session.lastName ?? ""}`.trim();
@@ -104,7 +109,7 @@ export async function POST(request: NextRequest) {
   if (!documentName) return badRequest("Name the document you are requesting.");
   if (documentName.length > 120) return badRequest("Document names must be 120 characters or fewer.");
 
-  const taskId = typeof body?.taskId === "string" && body.taskId.trim() ? body.taskId.trim() : null;
+  let taskId = typeof body?.taskId === "string" && body.taskId.trim() ? body.taskId.trim() : null;
   const scope = getCompanyScope(session);
   const isDocumentsAdmin = canManageDocuments(session);
   const isChecklistAdmin = canManageChecklists(session);
@@ -151,6 +156,38 @@ export async function POST(request: NextRequest) {
     ? Math.max(1, Math.min(100, Number(body.maxUploads)))
     : 10;
 
+  // Standalone requests (not raised from a checklist task) still need to be
+  // visible to HR/admin. Attach them to a To-Do task on the employee's active
+  // checklist unless the caller explicitly opts out.
+  let createdUploadTaskId: string | null = null;
+  if (!taskId && body?.createTask !== false) {
+    const reusable =
+      body?.reuse === true
+        ? await findReusableUploadLink({ employeeId: employee.id, documentName })
+        : null;
+
+    if (reusable?.taskId) {
+      taskId = reusable.taskId;
+    } else {
+      const checklistType: UploadRequestChecklistType =
+        body?.checklistType === "OFFBOARDING" ? "OFFBOARDING" : "ONBOARDING";
+      const ensured = await ensureUploadRequestTask({
+        employeeId: employee.id,
+        companyId,
+        documentName,
+        checklistType,
+      });
+      taskId = ensured.task.id;
+      if (ensured.created) createdUploadTaskId = ensured.task.id;
+      if (reusable) {
+        await prisma.documentUploadLink.update({
+          where: { id: reusable.id },
+          data: { taskId },
+        });
+      }
+    }
+  }
+
   const result = await createDocumentUploadLink({
     companyId,
     employeeId: employee.id,
@@ -179,9 +216,15 @@ export async function POST(request: NextRequest) {
   });
   revalidatePath("/documents");
   revalidatePath(`/documents/${result.folder.id}`);
+  if (taskId) {
+    revalidatePath("/checklist/todos");
+    revalidatePath("/checklist/onboarding");
+    revalidatePath("/checklist/offboarding");
+  }
 
   return NextResponse.json({
     ...serializeLink(link, request.nextUrl.origin),
     reused: result.reused,
+    taskCreated: Boolean(createdUploadTaskId),
   });
 }

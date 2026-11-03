@@ -13,7 +13,7 @@ export async function GET(
   if (!session) return unauthorized();
 
   const { id } = await params;
-  return serveDocument(request, id, session, null);
+  return serveDocument(request, id, session, null, request.nextUrl.searchParams.get("inline") === "1");
 }
 
 export async function POST(
@@ -25,10 +25,10 @@ export async function POST(
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const pin = typeof body?.pin === "string" ? body.pin : "";
-  return serveDocument(request, id, session, pin);
+  return serveDocument(request, id, session, pin, true);
 }
 
-async function serveDocument(request: NextRequest, id: string, session: NonNullable<Awaited<ReturnType<typeof requireSession>>>, pin: string | null) {
+async function serveDocument(request: NextRequest, id: string, session: NonNullable<Awaited<ReturnType<typeof requireSession>>>, pin: string | null, inline = false) {
   const document = await prisma.document.findUnique({
     where: { id },
     include: { folder: true },
@@ -66,7 +66,7 @@ async function serveDocument(request: NextRequest, id: string, session: NonNulla
   return new Response(upstream.body, {
     headers: {
       "Content-Type": document.mimeType || upstream.headers.get("content-type") || "application/octet-stream",
-      "Content-Disposition": `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(document.fileName ?? document.title)}`,
+      "Content-Disposition": `${inline && (document.mimeType === "application/pdf" || document.mimeType?.startsWith("image/")) ? "inline" : "attachment"}; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(document.fileName ?? document.title)}`,
       "Cache-Control": "private, no-store",
       ...(upstream.headers.get("content-length") ? { "Content-Length": upstream.headers.get("content-length")! } : {}),
     },

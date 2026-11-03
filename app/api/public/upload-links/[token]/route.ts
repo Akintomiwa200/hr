@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { deleteCloudinaryFile, uploadToCloudinary } from "@/lib/cloudinary";
+import { createNotification } from "@/lib/notifications";
 import {
   UPLOAD_LINK_MAX_BYTES,
   allowedUploadExtension,
@@ -138,6 +139,21 @@ export async function POST(
     revalidatePath("/documents");
     revalidatePath(`/documents/${link.folderId}`);
     if (document.folderId) revalidatePath(`/documents/${document.folderId}`);
+
+    if (link.createdById) {
+      try {
+        await createNotification({
+          userId: link.createdById,
+          type: link.taskId ? "checklist" : "general",
+          title: `Document uploaded: ${link.documentName}`,
+          message: `${uploaderName} uploaded ${fileName} for ${link.documentName}.`,
+          href: link.taskId ? `/checklist/tasks/${link.taskId}` : `/documents/${link.folderId}`,
+        });
+      } catch (error) {
+        // The upload itself succeeded; a notification failure must not roll it back.
+        console.error("Could not notify upload link creator", error);
+      }
+    }
 
     const refreshed = await prisma.documentUploadLink.findUnique({
       where: { id: link.id },

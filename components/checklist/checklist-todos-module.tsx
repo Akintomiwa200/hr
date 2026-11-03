@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
+  FileText,
   Filter,
   LayoutGrid,
   List,
@@ -33,6 +34,15 @@ export type TodoTask = {
     type: string;
     employee: { id: string; firstName: string; lastName: string };
   };
+  taskType?: string;
+  requiredDocuments?: string[];
+  files?: Array<{
+    id: string;
+    documentName: string;
+    fileName: string;
+    fileUrl: string;
+    createdAt: string;
+  }>;
   _count?: { comments: number };
 };
 
@@ -109,8 +119,21 @@ export function ChecklistTodosModule({
   }, [buildQuery]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/checklist/tasks?${buildQuery()}`, {
+          cache: "no-store",
+        });
+        if (!cancelled && res.ok) setTasks(await res.json());
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [buildQuery]);
 
   useAppEvents({
     types: ["checklist_updated"],
@@ -370,6 +393,9 @@ export function ChecklistTodosModule({
                           {task._count?.comments}
                         </span>
                       )}
+                      <span className="ml-2">
+                        <DocumentBadge task={task} compact />
+                      </span>
                     </button>
                   </td>
                   <td className="px-5 py-4">
@@ -388,19 +414,19 @@ export function ChecklistTodosModule({
                     {fullName(task.instance.employee.firstName, task.instance.employee.lastName)}
                   </td>
                   <td className="px-5 py-4">
-                    {task.status !== "COMPLETED" && (
-                      <div className="flex gap-1">
-                        <Link
-                          href={`/checklist/tasks/${task.id}`}
-                          className="px-2 py-1 text-xs font-medium text-brand-600 hover:underline"
-                        >
-                          Documents
-                        </Link>
+                    <div className="flex gap-1">
+                      <Link
+                        href={`/checklist/tasks/${task.id}`}
+                        className="px-2 py-1 text-xs font-medium text-brand-600 hover:underline"
+                      >
+                        Documents
+                      </Link>
+                      {task.status !== "COMPLETED" && (
                         <Button size="sm" variant="ghost" onClick={() => updateStatus(task.id, "COMPLETED")}>
                           Complete
                         </Button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -534,6 +560,49 @@ export function ChecklistTodosModule({
   );
 }
 
+function documentSummary(task: TodoTask) {
+  const required = task.requiredDocuments ?? [];
+  const files = task.files ?? [];
+  if (required.length === 0 && files.length === 0) return null;
+
+  const uploaded = new Set(files.map((file) => file.documentName.trim().toLowerCase()));
+  const completed = required.filter((name) => uploaded.has(name.trim().toLowerCase())).length;
+  const waiting = required.length > 0 && completed < required.length;
+
+  return {
+    requiredCount: required.length,
+    completed,
+    fileCount: files.length,
+    waiting,
+    label: required.length
+      ? `${completed}/${required.length} required document${required.length === 1 ? "" : "s"}`
+      : `${files.length} document${files.length === 1 ? "" : "s"} uploaded`,
+  };
+}
+
+function DocumentBadge({ task, compact = false }: { task: TodoTask; compact?: boolean }) {
+  const docs = documentSummary(task);
+  if (!docs) return null;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+        docs.waiting ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+      }`}
+      title={docs.label}
+    >
+      <FileText className="h-3 w-3" />
+      {compact
+        ? docs.requiredCount
+          ? `${docs.completed}/${docs.requiredCount} docs`
+          : `${docs.fileCount} docs`
+        : docs.waiting
+          ? `Awaiting upload · ${docs.completed}/${docs.requiredCount}`
+          : docs.label}
+    </span>
+  );
+}
+
 function TaskCard({
   task,
   onOpen,
@@ -588,6 +657,7 @@ function TaskCard({
             {task._count?.comments}
           </span>
         )}
+        <DocumentBadge task={task} />
       </div>
     </button>
   );

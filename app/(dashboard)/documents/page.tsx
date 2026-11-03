@@ -2,13 +2,14 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { isDocumentFolderModelReady, prisma } from "@/lib/prisma";
 import { getCompanyScope, folderCompanyWhere } from "@/lib/company-scope";
-import { canManageDocuments, canViewSharedResource, formatFileSize } from "@/lib/documents/access";
+import { canManageDocuments, canViewDocument, canViewSharedResource, formatFileSize } from "@/lib/documents/access";
 import { shareScopeLabel } from "@/lib/documents/share-groups";
 import { Card, PageHeader } from "@/components/ui";
 import { DocumentsModule } from "@/components/documents/documents-module";
 import { HelpLink } from "@/components/help/help-link";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 import { canViewEmployee } from "@/lib/employee-access";
+import { EmployeeDocumentsList } from "@/components/documents/employee-documents-list";
 
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<{ employeeId?: string }> }) {
   const session = await getSession();
@@ -30,6 +31,20 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   }
 
   const scope = getCompanyScope(session);
+  if (employeeId) {
+    const documents = await prisma.document.findMany({
+      where: { employeeId, ...(scope.companyId ? { companyId: scope.companyId } : scope.isPlatformAdmin ? {} : { companyId: "__none__" }) },
+      include: {
+        folder: { select: { id: true, name: true, shareScope: true, shareTargets: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    const employeeContext = session.employeeId
+      ? await prisma.employee.findUnique({ where: { id: session.employeeId }, select: { id: true, departmentId: true, hireDate: true, status: true, managerId: true } })
+      : null;
+    const visible = documents.filter((document) => canViewDocument(session, document, employeeContext, document.folder));
+    return <div><PageHeader title="Employee Documents" description="Uploaded files attached to this employee" /><EmployeeDocumentsList documents={visible.map((document) => ({ id: document.id, title: document.title, fileName: document.fileName ?? document.title, fileSizeLabel: formatFileSize(document.fileSize), uploadedBy: document.uploadedBy, createdAt: document.createdAt.toISOString(), visibility: document.visibility, folderName: document.folder?.name ?? "Unfiled" }))} employeeId={employeeId} /><PageLiveRefresh types={["document_updated", "folder_updated"]} /></div>;
+  }
   const employee = session.employeeId
     ? await prisma.employee.findUnique({
         where: { id: session.employeeId },

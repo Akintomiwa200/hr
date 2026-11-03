@@ -21,6 +21,7 @@ type UploadLinkRow = {
   maxUploads: number;
   uploadCount: number;
   lastUsedAt: string | null;
+  taskId?: string | null;
   state: "ACTIVE" | "REVOKED" | "EXPIRED" | "EXHAUSTED";
   stateLabel: string;
 };
@@ -63,6 +64,8 @@ function UploadLinksDialogContent({
   const [documentName, setDocumentName] = useState(initialDocumentName ?? "");
   const [expiresInDays, setExpiresInDays] = useState("14");
   const [maxUploads, setMaxUploads] = useState("10");
+  const [createTask, setCreateTask] = useState(true);
+  const [checklistType, setChecklistType] = useState<"ONBOARDING" | "OFFBOARDING">("ONBOARDING");
   const [links, setLinks] = useState<UploadLinkRow[]>([]);
   const [loading, setLoading] = useState(Boolean(initialEmployeeId));
   const [creating, setCreating] = useState(false);
@@ -143,6 +146,8 @@ function UploadLinksDialogContent({
           documentName: documentName.trim(),
           expiresInDays: expiresInDays === "never" ? null : Number(expiresInDays),
           maxUploads: Number(maxUploads),
+          createTask,
+          checklistType,
         }),
       });
       if (!res.ok) {
@@ -152,7 +157,11 @@ function UploadLinksDialogContent({
       const link = (await res.json()) as UploadLinkRow;
       setLatest(link);
       setLinks((current) => [link, ...current.filter((item) => item.id !== link.id)]);
-      notify.success("Upload link created. Copy it and send it to the staff member.");
+      notify.success(
+        link.taskId
+          ? "Upload link created and added to the employee's To-Do list."
+          : "Upload link created. Copy it and send it to the staff member."
+      );
     } catch {
       notify.error("Could not create the upload link");
     } finally {
@@ -262,6 +271,43 @@ function UploadLinksDialogContent({
           </label>
         </div>
 
+        <div className="rounded-xl border border-gray-100 bg-white px-4 py-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={createTask}
+              onChange={(event) => setCreateTask(event.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-700">
+                Add this request to the employee&apos;s To-Do list
+              </span>
+              <span className="block text-xs text-gray-500">
+                HR and admins will see the request and the uploaded file in To-Dos until it is completed.
+              </span>
+            </span>
+          </label>
+          {createTask && (
+            <label className="ml-7 mt-3 block text-sm font-medium text-gray-700">
+              Checklist
+              <select
+                className={`${inputClass} mt-1.5`}
+                value={checklistType}
+                onChange={(event) =>
+                  setChecklistType(event.target.value as "ONBOARDING" | "OFFBOARDING")
+                }
+              >
+                <option value="ONBOARDING">Onboarding</option>
+                <option value="OFFBOARDING">Offboarding</option>
+              </select>
+              <span className="mt-1 block text-xs font-normal text-gray-400">
+                Used when the employee has no active checklist yet.
+              </span>
+            </label>
+          )}
+        </div>
+
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50/70 px-4 py-3">
           <p className="text-xs text-gray-500">
             Files will be saved to <span className="font-medium text-gray-700">{selectedName}</span>
@@ -297,6 +343,7 @@ function UploadLinksDialogContent({
             <p className="mt-2 text-[11px] text-brand-700/80">
               Send this link to {latest.employeeName}. They can upload {latest.documentName} without logging in; the file
               appears in {latest.folderPath}.
+              {latest.taskId ? " The request is also on their To-Do list." : ""}
             </p>
           </div>
         )}
@@ -338,6 +385,7 @@ function UploadLinksDialogContent({
                         >
                           {link.stateLabel}
                         </Badge>
+                        {link.taskId && <Badge variant="info">To-Do</Badge>}
                       </div>
                       <p className="mt-0.5 text-[11px] text-gray-400">
                         {link.folderPath} · {link.uploadCount}/{link.maxUploads} uploads

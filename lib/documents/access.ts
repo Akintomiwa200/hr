@@ -74,7 +74,7 @@ export function canViewDocument(
   folder?: Shareable | null
 ): boolean {
   if (document.visibility === "PRIVATE") {
-    return document.uploadedById === session.id || Boolean(document.employeeId && document.employeeId === session.employeeId) || (!document.uploadedById && canManageDocuments(session));
+    return canManageDocuments(session) || document.uploadedById === session.id || Boolean(document.employeeId && document.employeeId === session.employeeId);
   }
   if (canManageDocuments(session)) return true;
   if (!canViewSharedResource(session, document, employee)) return false;
