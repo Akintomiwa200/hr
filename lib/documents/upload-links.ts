@@ -103,7 +103,7 @@ export async function ensureEmployeeDocumentFolder(opts: {
       name,
       description: `Documents for ${name}`,
       createdByName: opts.createdByName?.trim() || "Smart HR",
-      shareScope: "EVERYONE",
+      shareScope: "PRIVATE",
     },
   });
 }
@@ -139,7 +139,7 @@ export async function ensureDocumentSubfolder(opts: {
       name,
       description: `${name} uploaded for this employee`,
       createdByName: opts.createdByName?.trim() || "Smart HR",
-      shareScope: "EVERYONE",
+      shareScope: "PRIVATE",
     },
   });
 }

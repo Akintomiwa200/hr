@@ -52,6 +52,7 @@ export function canViewSharedResource(
   const targets = parseShareTargets(resource.shareTargets);
 
   if (scope === "EVERYONE") return true;
+  if (scope === "PRIVATE") return false;
   if (!employee) return false;
 
   if (scope === "DEPARTMENT" || scope === "OFFICE") {
@@ -64,7 +65,19 @@ export function canViewSharedResource(
     return targets.some((groupId) => inEmployeeGroup(groupId, employee));
   }
 
-  return true;
+  return false;
+}
+
+/** Employee document roots are personal filing areas, even when older rows
+ * still have the legacy EVERYONE folder setting. */
+export function canViewDocumentFolder(
+  session: SessionUser,
+  folder: Shareable & { employeeId?: string | null },
+  employee: EmployeeContext | null
+): boolean {
+  if (canManageDocuments(session)) return true;
+  if (folder.employeeId) return folder.employeeId === session.employeeId;
+  return canViewSharedResource(session, folder, employee);
 }
 
 export function canViewDocument(
@@ -78,11 +91,11 @@ export function canViewDocument(
   // not grant access to the file or its preview/download endpoint.
   if (normalizeRole(session.role) !== "SUPER_ADMIN" && document.companyId !== session.companyId) return false;
   if (document.visibility === "PRIVATE") {
-    return (canManageDocuments(session) && document.companyId === session.companyId) || document.uploadedById === session.id || Boolean(document.employeeId && document.employeeId === session.employeeId);
+    return (canManageDocuments(session) && document.companyId === session.companyId) || document.uploadedById === session.id || Boolean(document.employeeId && document.employeeId === session.employeeId && (!folder || canViewDocumentFolder(session, folder, employee)));
   }
   if (canManageDocuments(session)) return true;
   if (!canViewSharedResource(session, document, employee)) return false;
-  return !folder || canViewSharedResource(session, folder, employee);
+  return !folder || canViewDocumentFolder(session, folder, employee);
 }
 
 export function formatFileSize(bytes: number | null | undefined): string {

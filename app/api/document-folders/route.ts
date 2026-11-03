@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
 import { getCompanyScope, folderCompanyWhere, requireOrgCompanyId } from "@/lib/company-scope";
-import { canManageDocuments, canViewSharedResource, formatFileSize } from "@/lib/documents/access";
+import { canManageDocuments, canViewDocument, canViewDocumentFolder, formatFileSize } from "@/lib/documents/access";
 import { shareScopeLabel } from "@/lib/documents/share-groups";
 
 async function getEmployeeContext(session: NonNullable<Awaited<ReturnType<typeof requireSession>>>) {
@@ -24,22 +24,29 @@ function mapFolder(
     shareScope: string;
     shareTargets: string | null;
     createdAt: Date;
-    documents: { fileSize: number | null }[];
-  }
+    documents: { fileSize: number | null; companyId: string | null; employeeId: string | null; uploadedById: string | null; visibility: string; shareScope: string; shareTargets: string | null }[];
+    employeeId?: string | null;
+  },
+  session?: NonNullable<Awaited<ReturnType<typeof requireSession>>>,
+  employee?: Awaited<ReturnType<typeof getEmployeeContext>>
 ) {
-  const totalSize = folder.documents.reduce((sum, d) => sum + (d.fileSize ?? 0), 0);
+  const documents = session
+    ? folder.documents.filter((document) => canViewDocument(session, document, employee ?? null, folder))
+    : folder.documents;
+  const totalSize = documents.reduce((sum, d) => sum + (d.fileSize ?? 0), 0);
   return {
     id: folder.id,
     name: folder.name,
     description: folder.description,
     createdByName: folder.createdByName,
     createdAt: folder.createdAt,
-    fileCount: folder.documents.length,
+    fileCount: documents.length,
     totalSize,
     totalSizeLabel: formatFileSize(totalSize),
-    sharedLabel: shareScopeLabel(folder.shareScope, folder.shareTargets),
-    shareScope: folder.shareScope,
+    sharedLabel: folder.employeeId ? "Private employee folder" : shareScopeLabel(folder.shareScope, folder.shareTargets),
+    shareScope: folder.employeeId ? "PRIVATE" : folder.shareScope,
     shareTargets: folder.shareTargets,
+    employeeId: folder.employeeId ?? null,
   };
 }
 
@@ -53,15 +60,15 @@ export async function GET() {
 
   const folders = await prisma.documentFolder.findMany({
     where: folderCompanyWhere(scope),
-    include: { documents: { select: { fileSize: true } } },
+    include: { documents: { select: { fileSize: true, companyId: true, employeeId: true, uploadedById: true, visibility: true, shareScope: true, shareTargets: true } } },
     orderBy: { name: "asc" },
   });
 
   const visible = isAdmin
     ? folders
-    : folders.filter((f) => canViewSharedResource(session, f, employee));
+    : folders.filter((f) => canViewDocumentFolder(session, f, employee));
 
-  return NextResponse.json(visible.map(mapFolder));
+  return NextResponse.json(visible.map((folder) => mapFolder(folder, session, employee)));
 }
 
 export async function POST(request: NextRequest) {
@@ -82,7 +89,7 @@ export async function POST(request: NextRequest) {
       companyId,
       shareScope: "EVERYONE",
     },
-    include: { documents: { select: { fileSize: true } } },
+    include: { documents: { select: { fileSize: true, companyId: true, employeeId: true, uploadedById: true, visibility: true, shareScope: true, shareTargets: true } } },
   });
 
   broadcastAppEvent("folder_updated", { id: folder.id, action: "created" });

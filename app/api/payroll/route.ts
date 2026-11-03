@@ -24,6 +24,7 @@ import {
 } from "@/lib/payroll-types";
 import { createNotification } from "@/lib/notifications";
 import { audit } from "@/lib/audit";
+import { employeeCompanyWhere, getCompanyScope } from "@/lib/company-scope";
 
 export async function GET() {
   const session = await requireSession();
@@ -63,25 +64,34 @@ export async function POST(request: NextRequest) {
   const canManage = await canManagePayrollRecord(session, { employeeId });
   if (!canManage) return forbidden();
 
+  const employee = await prisma.employee.findFirst({
+    where: { id: employeeId, ...employeeCompanyWhere(getCompanyScope(session)) },
+    select: { salary: true },
+  });
+  if (!employee) return badRequest("Employee not found");
+
   await ensurePayrollSettings(session.companyId);
 
   let items: PayrollLineItem[];
   let pendingDeductionIds: string[] = [];
-  if (Array.isArray(breakdown) && breakdown.length > 0) {
-    items = breakdown;
-  } else {
-    const result = await buildAutoPayrollBreakdown({
-      employeeId,
-      periodStart: new Date(periodStart),
-      periodEnd: new Date(periodEnd),
-      baseSalary: Number(baseSalary),
-      bonus: Number(bonus ?? 0),
-      manualItems,
-      companyId: session.companyId,
-    });
-    items = result.items;
-    pendingDeductionIds = result.meta.pendingDeductionIds;
-  }
+  // Rebuild from the current employee salary at save time. A preview can stay
+  // open while HR changes the employee's compensation in another tab.
+  const previewManualItems = Array.isArray(breakdown)
+    ? (breakdown as PayrollLineItem[]).filter(
+        (item) => !item.auto && item.category !== "BASE_SALARY" && item.category !== "BONUS"
+      )
+    : undefined;
+  const result = await buildAutoPayrollBreakdown({
+    employeeId,
+    periodStart: new Date(periodStart),
+    periodEnd: new Date(periodEnd),
+    baseSalary: employee.salary,
+    bonus: Number(bonus ?? 0),
+    manualItems: previewManualItems ?? manualItems,
+    companyId: session.companyId,
+  });
+  items = result.items;
+  pendingDeductionIds = result.meta.pendingDeductionIds;
 
   const summary = summarizePayroll(items);
 

@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { isDocumentFolderModelReady, prisma } from "@/lib/prisma";
 import { getCompanyScope, folderCompanyWhere } from "@/lib/company-scope";
-import { canManageDocuments, canViewDocument, canViewSharedResource, formatFileSize } from "@/lib/documents/access";
+import { canManageDocuments, canViewDocument, canViewDocumentFolder, formatFileSize } from "@/lib/documents/access";
 import { shareScopeLabel } from "@/lib/documents/share-groups";
 import { Card, PageHeader } from "@/components/ui";
 import { DocumentsModule } from "@/components/documents/documents-module";
@@ -59,7 +59,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const [foldersRaw, departments, employees] = await Promise.all([
     prisma.documentFolder.findMany({
       where: folderCompanyWhere(scope),
-      include: { documents: { select: { fileSize: true, employeeId: true } } },
+        include: { documents: { select: { fileSize: true, employeeId: true, companyId: true, uploadedById: true, visibility: true, shareScope: true, shareTargets: true } } },
       orderBy: { name: "asc" },
     }),
     prisma.department.findMany({
@@ -129,16 +129,20 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     scopedFolders = scopedFolders.filter((folder) => visibleIds.has(folder.id));
   }
 
-  const folders = (isAdmin ? scopedFolders : scopedFolders.filter((f) => canViewSharedResource(session, f, employee)))
+  const folders = (isAdmin ? scopedFolders : scopedFolders.filter((f) => canViewDocumentFolder(session, f, employee)))
     .filter((folder) => !folder.parentId)
     .map((folder) => {
       const descendantIds = descendantsOf(folder.id);
       const folderDocuments = foldersRaw
         .filter((item) => descendantIds.has(item.id))
-        .flatMap((item) => item.documents)
-        .filter((document) => !employeeId || document.employeeId === employeeId);
+        .flatMap((item) => item.documents.map((document) => ({ document, folder: item })))
+        .filter(({ document, folder: documentFolder }) =>
+          (!employeeId || document.employeeId === employeeId) &&
+          canViewDocument(session, document, employee, documentFolder)
+        )
+        .map(({ document }) => document);
       const totalSize = folderDocuments.reduce((sum, d) => sum + (d.fileSize ?? 0), 0);
-      const subfolderCount = foldersRaw.filter((item) => item.parentId === folder.id).length;
+      const subfolderCount = foldersRaw.filter((item) => item.parentId === folder.id && canViewDocumentFolder(session, item, employee)).length;
       return {
         id: folder.id,
         name: folder.name,
@@ -147,8 +151,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         createdAt: folder.createdAt,
         fileCount: folderDocuments.length,
         totalSizeLabel: formatFileSize(totalSize),
-        sharedLabel: shareScopeLabel(folder.shareScope, folder.shareTargets),
-        shareScope: folder.shareScope,
+        sharedLabel: folder.employeeId ? "Private employee folder" : shareScopeLabel(folder.shareScope, folder.shareTargets),
+        shareScope: folder.employeeId ? "PRIVATE" : folder.shareScope,
         shareTargets: folder.shareTargets,
         employeeId: folder.employeeId,
         subfolderCount,

@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canManageDocuments, canViewSharedResource, formatFileSize } from "@/lib/documents/access";
+import { canManageDocuments, canViewDocumentFolder, formatFileSize } from "@/lib/documents/access";
 import { shareScopeLabel } from "@/lib/documents/share-groups";
 import { PageHeader } from "@/components/ui";
 import { FolderDetailModule } from "@/components/documents/folder-detail-module";
@@ -34,7 +34,7 @@ export default async function FolderDetailPage({
       })
     : null;
 
-  if (!canManageDocuments(session) && !canViewSharedResource(session, folder, employee)) {
+  if (!canViewDocumentFolder(session, folder, employee)) {
     redirect("/documents");
   }
 
@@ -46,7 +46,7 @@ export default async function FolderDetailPage({
     }),
     prisma.documentFolder.findMany({
       where: { parentId: folder.id },
-      include: { _count: { select: { documents: true } } },
+      include: { documents: { select: { id: true, fileSize: true, companyId: true, employeeId: true, uploadedById: true, visibility: true, shareScope: true, shareTargets: true } } },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -85,12 +85,12 @@ export default async function FolderDetailPage({
           description: folder.description,
           employeeId: folder.employeeId,
           path,
-          subfolders: childFolders.map((child) => ({
+          subfolders: childFolders.filter((child) => canViewDocumentFolder(session, child, employee)).map((child) => ({
             id: child.id,
             name: child.name,
-            fileCount: child._count.documents,
+            fileCount: child.documents.filter((document) => canViewDocument(session, document, employee, child)).length,
           })),
-          sharedLabel: shareScopeLabel(folder.shareScope, folder.shareTargets),
+          sharedLabel: folder.employeeId ? "Private employee folder" : shareScopeLabel(folder.shareScope, folder.shareTargets),
           documents: visibleDocuments.map((d) => ({
             id: d.id,
             title: d.title,

@@ -14,6 +14,8 @@ import { parseEmployeeShiftFields } from "@/lib/employee-shift";
 import { replayUnprocessedPunchesForEmployee } from "@/lib/zkteco/service";
 import { audit } from "@/lib/audit";
 import { notifyCompanyAdminsOfStaffChange } from "@/lib/employees/admin-alerts";
+import { syncDraftPayrollSalary } from "@/lib/payroll-salary-sync";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function GET(
   _request: NextRequest,
@@ -267,6 +269,10 @@ export async function PATCH(
   }
 
   notifyEmployeeChange(id, "updated");
+  if (salary !== undefined) {
+    await syncDraftPayrollSalary(id, employee.salary);
+    broadcastAppEvent("payroll_updated", { employeeId: id, action: "salary_changed" });
+  }
   await audit({
     actor: session,
     module: "employees",

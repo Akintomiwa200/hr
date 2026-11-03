@@ -246,7 +246,7 @@ export function DocumentsModule({
                 {folder.employeeId && (
                   <button type="button" onClick={() => { setUploadLinkFolder(folder); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><Link2 className="h-4 w-4" />Upload link</button>
                 )}
-                <button type="button" onClick={() => { setShareFolder(folder); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><Share2 className="h-4 w-4" />Share</button>
+                {!folder.employeeId && <button type="button" onClick={() => { setShareFolder(folder); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><Share2 className="h-4 w-4" />Share</button>}
                 <button type="button" onClick={() => { setEditFolder(folder); setForm({ name: folder.name, description: folder.description ?? "" }); setCreateOpen(true); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><Pencil className="h-4 w-4" />Edit</button>
                 <button type="button" onClick={() => void copyFolderLink(folder)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"><Copy className="h-4 w-4" />Copy link</button>
                 <button type="button" onClick={() => { setDeleteFolder(folder); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" />Delete</button>

@@ -4,9 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { serializeShareTargets } from "@/lib/documents/share-groups";
-import { canManageDocuments, canViewDocument, canViewSharedResource, formatFileSize } from "@/lib/documents/access";
+import { canManageDocuments, canViewDocument, canViewDocumentFolder, formatFileSize } from "@/lib/documents/access";
 import { shareScopeLabel } from "@/lib/documents/share-groups";
 import { deleteCloudinaryFile } from "@/lib/cloudinary";
+import { getCompanyScope } from "@/lib/company-scope";
 
 async function getEmployeeContext(session: NonNullable<Awaited<ReturnType<typeof requireSession>>>) {
   if (!session.employeeId) return null;
@@ -31,11 +32,13 @@ export async function GET(
   if (!folder) return notFound();
 
   const employee = await getEmployeeContext(session);
-  if (!canManageDocuments(session) && !canViewSharedResource(session, folder, employee)) {
+  const scope = getCompanyScope(session);
+  if ((!scope.isPlatformAdmin && folder.companyId !== scope.companyId) || !canViewDocumentFolder(session, folder, employee)) {
     return unauthorized();
   }
 
-  const totalSize = folder.documents.reduce((sum, d) => sum + (d.fileSize ?? 0), 0);
+  const visibleDocuments = folder.documents.filter((document) => canViewDocument(session, document, employee, folder));
+  const totalSize = visibleDocuments.reduce((sum, d) => sum + (d.fileSize ?? 0), 0);
 
   return NextResponse.json({
     id: folder.id,
@@ -43,10 +46,10 @@ export async function GET(
     description: folder.description,
     createdByName: folder.createdByName,
     createdAt: folder.createdAt,
-    shareScope: folder.shareScope,
+    shareScope: folder.employeeId ? "PRIVATE" : folder.shareScope,
     shareTargets: folder.shareTargets,
-    sharedLabel: shareScopeLabel(folder.shareScope, folder.shareTargets),
-    fileCount: folder.documents.length,
+    sharedLabel: folder.employeeId ? "Private employee folder" : shareScopeLabel(folder.shareScope, folder.shareTargets),
+    fileCount: visibleDocuments.length,
     totalSizeLabel: formatFileSize(totalSize),
     documents: folder.documents.filter((d) => canViewDocument(session, d, employee, folder)).map((d) => ({
       id: d.id,
@@ -73,6 +76,8 @@ export async function PATCH(
   const body = await request.json();
   const existing = await prisma.documentFolder.findUnique({ where: { id } });
   if (!existing) return notFound();
+  const scope = getCompanyScope(session);
+  if (!scope.isPlatformAdmin && existing.companyId !== scope.companyId) return notFound();
 
   const folder = await prisma.documentFolder.update({
     where: { id },
@@ -104,6 +109,8 @@ export async function DELETE(
   const { id } = await params;
   const existing = await prisma.documentFolder.findUnique({ where: { id } });
   if (!existing) return notFound();
+  const scope = getCompanyScope(session);
+  if (!scope.isPlatformAdmin && existing.companyId !== scope.companyId) return notFound();
 
   // Collect every nested subfolder so their Cloudinary files are cleaned up
   // before the database cascade removes the folder tree.
