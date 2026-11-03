@@ -294,7 +294,7 @@ export function FolderDetailModule({
                 <th className="px-5 py-3">Name</th>
                 <th className="px-5 py-3">Size</th>
                 <th className="px-5 py-3">Uploaded</th>
-                <th className="px-5 py-3">Action</th>
+                <th className="px-5 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -305,6 +305,15 @@ export function FolderDetailModule({
                   <td className="px-5 py-4 text-gray-500">{formatDate(doc.createdAt)}</td>
                   <td className="px-5 py-4">
                     <div className="flex gap-1">
+                      <Link
+                        href={`/documents/file/${doc.id}${employeeFilterId ? `?employeeId=${employeeFilterId}` : ""}`}
+                        title="View document"
+                        aria-label={`View ${doc.fileName}`}
+                        className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-emerald-700 hover:bg-emerald-50"
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span className="text-xs font-medium">View</span>
+                      </Link>
                       {doc.fileUrl && doc.visibility === "PROTECTED" && (
                         <button type="button" onClick={() => openPinDialog(doc, "open")} title="Enter PIN to open" className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50"><Download className="w-4 h-4" /></button>
                       )}
