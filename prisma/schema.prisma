@@ -562,6 +562,7 @@ model LeaveSettings {
   allocationEnabled Boolean  @default(false)
   defaultAnnualDays Float    @default(20)
   defaultSickDays   Float    @default(10)
+  allocationRules   String   @default("[]")
   updatedAt         DateTime @updatedAt
 
   company Company? @relation(fields: [companyId], references: [id])
@@ -579,6 +580,7 @@ model LeaveAllocation {
   type       LeaveType
   totalDays  Float
   usedDays   Float     @default(0)
+  isOverride Boolean   @default(false)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
@@ -844,12 +846,15 @@ model PayrollSettings {
   companyId               String?  @unique
   holidayAllowanceEnabled Boolean  @default(false)
   holidayAllowanceAmount  Float    @default(150)
+  latenessDeductionEnabled Boolean @default(true)
   latenessDeductionPerDay Float    @default(25)
+  absenceDeductionEnabled Boolean  @default(true)
   absenceDeductionPerDay  Float    @default(100)
   damageDeductionEnabled  Boolean  @default(true)
+  taxEnabled              Boolean  @default(true)
   taxRatePercent          Float    @default(10)
   workingDaysPerWeek      Int      @default(5)
-  proRataSalaryEnabled    Boolean  @default(true)
+  proRataSalaryEnabled    Boolean  @default(false)
   overtimeEnabled         Boolean  @default(false)
   overtimeMultiplier      Float    @default(1.75)
   overtimeThresholdMinutes Int    @default(30)

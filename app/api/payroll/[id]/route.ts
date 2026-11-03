@@ -23,6 +23,7 @@ import {
 } from "@/lib/payroll-types";
 import { refreshPayrollRunTotals } from "@/lib/payroll-bulk";
 import { createNotification } from "@/lib/notifications";
+import { getPayrollSettings } from "@/lib/payroll-engine";
 
 export async function GET(
   _request: NextRequest,
@@ -65,6 +66,14 @@ export async function PATCH(
   const canManage = await canManagePayrollRecord(session, existing);
   if (!canManage) return forbidden();
 
+  const payrollEmployee = await prisma.employee.findUnique({
+    where: { id: existing.employeeId },
+    select: { user: { select: { companyId: true } } },
+  });
+  const settings = await getPayrollSettings(
+    payrollEmployee?.user.companyId ?? session.companyId
+  );
+
   let base = existing.baseSalary;
   let bonus = existing.bonus;
   let deductions = existing.deductions;
@@ -73,7 +82,9 @@ export async function PATCH(
   let breakdownJson = existing.breakdown;
 
   if (Array.isArray(body.breakdown)) {
-    const items = body.breakdown as PayrollLineItem[];
+    const items = (body.breakdown as PayrollLineItem[]).filter(
+      (item) => settings.damageDeductionEnabled || item.category !== "DAMAGE"
+    );
     const summary = summarizePayroll(items);
     base = summary.baseSalary;
     bonus = summary.bonus;

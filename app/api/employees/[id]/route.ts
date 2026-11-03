@@ -16,6 +16,7 @@ import { audit } from "@/lib/audit";
 import { notifyCompanyAdminsOfStaffChange } from "@/lib/employees/admin-alerts";
 import { syncDraftPayrollSalary } from "@/lib/payroll-salary-sync";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { syncEmployeeLeaveAllocations } from "@/lib/leave-settings";
 
 export async function GET(
   _request: NextRequest,
@@ -266,6 +267,14 @@ export async function PATCH(
 
   if (endDate !== undefined) {
     await prisma.$executeRaw`UPDATE "Employee" SET "endDate" = ${parseLocalDate(endDate)} WHERE "id" = ${id}`;
+  }
+
+  if (departmentId !== undefined || jobTitle !== undefined) {
+    await syncEmployeeLeaveAllocations({
+      companyId: existing.user?.companyId ?? null,
+      employeeId: id,
+      year: new Date().getFullYear(),
+    });
   }
 
   notifyEmployeeChange(id, "updated");

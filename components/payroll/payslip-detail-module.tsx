@@ -236,6 +236,7 @@ export function PayslipDetailModule({
   viewer,
   companyName = "Smart HR",
   companyLogo,
+  damageDeductionEnabled = true,
 }: {
   record: PayslipRecord;
   breakdown: PayrollLineItem[];
@@ -243,6 +244,7 @@ export function PayslipDetailModule({
   viewer: PayslipViewerContext;
   companyName?: string;
   companyLogo?: string | null;
+  damageDeductionEnabled?: boolean;
 }) {
   const router = useRouter();
   useAppEvents({
@@ -583,14 +585,14 @@ export function PayslipDetailModule({
               addButtons={
                 editing ? (
                   <>
-                    <Button
+                    {damageDeductionEnabled && <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => setItems((prev) => [...prev, newLine("DEDUCTION", "DAMAGE")])}
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Damage
-                    </Button>
+                    </Button>}
                     <Button
                       variant="secondary"
                       size="sm"

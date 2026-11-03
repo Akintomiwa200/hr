@@ -6,6 +6,7 @@ import {
   employeeIdsInCompanyScope,
 } from "@/lib/employee-access";
 import { notifyEmployeeChange } from "@/lib/employees/mutations";
+import { syncEmployeeLeaveAllocations } from "@/lib/leave-settings";
 
 export async function PATCH(request: NextRequest) {
   const session = await getSession();
@@ -43,6 +44,11 @@ export async function PATCH(request: NextRequest) {
       where: { id: { in: scopedIds } },
       data: { departmentId },
     });
+    await Promise.all(scopedIds.map((employeeId) => syncEmployeeLeaveAllocations({
+      companyId: session.companyId ?? null,
+      employeeId,
+      year: new Date().getFullYear(),
+    })));
   } else {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }

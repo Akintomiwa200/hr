@@ -24,9 +24,12 @@ export type PayrollLineItem = {
 export type PayrollSettingsData = {
   holidayAllowanceEnabled: boolean;
   holidayAllowanceAmount: number;
+  latenessDeductionEnabled: boolean;
   latenessDeductionPerDay: number;
+  absenceDeductionEnabled: boolean;
   absenceDeductionPerDay: number;
   damageDeductionEnabled: boolean;
+  taxEnabled: boolean;
   taxRatePercent: number;
   workingDaysPerWeek: number;
   proRataSalaryEnabled: boolean;
@@ -38,12 +41,15 @@ export type PayrollSettingsData = {
 export const defaultPayrollSettings: PayrollSettingsData = {
   holidayAllowanceEnabled: false,
   holidayAllowanceAmount: 150,
+  latenessDeductionEnabled: true,
   latenessDeductionPerDay: 25,
+  absenceDeductionEnabled: true,
   absenceDeductionPerDay: 100,
   damageDeductionEnabled: true,
+  taxEnabled: true,
   taxRatePercent: 10,
   workingDaysPerWeek: 5,
-  proRataSalaryEnabled: true,
+  proRataSalaryEnabled: false,
   overtimeEnabled: false,
   overtimeMultiplier: 1.75,
   overtimeThresholdMinutes: 30,

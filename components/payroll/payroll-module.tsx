@@ -521,7 +521,7 @@ export function PayrollModule({
                 }}
               />
             </div>
-            <div>
+            {settings?.damageDeductionEnabled !== false && <div>
               <label className={labelClass}>Damage deduction</label>
               <input
                 className={inputClass}
@@ -532,7 +532,7 @@ export function PayrollModule({
                   setPreview(null);
                 }}
               />
-            </div>
+            </div>}
           </div>
           <div>
             <label className={labelClass}>Status</label>

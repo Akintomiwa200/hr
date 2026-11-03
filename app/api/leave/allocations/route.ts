@@ -28,8 +28,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const year = Number(searchParams.get("year")) || new Date().getFullYear();
 
-  const [settings, employees, allocations] = await Promise.all([
-    getLeaveSettings(session.companyId),
+  const settings = await getLeaveSettings(session.companyId);
+  if (settings.allocationEnabled && session.companyId) {
+    await generateDefaultAllocations({ companyId: session.companyId, year });
+  }
+  const [employees, allocations, departments, jobTitles] = await Promise.all([
     prisma.employee.findMany({
       where: { status: "ACTIVE", user: { companyId: session.companyId ?? "" } },
       select: {
@@ -48,6 +51,17 @@ export async function GET(request: NextRequest) {
         totalDays: true,
         usedDays: true,
       },
+    }),
+    prisma.department.findMany({
+      where: { companyId: session.companyId ?? "" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.employee.findMany({
+      where: { status: "ACTIVE", user: { companyId: session.companyId ?? "" } },
+      select: { jobTitle: true },
+      distinct: ["jobTitle"],
+      orderBy: { jobTitle: "asc" },
     }),
   ]);
 
@@ -74,6 +88,9 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     year,
     enabled: settings.allocationEnabled,
+    jobTitles: jobTitles.map((employee) => employee.jobTitle).filter(Boolean),
+    departments,
+    rules: settings.allocationRules,
     defaults: {
       annual: settings.defaultAnnualDays,
       sick: settings.defaultSickDays,
@@ -115,6 +132,19 @@ export async function PATCH(request: NextRequest) {
   const entries = Array.isArray(body.entries) ? body.entries : [];
   if (entries.length === 0) {
     return NextResponse.json({ error: "No entries provided" }, { status: 400 });
+  }
+  const requestedEmployeeIds = Array.from(
+    new Set<string>(entries.map((entry: { employeeId?: string }) => String(entry?.employeeId ?? "")).filter((id: string) => id.length > 0))
+  );
+  const scopedEmployees = await prisma.employee.findMany({
+    where: {
+      id: { in: requestedEmployeeIds },
+      user: { companyId: session.companyId ?? "" },
+    },
+    select: { id: true },
+  });
+  if (scopedEmployees.length !== requestedEmployeeIds.length) {
+    return NextResponse.json({ error: "One or more employees are outside your company" }, { status: 403 });
   }
   for (const entry of entries) {
     const type = String(entry?.type ?? "").toUpperCase();

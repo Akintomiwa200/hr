@@ -54,9 +54,12 @@ function computeOvertimeMinutes(input: {
 function mapSettings(row: {
   holidayAllowanceEnabled: boolean;
   holidayAllowanceAmount: number;
+  latenessDeductionEnabled: boolean;
   latenessDeductionPerDay: number;
+  absenceDeductionEnabled: boolean;
   absenceDeductionPerDay: number;
   damageDeductionEnabled: boolean;
+  taxEnabled: boolean;
   taxRatePercent: number;
   workingDaysPerWeek?: number;
   proRataSalaryEnabled?: boolean;
@@ -67,9 +70,12 @@ function mapSettings(row: {
   return {
     holidayAllowanceEnabled: row.holidayAllowanceEnabled,
     holidayAllowanceAmount: row.holidayAllowanceAmount,
+    latenessDeductionEnabled: row.latenessDeductionEnabled,
     latenessDeductionPerDay: row.latenessDeductionPerDay,
+    absenceDeductionEnabled: row.absenceDeductionEnabled,
     absenceDeductionPerDay: row.absenceDeductionPerDay,
     damageDeductionEnabled: row.damageDeductionEnabled,
+    taxEnabled: row.taxEnabled,
     taxRatePercent: row.taxRatePercent,
     workingDaysPerWeek: row.workingDaysPerWeek === 6 ? 6 : 5,
     proRataSalaryEnabled: row.proRataSalaryEnabled !== false,
@@ -298,7 +304,7 @@ export async function buildAutoPayrollBreakdown(input: {
     }
   }
 
-  if (lateDays > 0) {
+  if (settings.latenessDeductionEnabled && lateDays > 0) {
     const lateDates = formatShortDates(lateRows.map((row) => row.date));
     items.push({
       id: lineId("late"),
@@ -311,7 +317,7 @@ export async function buildAutoPayrollBreakdown(input: {
     });
   }
 
-  if (absentDays > 0 && !settings.proRataSalaryEnabled) {
+  if (settings.absenceDeductionEnabled && absentDays > 0 && !settings.proRataSalaryEnabled) {
     const absentDates = formatShortDates(absentRows.map((row) => row.date));
     items.push({
       id: lineId("absence"),
@@ -337,11 +343,13 @@ export async function buildAutoPayrollBreakdown(input: {
   }
 
   for (const manual of input.manualItems ?? []) {
-    items.push(manual);
+    if (manual.category !== "DAMAGE" || settings.damageDeductionEnabled) {
+      items.push(manual);
+    }
   }
 
   const preTax = summarizePayroll(items);
-  if (settings.taxRatePercent > 0) {
+  if (settings.taxEnabled && settings.taxRatePercent > 0) {
     items.push({
       id: lineId("tax"),
       type: "DEDUCTION",

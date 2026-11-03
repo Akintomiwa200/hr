@@ -9,6 +9,7 @@ import { canManagePayrollSettings } from "@/lib/payroll-access";
 import { ensurePayrollSettings, getPayrollSettings, updatePayrollSettings } from "@/lib/payroll-engine";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { audit } from "@/lib/audit";
+import { syncDraftPayrollForCompany } from "@/lib/payroll-salary-sync";
 
 export async function GET() {
   const session = await requireSession();
@@ -34,8 +35,14 @@ export async function PATCH(request: NextRequest) {
     ...(body.holidayAllowanceAmount !== undefined && {
       holidayAllowanceAmount: Number(body.holidayAllowanceAmount),
     }),
+    ...(body.latenessDeductionEnabled !== undefined && {
+      latenessDeductionEnabled: Boolean(body.latenessDeductionEnabled),
+    }),
     ...(body.latenessDeductionPerDay !== undefined && {
       latenessDeductionPerDay: Number(body.latenessDeductionPerDay),
+    }),
+    ...(body.absenceDeductionEnabled !== undefined && {
+      absenceDeductionEnabled: Boolean(body.absenceDeductionEnabled),
     }),
     ...(body.absenceDeductionPerDay !== undefined && {
       absenceDeductionPerDay: Number(body.absenceDeductionPerDay),
@@ -45,6 +52,9 @@ export async function PATCH(request: NextRequest) {
     }),
     ...(body.taxRatePercent !== undefined && {
       taxRatePercent: Number(body.taxRatePercent),
+    }),
+    ...(body.taxEnabled !== undefined && {
+      taxEnabled: Boolean(body.taxEnabled),
     }),
     ...(body.workingDaysPerWeek !== undefined && {
       workingDaysPerWeek: Number(body.workingDaysPerWeek) === 6 ? 6 : 5,
@@ -62,6 +72,10 @@ export async function PATCH(request: NextRequest) {
       overtimeThresholdMinutes: Number(body.overtimeThresholdMinutes),
     }),
   });
+
+  if (Object.keys(body).some((key) => key in settings)) {
+    await syncDraftPayrollForCompany(session.companyId ?? null);
+  }
 
   revalidatePath("/payroll");
   broadcastAppEvent("payroll_updated", { action: "settings_updated" });

@@ -8,7 +8,7 @@ import {
   canManagePayrollRecord,
   canViewPayrollRecord,
 } from "@/lib/payroll-access";
-import { legacyBreakdownFromRecord } from "@/lib/payroll-engine";
+import { getPayrollSettings, legacyBreakdownFromRecord } from "@/lib/payroll-engine";
 import { getPayslipViewerContext } from "@/lib/payslip-viewer";
 
 export default async function PayslipPage({
@@ -24,7 +24,7 @@ export default async function PayslipPage({
     prisma.payrollRecord.findUnique({
       where: { id },
       include: {
-        employee: { include: { department: true } },
+        employee: { include: { department: true, user: { select: { companyId: true } } } },
       },
     }),
     session.companyId
@@ -35,6 +35,9 @@ export default async function PayslipPage({
       : Promise.resolve(null),
   ]);
   if (!record) notFound();
+  const payrollSettings = await getPayrollSettings(
+    record.employee.user?.companyId ?? session.companyId
+  );
 
   const allowed = await canViewPayrollRecord(session, record);
   if (!allowed) redirect("/payroll");
@@ -68,6 +71,7 @@ export default async function PayslipPage({
         viewer={viewer}
         companyName={company?.name ?? "Company"}
         companyLogo={company?.logo}
+        damageDeductionEnabled={payrollSettings.damageDeductionEnabled}
       />
     </div>
   );

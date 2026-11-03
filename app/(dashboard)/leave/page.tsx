@@ -5,7 +5,7 @@ import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
 import { teamScopedEmployeeWhere } from "@/lib/employee-access";
 import { getLeaveWorkspace } from "@/lib/role-workspace";
 import { canManageLeaveAllocations, normalizeRole } from "@/lib/roles";
-import { getLeaveSettings } from "@/lib/leave-settings";
+import { ensureAllocation, getLeaveSettings } from "@/lib/leave-settings";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { LeaveModule } from "@/components/leave/leave-module";
@@ -40,6 +40,12 @@ export default async function LeavePage() {
   ]);
 
   const year = new Date().getFullYear();
+  if (leaveSettings.allocationEnabled && session.employeeId) {
+    await Promise.all([
+      ensureAllocation({ companyId: session.companyId, employeeId: session.employeeId, year, type: "ANNUAL" }),
+      ensureAllocation({ companyId: session.companyId, employeeId: session.employeeId, year, type: "SICK" }),
+    ]);
+  }
   const myBalances =
     leaveSettings.allocationEnabled && session.employeeId
       ? await prisma.leaveAllocation.findMany({

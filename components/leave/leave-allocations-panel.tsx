@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, Settings2, Wand2 } from "lucide-react";
+import { CalendarPlus, Plus, Settings2, Trash2, Wand2 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
 import { cn, fullName } from "@/lib/utils";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { scheduleRouterRefresh } from "@/hooks/use-soft-refresh";
-import type { LeaveSettingsData } from "@/lib/leave-settings";
+import type { LeaveAllocationRule, LeaveSettingsData } from "@/lib/leave-settings";
 
 const inputClass =
   "w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/25 focus:border-brand-500";
@@ -24,6 +24,9 @@ type AllocationsData = {
   year: number;
   enabled: boolean;
   defaults: { annual: number; sick: number };
+  rules: LeaveAllocationRule[];
+  jobTitles: string[];
+  departments: { id: string; name: string }[];
   rows: AllocationRow[];
 };
 
@@ -39,6 +42,8 @@ export function LeaveAllocationsPanel({
   const [data, setData] = useState<AllocationsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, { annual: number; sick: number }>>({});
+
+  useEffect(() => setForm(settings), [settings]);
 
   const refresh = async () => {
     const res = await fetch(`/api/leave/allocations?year=${year}`);
@@ -84,6 +89,7 @@ export function LeaveAllocationsPanel({
         return;
       }
       notify.success("Leave allocation settings saved");
+      if (open && data) await refresh();
     } catch {
       notify.error("Failed to save leave settings");
     } finally {
@@ -118,11 +124,18 @@ export function LeaveAllocationsPanel({
   const saveTotals = async () => {
     setLoading(true);
     try {
-      const entries = Object.entries(drafts).map(([employeeId, d]) => [
-        { employeeId, type: "ANNUAL", totalDays: d.annual },
-        { employeeId, type: "SICK", totalDays: d.sick },
-      ]);
-      if (entries.length === 0) return;
+      const entries = (data?.rows ?? []).flatMap((row) => {
+        const draft = drafts[row.employee.id];
+        if (!draft) return [];
+        return [
+          ...(draft.annual !== row.annual.totalDays ? [{ employeeId: row.employee.id, type: "ANNUAL", totalDays: draft.annual }] : []),
+          ...(draft.sick !== row.sick.totalDays ? [{ employeeId: row.employee.id, type: "SICK", totalDays: draft.sick }] : []),
+        ];
+      });
+      if (entries.length === 0) {
+        notify.success("Leave balances are already up to date");
+        return;
+      }
       const res = await fetch("/api/leave/allocations", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -204,6 +217,46 @@ export function LeaveAllocationsPanel({
                     }
                   />
                 </div>
+              </div>
+            )}
+            {form.allocationEnabled && (
+              <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Role and department rules</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Role means the employee job title. Role plus department rules take priority. If role-only and department-only rules both match, the first matching rule wins. Individual balances can still be overridden below.</p>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => setForm({
+                    ...form,
+                    allocationRules: [...form.allocationRules, { id: crypto.randomUUID(), type: "ANNUAL", role: null, departmentId: null, days: form.defaultAnnualDays }],
+                  })}>
+                    <Plus className="w-4 h-4" /> Rule
+                  </Button>
+                </div>
+                {form.allocationRules.map((rule, index) => (
+                  <div key={rule.id} className="grid grid-cols-1 sm:grid-cols-[1fr_1.3fr_1.5fr_100px_auto] gap-2 items-end rounded-xl border border-gray-100 p-3">
+                    <label className="text-xs font-medium text-gray-600">Leave type
+                      <select className={`${inputClass} mt-1`} value={rule.type} onChange={(e) => setForm({ ...form, allocationRules: form.allocationRules.map((item, i) => i === index ? { ...item, type: e.target.value as LeaveAllocationRule["type"] } : item) })}>
+                        <option value="ANNUAL">Annual</option><option value="SICK">Sick</option>
+                      </select>
+                    </label>
+                    <label className="text-xs font-medium text-gray-600">Role / job title
+                      <input list={`leave-job-titles-${rule.id}`} className={`${inputClass} mt-1`} value={rule.role ?? ""} placeholder="Any role" onChange={(e) => setForm({ ...form, allocationRules: form.allocationRules.map((item, i) => i === index ? { ...item, role: e.target.value || null } : item) })} />
+                      <datalist id={`leave-job-titles-${rule.id}`}>
+                        {(data?.jobTitles ?? []).map((title) => <option key={title} value={title} />)}
+                      </datalist>
+                    </label>
+                    <label className="text-xs font-medium text-gray-600">Department
+                      <select className={`${inputClass} mt-1`} value={rule.departmentId ?? ""} onChange={(e) => setForm({ ...form, allocationRules: form.allocationRules.map((item, i) => i === index ? { ...item, departmentId: e.target.value || null } : item) })}>
+                        <option value="">Any department</option>{(data?.departments ?? []).map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+                      </select>
+                    </label>
+                    <label className="text-xs font-medium text-gray-600">Days / year
+                      <input type="number" min="0" step="0.5" className={`${inputClass} mt-1`} value={rule.days} onChange={(e) => setForm({ ...form, allocationRules: form.allocationRules.map((item, i) => i === index ? { ...item, days: Number(e.target.value) || 0 } : item) })} />
+                    </label>
+                    <Button variant="ghost" size="sm" aria-label="Remove leave rule" onClick={() => setForm({ ...form, allocationRules: form.allocationRules.filter((_, i) => i !== index) })}><Trash2 className="w-4 h-4" /></Button>
+                  </div>
+                ))}
               </div>
             )}
             <div className="mt-4">

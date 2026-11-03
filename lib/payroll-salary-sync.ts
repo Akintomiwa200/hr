@@ -56,3 +56,18 @@ export async function syncDraftPayrollSalary(employeeId: string, salary: number)
   for (const runId of runIds) await refreshPayrollRunTotals(runId);
   return drafts.length;
 }
+
+/** Rebuild drafts when a payroll rule changes, using each employee's saved salary. */
+export async function syncDraftPayrollForCompany(companyId: string | null) {
+  const employees = await prisma.employee.findMany({
+    where: {
+      user: { companyId },
+      payrollRecords: { some: { status: "DRAFT" } },
+    },
+    select: { id: true, salary: true },
+  });
+  for (const employee of employees) {
+    await syncDraftPayrollSalary(employee.id, employee.salary);
+  }
+  return employees.length;
+}

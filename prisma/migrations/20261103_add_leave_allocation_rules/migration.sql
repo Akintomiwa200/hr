@@ -1,0 +1,5 @@
+ALTER TABLE "LeaveSettings"
+  ADD COLUMN IF NOT EXISTS "allocationRules" TEXT NOT NULL DEFAULT '[]';
+
+ALTER TABLE "LeaveAllocation"
+  ADD COLUMN IF NOT EXISTS "isOverride" BOOLEAN NOT NULL DEFAULT false;

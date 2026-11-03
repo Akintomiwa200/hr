@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Settings2 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
@@ -20,6 +20,8 @@ export function PayrollSettingsPanel({
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(settings);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => setForm(settings), [settings]);
 
   const save = async () => {
     setLoading(true);
@@ -57,7 +59,9 @@ export function PayrollSettingsPanel({
               <div>
                 <p className="text-sm font-semibold text-gray-900">Pro-rata salary</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Pay staff based on days they came to work instead of the full monthly amount.
+                  Off by default: base salary stays at the full monthly amount. Turn on only if
+                  salary should be prorated by days worked. Lateness and absence deductions are
+                  controlled separately below.
                 </p>
               </div>
               <input
@@ -179,7 +183,13 @@ export function PayrollSettingsPanel({
           </Card>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
+            <div className="sm:col-span-2">
+              <label className="flex items-center justify-between gap-3 cursor-pointer rounded-xl border border-gray-200 p-3">
+                <span className="text-sm font-medium text-gray-700">Automatic lateness deductions</span>
+                <input type="checkbox" checked={form.latenessDeductionEnabled} onChange={(e) => setForm({ ...form, latenessDeductionEnabled: e.target.checked })} className="w-4 h-4 accent-violet-600" />
+              </label>
+            </div>
+            {form.latenessDeductionEnabled && <div>
               <label className="text-xs font-semibold text-gray-500 uppercase">
                 Lateness deduction / day
               </label>
@@ -192,8 +202,14 @@ export function PayrollSettingsPanel({
                   setForm({ ...form, latenessDeductionPerDay: Number(e.target.value) })
                 }
               />
+            </div>}
+            <div className="sm:col-span-2">
+              <label className="flex items-center justify-between gap-3 cursor-pointer rounded-xl border border-gray-200 p-3">
+                <span className="text-sm font-medium text-gray-700">Automatic absence deductions</span>
+                <input type="checkbox" checked={form.absenceDeductionEnabled} onChange={(e) => setForm({ ...form, absenceDeductionEnabled: e.target.checked })} className="w-4 h-4 accent-violet-600" />
+              </label>
             </div>
-            <div>
+            {form.absenceDeductionEnabled && <div>
               <label className="text-xs font-semibold text-gray-500 uppercase">
                 Absence deduction / day
               </label>
@@ -206,8 +222,14 @@ export function PayrollSettingsPanel({
                   setForm({ ...form, absenceDeductionPerDay: Number(e.target.value) })
                 }
               />
+            </div>}
+            <div className="sm:col-span-2">
+              <label className="flex items-center justify-between gap-3 cursor-pointer rounded-xl border border-gray-200 p-3">
+                <span className="text-sm font-medium text-gray-700">Automatic tax deduction</span>
+                <input type="checkbox" checked={form.taxEnabled} onChange={(e) => setForm({ ...form, taxEnabled: e.target.checked })} className="w-4 h-4 accent-violet-600" />
+              </label>
             </div>
-            <div>
+            {form.taxEnabled && <div>
               <label className="text-xs font-semibold text-gray-500 uppercase">
                 Tax rate (%)
               </label>
@@ -222,7 +244,7 @@ export function PayrollSettingsPanel({
                   setForm({ ...form, taxRatePercent: Number(e.target.value) })
                 }
               />
-            </div>
+            </div>}
             <div className="flex items-end">
               <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer pb-2">
                 <input
