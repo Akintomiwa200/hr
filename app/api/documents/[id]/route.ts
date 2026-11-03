@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
-import { badRequest, isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
+import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { deleteCloudinaryFile } from "@/lib/cloudinary";
 import { canManageDocuments } from "@/lib/documents/access";
 import bcrypt from "bcryptjs";
@@ -46,6 +46,23 @@ export async function DELETE(
   if (!existing) return notFound();
 
   await prisma.document.delete({ where: { id } });
+
+  // Checklist uploads mirror their file into Documents. Removing the document
+  // should also clear that task file so the task never points at a deleted file.
+  const linkedTaskFiles = existing.publicId
+    ? await prisma.checklistTaskFile.findMany({
+        where: { publicId: existing.publicId },
+        select: { taskId: true },
+      })
+    : [];
+  if (linkedTaskFiles.length > 0) {
+    await prisma.checklistTaskFile.deleteMany({ where: { publicId: existing.publicId! } });
+    for (const taskId of new Set(linkedTaskFiles.map((file) => file.taskId))) {
+      broadcastAppEvent("checklist_updated", { id: taskId, action: "document_deleted" });
+    }
+    revalidatePath("/checklist/todos");
+  }
+
   if (existing.publicId && (existing.storageType === "image" || existing.storageType === "raw")) {
     await deleteCloudinaryFile(existing.publicId, existing.storageType);
   }

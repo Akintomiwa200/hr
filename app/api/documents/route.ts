@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
 import { getCompanyScope, requireOrgCompanyId } from "@/lib/company-scope";
-import { canManageDocuments, canViewDocument, canViewSharedResource } from "@/lib/documents/access";
+import { canManageDocuments, canViewDocument } from "@/lib/documents/access";
 import { deleteCloudinaryFile, uploadToCloudinary } from "@/lib/cloudinary";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
   const folderIdInput = form.get("folderId");
   const folderId = typeof folderIdInput === "string" && folderIdInput.trim() ? folderIdInput.trim() : null;
   const employeeIdInput = form.get("employeeId");
-  const employeeId = typeof employeeIdInput === "string" && employeeIdInput.trim() ? employeeIdInput.trim() : null;
+  let employeeId = typeof employeeIdInput === "string" && employeeIdInput.trim() ? employeeIdInput.trim() : null;
   const visibilityInput = form.get("visibility");
   const visibility = visibilityInput === "PUBLIC" || visibilityInput === "PROTECTED" ? visibilityInput : "PRIVATE";
   const protectionPin = form.get("protectionPin");
@@ -74,9 +74,17 @@ export async function POST(request: NextRequest) {
   const companyId = requireOrgCompanyId(getCompanyScope(session));
   const author = `${session.firstName ?? "User"} ${session.lastName ?? ""}`.trim();
 
+  let folder: { id: string; name: string; employeeId: string | null } | null = null;
   if (folderId) {
-    const folder = await prisma.documentFolder.findFirst({ where: { id: folderId, companyId } });
+    folder = await prisma.documentFolder.findFirst({
+      where: { id: folderId, companyId },
+      select: { id: true, name: true, employeeId: true },
+    });
     if (!folder) return badRequest("Folder not found");
+    // Files uploaded into an employee's folder belong to that employee even
+    // when the uploader leaves the employee picker empty. Without this the
+    // file is missing from HR's employee document view.
+    if (!employeeId && folder.employeeId) employeeId = folder.employeeId;
   }
   if (employeeId) {
     const employee = await prisma.employee.findFirst({ where: { id: employeeId, user: { companyId } }, select: { id: true } });
@@ -104,7 +112,7 @@ export async function POST(request: NextRequest) {
     document = await prisma.document.create({
       data: {
         title: title.trim(),
-        category: folderId ? (await prisma.documentFolder.findUnique({ where: { id: folderId }, select: { name: true } }))?.name ?? "General" : "General",
+        category: folder?.name ?? "General",
         fileUrl: uploaded.url,
         fileName,
         mimeType: file.type || "application/octet-stream",

@@ -6,6 +6,10 @@ import { badRequest, notFound, requireSession, unauthorized } from "@/lib/api-au
 import { canUploadChecklistDocument } from "@/lib/checklist/task-access";
 import { slugDocumentName } from "@/lib/checklist/documents";
 import { deleteTaskFile, fetchTaskFiles, findTaskFile, insertTaskFile } from "@/lib/checklist/document-store";
+import {
+  deleteChecklistTaskDocument,
+  recordChecklistTaskDocument,
+} from "@/lib/checklist/task-documents";
 import { deleteCloudinaryFile, uploadChecklistFileToCloudinary } from "@/lib/cloudinary";
 
 const MAX_BYTES = 12 * 1024 * 1024;
@@ -91,12 +95,35 @@ export async function POST(
       });
     }
 
+    // Mirror the upload into Documents so HR and admins can find it outside
+    // the checklist task too. A failure here must not lose the upload.
+    let documentId: string | null = null;
+    try {
+      const document = await recordChecklistTaskDocument({
+        companyId: task.instance.companyId,
+        employeeId: employee.id,
+        documentName,
+        fileName: file.name,
+        fileUrl: uploaded.url,
+        publicId: uploaded.publicId,
+        fileSize: uploaded.bytes,
+        mimeType: file.type || null,
+        storageType: uploaded.resourceType,
+        uploadedById: session.id,
+        uploadedByName: authorName(session),
+      });
+      documentId = document.id;
+    } catch (error) {
+      console.error("Could not add checklist upload to Documents", error);
+    }
+
     broadcastAppEvent("checklist_updated", { id, action: "document_uploaded" });
-    broadcastAppEvent("document_updated", { taskId: id, fileId: record.id });
+    broadcastAppEvent("document_updated", { taskId: id, fileId: record.id, documentId });
     revalidatePath("/checklist/todos");
     revalidatePath("/checklist/onboarding");
     revalidatePath("/checklist/offboarding");
-    return NextResponse.json(record);
+    revalidatePath("/documents");
+    return NextResponse.json({ ...record, documentId });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Upload failed";
     if (message === "CLOUDINARY_NOT_CONFIGURED") {
@@ -132,10 +159,25 @@ export async function DELETE(
   const file = await findTaskFile(fileId, id);
   if (!file) return notFound();
 
+  const linkedDocument = await deleteChecklistTaskDocument({
+    publicId: file.publicId,
+    fileName: file.fileName,
+    fileUrl: file.fileUrl,
+    employeeId: task.instance.employeeId,
+  });
+
   if (file.publicId) await deleteCloudinaryFile(file.publicId);
   await deleteTaskFile(fileId);
 
   broadcastAppEvent("checklist_updated", { id, action: "document_deleted" });
+  if (linkedDocument) {
+    broadcastAppEvent("document_updated", {
+      id: linkedDocument.id,
+      folderId: linkedDocument.folderId,
+      action: "file_deleted",
+    });
+    revalidatePath("/documents");
+  }
   revalidatePath("/checklist/todos");
   return NextResponse.json({ success: true });
 }
