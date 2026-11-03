@@ -5,10 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
+  CalendarDays,
+  Check,
   FileText,
   Filter,
   LayoutGrid,
   List,
+  ListChecks,
   MessageSquare,
   Plus,
   Search,
@@ -73,7 +76,7 @@ export function ChecklistTodosModule({
   const router = useRouter();
   const [tasks, setTasks] = useState<TodoTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"board" | "list">("board");
+  const [view, setView] = useState<"board" | "list" | "checklist" | "timeline">("board");
   const [dragId, setDragId] = useState<string | null>(null);
   const [selected, setSelected] = useState<TodoTask | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -198,6 +201,18 @@ export function ChecklistTodosModule({
 
   const activeCount = tasks.filter((t) => t.status !== "COMPLETED").length;
 
+  const changeView = (next: typeof view) => {
+    setView(next);
+    // A checklist is only useful when completed items stay visible.
+    if (next === "checklist") {
+      setFilters((f) => (f.status === "ACTIVE" ? { ...f, status: "ALL" } : f));
+    }
+  };
+
+  const toggleDone = (task: TodoTask) => {
+    updateStatus(task.id, task.status === "COMPLETED" ? "PENDING" : "COMPLETED");
+  };
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -265,19 +280,39 @@ export function ChecklistTodosModule({
         <div className="flex rounded-lg border border-gray-200 overflow-hidden">
           <button
             type="button"
-            onClick={() => setView("board")}
+            onClick={() => changeView("board")}
             className={`px-3 py-2 text-sm ${view === "board" ? "bg-violet-50 text-violet-700" : "bg-white text-gray-600"}`}
             aria-label="Board view"
+            title="Board view"
           >
             <LayoutGrid className="w-4 h-4" />
           </button>
           <button
             type="button"
-            onClick={() => setView("list")}
+            onClick={() => changeView("list")}
             className={`px-3 py-2 text-sm border-l border-gray-200 ${view === "list" ? "bg-violet-50 text-violet-700" : "bg-white text-gray-600"}`}
             aria-label="List view"
+            title="List view"
           >
             <List className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => changeView("checklist")}
+            className={`px-3 py-2 text-sm border-l border-gray-200 ${view === "checklist" ? "bg-violet-50 text-violet-700" : "bg-white text-gray-600"}`}
+            aria-label="Checklist view"
+            title="Checklist view"
+          >
+            <ListChecks className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => changeView("timeline")}
+            className={`px-3 py-2 text-sm border-l border-gray-200 ${view === "timeline" ? "bg-violet-50 text-violet-700" : "bg-white text-gray-600"}`}
+            aria-label="Timeline view"
+            title="Timeline view"
+          >
+            <CalendarDays className="w-4 h-4" />
           </button>
         </div>
 
@@ -363,6 +398,10 @@ export function ChecklistTodosModule({
             );
           })}
         </div>
+      ) : view === "checklist" ? (
+        <TaskChecklistView tasks={tasks} onOpen={setSelected} onToggle={toggleDone} />
+      ) : view === "timeline" ? (
+        <TaskTimelineView tasks={tasks} onOpen={setSelected} />
       ) : (
         <Card className="rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden p-0">
           <table className="w-full text-sm">
@@ -557,6 +596,255 @@ export function ChecklistTodosModule({
         </div>
       </Sheet>
     </>
+  );
+}
+
+function TaskChecklistView({
+  tasks,
+  onOpen,
+  onToggle,
+}: {
+  tasks: TodoTask[];
+  onOpen: (task: TodoTask) => void;
+  onToggle: (task: TodoTask) => void;
+}) {
+  const groups = COLUMNS.map((column) => ({
+    ...column,
+    tasks: tasks.filter((task) => task.status === column.key),
+  })).filter((group) => group.tasks.length > 0);
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="divide-y divide-gray-100">
+        {groups.map((group) => (
+          <section key={group.key} className="px-4 py-4 sm:px-6">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {group.label}
+              </h3>
+              <span className="rounded-full bg-gray-50 px-2 py-0.5 text-xs text-gray-400">
+                {group.tasks.length}
+              </span>
+            </div>
+            <ul className="space-y-1">
+              {group.tasks.map((task) => {
+                const done = task.status === "COMPLETED";
+                const required = task.requiredDocuments ?? [];
+                const uploaded = new Set(
+                  (task.files ?? []).map((file) => file.documentName.trim().toLowerCase())
+                );
+                const overdue = isTaskOverdue(task);
+                return (
+                  <li
+                    key={task.id}
+                    className="flex items-start gap-3 rounded-xl px-2 py-2 hover:bg-gray-50"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onToggle(task)}
+                      aria-label={done ? "Mark task as not done" : "Mark task as done"}
+                      title={done ? "Mark as not done" : "Mark as done"}
+                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                        done
+                          ? "border-emerald-500 bg-emerald-500 text-white"
+                          : "border-gray-300 text-transparent hover:border-violet-400 hover:text-violet-300"
+                      }`}
+                    >
+                      <Check className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpen(task)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <span
+                        className={`block text-sm font-medium ${
+                          done ? "text-gray-400 line-through" : "text-gray-900"
+                        }`}
+                      >
+                        {task.title}
+                      </span>
+                      <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
+                        <span>
+                          {task.instance.type} ·{" "}
+                          {fullName(task.instance.employee.firstName, task.instance.employee.lastName)}
+                        </span>
+                        {task.dueDate && (
+                          <span className={overdue ? "font-medium text-red-500" : ""}>
+                            {formatDate(task.dueDate)}
+                          </span>
+                        )}
+                        <DocumentBadge task={task} compact />
+                      </span>
+                      {required.length > 0 && (
+                        <span className="mt-1.5 block space-y-1">
+                          {required.map((name) => {
+                            const isUploaded = uploaded.has(name.trim().toLowerCase());
+                            return (
+                              <span
+                                key={name}
+                                className="flex items-center gap-2 text-xs text-gray-500"
+                              >
+                                <span
+                                  className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border ${
+                                    isUploaded
+                                      ? "border-emerald-500 bg-emerald-500 text-white"
+                                      : "border-gray-300 text-transparent"
+                                  }`}
+                                >
+                                  <Check className="h-2.5 w-2.5" />
+                                </span>
+                                <span className={isUploaded ? "text-gray-400 line-through" : ""}>
+                                  {name}
+                                </span>
+                              </span>
+                            );
+                          })}
+                        </span>
+                      )}
+                    </button>
+                    <Badge variant={PRIORITY_VARIANT[task.priority] ?? "neutral"}>
+                      {task.priority}
+                    </Badge>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+type TaskTimelineGroup = { key: string; label: string; tasks: TodoTask[] };
+
+function isTaskOverdue(task: TodoTask) {
+  return Boolean(task.dueDate && task.status !== "COMPLETED" && new Date(task.dueDate) < new Date());
+}
+
+function taskTimelineGroups(tasks: TodoTask[]): TaskTimelineGroup[] {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(start);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+
+  const groups: TaskTimelineGroup[] = [
+    { key: "overdue", label: "Overdue", tasks: [] },
+    { key: "today", label: "Today", tasks: [] },
+    { key: "week", label: "Next 7 days", tasks: [] },
+    { key: "later", label: "Later", tasks: [] },
+    { key: "none", label: "No due date", tasks: [] },
+    { key: "completed", label: "Completed", tasks: [] },
+  ];
+
+  for (const task of tasks) {
+    if (task.status === "COMPLETED") {
+      groups[5].tasks.push(task);
+      continue;
+    }
+    if (!task.dueDate) {
+      groups[4].tasks.push(task);
+      continue;
+    }
+    const dueDay = new Date(task.dueDate);
+    dueDay.setHours(0, 0, 0, 0);
+    if (dueDay < start) groups[0].tasks.push(task);
+    else if (dueDay.getTime() === start.getTime()) groups[1].tasks.push(task);
+    else if (dueDay <= weekEnd) groups[2].tasks.push(task);
+    else groups[3].tasks.push(task);
+  }
+
+  for (const group of groups) {
+    group.tasks.sort((a, b) => {
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    });
+  }
+
+  return groups.filter((group) => group.tasks.length > 0);
+}
+
+function TaskTimelineView({
+  tasks,
+  onOpen,
+}: {
+  tasks: TodoTask[];
+  onOpen: (task: TodoTask) => void;
+}) {
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="divide-y divide-gray-100">
+        {taskTimelineGroups(tasks).map((group) => (
+          <section key={group.key} className="px-4 py-4 sm:px-6">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {group.label}
+              </h3>
+              <span className="rounded-full bg-gray-50 px-2 py-0.5 text-xs text-gray-400">
+                {group.tasks.length}
+              </span>
+            </div>
+            <div className="space-y-0.5">
+              {group.tasks.map((task) => (
+                <TimelineTaskRow key={task.id} task={task} onOpen={() => onOpen(task)} />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function TimelineTaskRow({ task, onOpen }: { task: TodoTask; onOpen: () => void }) {
+  const done = task.status === "COMPLETED";
+  const overdue = isTaskOverdue(task);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-gray-50"
+    >
+      <span
+        className={`h-2 w-2 shrink-0 rounded-full ${
+          done ? "bg-emerald-400" : overdue ? "bg-red-400" : "bg-violet-400"
+        }`}
+      />
+      <span className="min-w-0 flex-1">
+        <span
+          className={`block truncate text-sm font-medium ${
+            done ? "text-gray-400 line-through" : "text-gray-900"
+          }`}
+        >
+          {task.title}
+        </span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
+          <span>
+            {task.instance.type} ·{" "}
+            {fullName(task.instance.employee.firstName, task.instance.employee.lastName)}
+          </span>
+          {task.dueDate && (
+            <span className={overdue ? "font-medium text-red-500" : ""}>
+              {formatDate(task.dueDate)}
+            </span>
+          )}
+          <DocumentBadge task={task} compact />
+        </span>
+      </span>
+      <Badge
+        variant={
+          task.status === "COMPLETED"
+            ? "success"
+            : task.status === "IN_PROGRESS"
+              ? "info"
+              : "neutral"
+        }
+      >
+        {task.status.replace("_", " ")}
+      </Badge>
+    </button>
   );
 }
 

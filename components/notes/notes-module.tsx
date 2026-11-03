@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  CalendarDays,
   Check,
-  Clock,
   FolderPlus,
   Globe2,
   LayoutGrid,
+  ListChecks,
   Lock,
   Pencil,
   Pin,
@@ -17,7 +18,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Button, EmptyState, Input, Select, Textarea } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, Input, Select, Textarea } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
@@ -81,7 +82,7 @@ export function NotesModule({
   const [typeFilter, setTypeFilter] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [view, setView] = useState<"grid" | "board">("board");
+  const [view, setView] = useState<"grid" | "board" | "checklist" | "timeline">("board");
   const [folder, setFolder] = useState<string>("all");
   const [search, setSearch] = useState("");
 
@@ -391,6 +392,26 @@ export function NotesModule({
           >
             <LayoutGrid className="w-4 h-4" />
           </button>
+          <button
+            type="button"
+            onClick={() => setView("checklist")}
+            title="Checklist view"
+            className={`p-1.5 rounded-lg transition-colors ${
+              view === "checklist" ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-50"
+            }`}
+          >
+            <ListChecks className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("timeline")}
+            title="Timeline view"
+            className={`p-1.5 rounded-lg transition-colors ${
+              view === "timeline" ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-50"
+            }`}
+          >
+            <CalendarDays className="w-4 h-4" />
+          </button>
         </div>
 
         <Button className="ml-auto" onClick={() => openCreate()}>
@@ -428,6 +449,23 @@ export function NotesModule({
               <Plus className="w-4 h-4" /> Write a note
             </Button>
           }
+        />
+      ) : view === "checklist" ? (
+        <NoteChecklistView
+          notes={visible}
+          currentUserId={currentUserId}
+          canManageNote={canManageNote}
+          onOpen={openEdit}
+          onToggle={(note) =>
+            moveColumn(note, (note.column ?? "TODO") === "DONE" ? "TODO" : "DONE")
+          }
+        />
+      ) : view === "timeline" ? (
+        <NoteTimelineView
+          notes={visible}
+          currentUserId={currentUserId}
+          canManageNote={canManageNote}
+          onOpen={openEdit}
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -779,5 +817,228 @@ export function NotesModule({
         </div>
       </Dialog>
     </>
+  );
+}
+
+const NOTE_COLUMN_VARIANT: Record<string, "neutral" | "info" | "success"> = {
+  TODO: "neutral",
+  ONGOING: "info",
+  DONE: "success",
+};
+
+const NOTE_COLOR_DOT: Record<string, string> = {
+  violet: "bg-violet-400",
+  amber: "bg-amber-400",
+  emerald: "bg-emerald-400",
+  sky: "bg-sky-400",
+  rose: "bg-rose-400",
+};
+
+function NoteMeta({ note, currentUserId }: { note: Note; currentUserId: string }) {
+  return (
+    <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
+      {note.folder && (
+        <span className="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-gray-500">
+          {note.folder}
+        </span>
+      )}
+      <span className="inline-flex items-center gap-1">
+        {note.scope === "SHARED" ? <Globe2 className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+        {note.scope === "SHARED" ? (note.userId === currentUserId ? "You" : "Shared") : "Personal"}
+      </span>
+      <span>{formatDate(note.updatedAt)}</span>
+      {note.pinned && (
+        <span className="inline-flex items-center gap-1 text-violet-400">
+          <Pin className="h-3 w-3" /> Pinned
+        </span>
+      )}
+    </span>
+  );
+}
+
+function NoteChecklistView({
+  notes,
+  currentUserId,
+  canManageNote,
+  onOpen,
+  onToggle,
+}: {
+  notes: Note[];
+  currentUserId: string;
+  canManageNote: (note: Note) => boolean;
+  onOpen: (note: Note) => void;
+  onToggle: (note: Note) => void;
+}) {
+  const groups = BOARD_COLUMNS.map((column) => ({
+    ...column,
+    notes: notes.filter((note) => (note.column ?? "TODO") === column.id),
+  })).filter((group) => group.notes.length > 0);
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="divide-y divide-gray-100">
+        {groups.map((group) => (
+          <section key={group.id} className="px-4 py-4 sm:px-6">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {group.label}
+              </h3>
+              <span className="rounded-full bg-gray-50 px-2 py-0.5 text-xs text-gray-400">
+                {group.notes.length}
+              </span>
+            </div>
+            <ul className="space-y-1">
+              {group.notes.map((note) => {
+                const done = (note.column ?? "TODO") === "DONE";
+                const canManage = canManageNote(note);
+                return (
+                  <li
+                    key={note.id}
+                    className="flex items-start gap-3 rounded-xl px-2 py-2 hover:bg-gray-50"
+                  >
+                    <button
+                      type="button"
+                      disabled={!canManage}
+                      onClick={() => onToggle(note)}
+                      aria-label={done ? "Mark note as not done" : "Mark note as done"}
+                      title={done ? "Mark as not done" : "Mark as done"}
+                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                        done
+                          ? "border-violet-500 bg-violet-500 text-white"
+                          : "border-gray-300 text-transparent hover:border-violet-400 hover:text-violet-300"
+                      } ${canManage ? "" : "cursor-not-allowed opacity-50"}`}
+                    >
+                      <Check className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => (canManage ? onOpen(note) : undefined)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <span
+                        className={`flex items-center gap-2 text-sm font-medium ${
+                          done ? "text-gray-400 line-through" : "text-gray-900"
+                        }`}
+                      >
+                        <span
+                          className={`h-2 w-2 shrink-0 rounded-full ${
+                            NOTE_COLOR_DOT[note.color] ?? NOTE_COLOR_DOT.violet
+                          }`}
+                        />
+                        <span className="truncate">{note.title || "Untitled note"}</span>
+                      </span>
+                      {note.content && (
+                        <span
+                          className={`mt-0.5 block text-xs line-clamp-2 ${
+                            done ? "text-gray-300 line-through" : "text-gray-500"
+                          }`}
+                        >
+                          {note.content}
+                        </span>
+                      )}
+                      <NoteMeta note={note} currentUserId={currentUserId} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+type NoteTimelineGroup = { key: string; label: string; notes: Note[] };
+
+function noteTimelineGroups(notes: Note[]): NoteTimelineGroup[] {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfWeek.getDate() - 7);
+
+  const groups: NoteTimelineGroup[] = [
+    { key: "today", label: "Today", notes: [] },
+    { key: "yesterday", label: "Yesterday", notes: [] },
+    { key: "week", label: "Earlier this week", notes: [] },
+    { key: "earlier", label: "Earlier", notes: [] },
+  ];
+
+  for (const note of notes) {
+    const day = new Date(note.updatedAt);
+    day.setHours(0, 0, 0, 0);
+    if (day.getTime() >= startOfToday.getTime()) groups[0].notes.push(note);
+    else if (day.getTime() >= startOfYesterday.getTime()) groups[1].notes.push(note);
+    else if (day.getTime() >= startOfWeek.getTime()) groups[2].notes.push(note);
+    else groups[3].notes.push(note);
+  }
+
+  return groups.filter((group) => group.notes.length > 0);
+}
+
+function NoteTimelineView({
+  notes,
+  currentUserId,
+  canManageNote,
+  onOpen,
+}: {
+  notes: Note[];
+  currentUserId: string;
+  canManageNote: (note: Note) => boolean;
+  onOpen: (note: Note) => void;
+}) {
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="divide-y divide-gray-100">
+        {noteTimelineGroups(notes).map((group) => (
+          <section key={group.key} className="px-4 py-4 sm:px-6">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {group.label}
+              </h3>
+              <span className="rounded-full bg-gray-50 px-2 py-0.5 text-xs text-gray-400">
+                {group.notes.length}
+              </span>
+            </div>
+            <div className="space-y-0.5">
+              {group.notes.map((note) => {
+                const column = note.column ?? "TODO";
+                const done = column === "DONE";
+                const canManage = canManageNote(note);
+                return (
+                  <button
+                    key={note.id}
+                    type="button"
+                    onClick={() => (canManage ? onOpen(note) : undefined)}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-gray-50"
+                  >
+                    <span
+                      className={`h-2 w-2 shrink-0 rounded-full ${
+                        done ? "bg-emerald-400" : NOTE_COLOR_DOT[note.color] ?? NOTE_COLOR_DOT.violet
+                      }`}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={`block truncate text-sm font-medium ${
+                          done ? "text-gray-400 line-through" : "text-gray-900"
+                        }`}
+                      >
+                        {note.title || "Untitled note"}
+                      </span>
+                      <NoteMeta note={note} currentUserId={currentUserId} />
+                    </span>
+                    <Badge variant={NOTE_COLUMN_VARIANT[column] ?? "neutral"}>
+                      {BOARD_COLUMNS.find((c) => c.id === column)?.label ?? column}
+                    </Badge>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+    </Card>
   );
 }
