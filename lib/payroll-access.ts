@@ -29,11 +29,17 @@ export async function canViewPayrollRecord(
   if ((role === "MANAGER" || role === "SUPERVISOR") && session.employeeId) {
     if (session.employeeId === record.employeeId) return true;
     const { prisma } = await import("@/lib/prisma");
-    const employee = await prisma.employee.findUnique({
-      where: { id: record.employeeId },
-      select: { managerId: true },
+    const employee = await prisma.employee.findFirst({
+      where: {
+        id: record.employeeId,
+        OR: [
+          { managerId: session.employeeId },
+          { managers: { some: { id: session.employeeId } } },
+        ],
+      },
+      select: { id: true },
     });
-    return employee?.managerId === session.employeeId;
+    return Boolean(employee);
   }
   return false;
 }
@@ -51,6 +57,43 @@ export async function canManagePayrollRecord(
 ) {
   if (canOperatePayroll(session.role) || isSuperAdmin(session.role)) return true;
   return false;
+}
+
+/** Supervisors may adjust draft payslips belonging to their direct reports. */
+export async function canAdjustPayrollRecord(
+  session: SessionUser,
+  record: { employeeId: string; status?: string }
+) {
+  if (normalizeRole(session.role) !== "SUPERVISOR" || !session.employeeId) return false;
+  if (record.status && record.status !== "DRAFT") return false;
+  const { prisma } = await import("@/lib/prisma");
+  const report = await prisma.employee.findFirst({
+    where: {
+      id: record.employeeId,
+      OR: [
+        { managerId: session.employeeId },
+        { managers: { some: { id: session.employeeId } } },
+      ],
+    },
+    select: { id: true },
+  });
+  return Boolean(report);
+}
+
+export function canViewPayrollRuns(session: SessionUser) {
+  return normalizeRole(session.role) === "SUPERVISOR" || canBulkPayroll(session);
+}
+
+export function payrollRunRecordWhere(session: SessionUser) {
+  if (normalizeRole(session.role) !== "SUPERVISOR" || !session.employeeId) {
+    return {};
+  }
+  return {
+    OR: [
+      { employee: { managerId: session.employeeId } },
+      { employee: { managers: { some: { id: session.employeeId } } } },
+    ],
+  };
 }
 
 export function canManagePayrollSettings(session: SessionUser) {
@@ -74,7 +117,10 @@ export async function payrollListWhere(session: SessionUser) {
   if (role === "EMPLOYEE" && session.employeeId) {
     return { employeeId: session.employeeId };
   }
-  if ((role === "MANAGER" || role === "SUPERVISOR") && session.employeeId) {
+  if (role === "SUPERVISOR" && session.employeeId) {
+    return { employeeId: session.employeeId };
+  }
+  if (role === "MANAGER" && session.employeeId) {
     return {
       OR: [
         { employeeId: session.employeeId },
@@ -91,6 +137,12 @@ export async function payrollListWhere(session: SessionUser) {
 
 export async function payrollRunListWhere(session: SessionUser) {
   const role = normalizeRole(session.role);
+  if (role === "SUPERVISOR" && session.employeeId) {
+    return {
+      companyId: session.companyId ?? null,
+      records: { some: payrollRunRecordWhere(session) },
+    };
+  }
   if (!canBulkPayroll(session) && !isSuperAdmin(role)) {
     return { id: "__none__" };
   }

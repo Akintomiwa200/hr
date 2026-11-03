@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getSession, canManageEmployees } from "@/lib/auth";
-import { LINE_MANAGER_ROLES, PEOPLE_DIRECTORY_ROLES, assignableRolesFor, hasRole } from "@/lib/roles";
+import { LINE_MANAGER_ROLES, PEOPLE_DIRECTORY_ROLES, assignableRolesFor, hasRole, normalizeRole } from "@/lib/roles";
 import { requirePeoplePage } from "@/lib/page-access";
 import { prisma } from "@/lib/prisma";
 import {
@@ -23,7 +23,9 @@ export default async function EmployeesPage() {
   const scope = getCompanyScope(session);
   const orgEmployee = employeeCompanyWhere(scope);
   const orgDepartment = departmentCompanyWhere(scope);
-  const directoryScope = await peopleDirectoryEmployeeWhere(session);
+  const directoryScope = normalizeRole(session.role) === "SUPERVISOR" && session.employeeId
+    ? { OR: [{ managerId: session.employeeId }, { managers: { some: { id: session.employeeId } } }] }
+    : await peopleDirectoryEmployeeWhere(session);
 
   // Offboarded staff (inactive with an end date) are managed on the
   // Delete & Separations page and are excluded from the working directory.

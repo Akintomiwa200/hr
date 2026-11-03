@@ -28,6 +28,15 @@ export function getLeaveWorkspace(role: Role): ModuleWorkspace {
       canActForTeam: false,
     };
   }
+  if (r === "SUPERVISOR") {
+    return {
+      title: "Team leave",
+      description: "View your team’s leave requests and manage your own time off",
+      mode: "team",
+      canActForSelf: true,
+      canActForTeam: false,
+    };
+  }
   if (isTeamLeadRole(r)) {
     return {
       title: "Team leave",
@@ -177,6 +186,15 @@ export function getPayrollWorkspace(role: Role): ModuleWorkspace {
     return {
       title: "My payslips",
       description: "View your salary history and download payslips",
+      mode: "self",
+      canActForSelf: true,
+      canActForTeam: false,
+    };
+  }
+  if (r === "SUPERVISOR") {
+    return {
+      title: "My payslips",
+      description: "View your salary history and download your payslips",
       mode: "self",
       canActForSelf: true,
       canActForTeam: false,

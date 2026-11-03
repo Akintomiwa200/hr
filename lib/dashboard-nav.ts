@@ -564,6 +564,14 @@ export const employeeNavSections: NavSection[] = [
         ],
       },
       {
+        id: "my-team",
+        href: "/employees",
+        label: "My team",
+        pageTitle: "My team",
+        icon: UsersRound,
+        roles: ["SUPERVISOR"],
+      },
+      {
         id: "payroll-compensation",
         href: "/payroll",
         label: "Payroll & Compensation",
@@ -579,6 +587,14 @@ export const employeeNavSections: NavSection[] = [
             roles: PAYROLL_VIEW_ROLES,
             match: (pathname) =>
               pathname === "/payroll" || pathname.startsWith("/payroll/"),
+          },
+          {
+            id: "payroll-runs",
+            href: "/payroll/runs",
+            label: "Payroll runs",
+            pageTitle: "Payroll runs",
+            roles: ["SUPERVISOR"],
+            match: (pathname) => pathname.startsWith("/payroll/runs"),
           },
           {
             id: "loans",
@@ -762,7 +778,7 @@ export const brandIcon = Activity;
 
 export function getNavSections(role: Role): NavSection[] {
   if (isSuperAdmin(role)) return superAdminNavSections;
-  if (normalizeRole(role) === "EMPLOYEE") return employeeNavSections;
+  if (["EMPLOYEE", "SUPERVISOR"].includes(normalizeRole(role))) return employeeNavSections;
   return dashboardNavSections;
 }
 

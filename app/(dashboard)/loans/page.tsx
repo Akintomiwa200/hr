@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { LoansModule } from "@/components/loans/loans-module";
-import { LOAN_VIEW_ROLES, canApproveLoans, hasRole } from "@/lib/roles";
+import { LOAN_VIEW_ROLES, canApproveLoans, hasRole, normalizeRole } from "@/lib/roles";
 import { getCompanyScope, employeeCompanyWhere } from "@/lib/company-scope";
 
 export default async function LoansPage() {
@@ -26,7 +26,11 @@ export default async function LoansPage() {
     <div>
       <PageHeader
         title="Loans & repayment"
-        description="Request, approve, and track staff loans. Approved loans generate a repayment plan whose monthly installments are deducted automatically from payroll."
+        description={canApprove
+          ? "Request, approve, and track staff loans. Approved loans generate a repayment plan whose monthly installments are deducted automatically from payroll."
+          : normalizeRole(session.role) === "SUPERVISOR"
+            ? "Request your own loan and view loan records for your direct reports."
+            : "Request and track your loans and repayment schedule."}
         action={<ModulePageActions helpSlug="payroll" helpLabel="Payroll guide" />}
       />
       <LoansModule

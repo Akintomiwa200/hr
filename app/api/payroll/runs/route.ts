@@ -8,19 +8,38 @@ import {
   requireSession,
   unauthorized,
 } from "@/lib/api-auth";
-import { canBulkPayroll, payrollRunListWhere } from "@/lib/payroll-access";
+import { canBulkPayroll, canViewPayrollRuns, payrollRunListWhere, payrollRunRecordWhere } from "@/lib/payroll-access";
+import { normalizeRole } from "@/lib/roles";
 import { refreshPayrollRunTotals } from "@/lib/payroll-bulk";
 
 export async function GET() {
   const session = await requireSession();
   if (!session) return unauthorized();
-  if (!canBulkPayroll(session)) return forbidden();
+  if (!canViewPayrollRuns(session)) return forbidden();
 
-  const runs = await prisma.payrollRun.findMany({
-    where: await payrollRunListWhere(session),
-    orderBy: { periodStart: "desc" },
-    take: 50,
-  });
+  const isSupervisor = normalizeRole(session.role) === "SUPERVISOR";
+  const runs = isSupervisor
+    ? (await prisma.payrollRun.findMany({
+        where: await payrollRunListWhere(session),
+        orderBy: { periodStart: "desc" },
+        take: 50,
+        include: {
+          records: {
+            where: payrollRunRecordWhere(session),
+            select: { grossPay: true, netPay: true },
+          },
+        },
+      })).map(({ records, ...run }) => ({
+        ...run,
+        employeeCount: records.length,
+        totalGross: records.reduce((sum, record) => sum + record.grossPay, 0),
+        totalNet: records.reduce((sum, record) => sum + record.netPay, 0),
+      }))
+    : await prisma.payrollRun.findMany({
+        where: await payrollRunListWhere(session),
+        orderBy: { periodStart: "desc" },
+        take: 50,
+      });
 
   return NextResponse.json(runs);
 }

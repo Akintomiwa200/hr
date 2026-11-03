@@ -4,7 +4,7 @@ import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { prisma } from "@/lib/prisma";
 import { badRequest, forbidden, requireSession, unauthorized } from "@/lib/api-auth";
 import { getCompanyScope, requireOrgCompanyId } from "@/lib/company-scope";
-import { LOAN_APPROVER_ROLES, canApproveLoans, hasRole } from "@/lib/roles";
+import { LOAN_APPROVER_ROLES, LOAN_VIEW_ROLES, canApproveLoans, hasRole } from "@/lib/roles";
 import { createLoan, listLoans, loanListWhere } from "@/lib/loans";
 import { notifyCompanyUsers } from "@/lib/notifications";
 import { fullName } from "@/lib/utils";
@@ -22,7 +22,7 @@ function authorName(session: {
 export async function GET(request: NextRequest) {
   const session = await requireSession();
   if (!session) return unauthorized();
-  if (!hasRole(session.role, [...LOAN_APPROVER_ROLES, "EMPLOYEE"])) return forbidden();
+  if (!hasRole(session.role, LOAN_VIEW_ROLES)) return forbidden();
 
   const status = request.nextUrl.searchParams.get("status") ?? "ALL";
   const employeeId = request.nextUrl.searchParams.get("employeeId") ?? undefined;

@@ -63,7 +63,6 @@ export const LEAVE_APPROVER_ROLES: Role[] = [
   "COMPANY_ADMIN",
   "HR",
   "MANAGER",
-  "SUPERVISOR",
 ];
 
 /** Can enable leave allocation and manage employee yearly balances. */
@@ -106,7 +105,6 @@ export const LOAN_APPROVER_ROLES: Role[] = [
   "HR",
   "ACCOUNT_OFFICER",
   "MANAGER",
-  "SUPERVISOR",
 ];
 
 /** Full recruitment module (jobs/candidates). */

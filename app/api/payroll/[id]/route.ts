@@ -9,6 +9,7 @@ import {
   unauthorized,
 } from "@/lib/api-auth";
 import {
+  canAdjustPayrollRecord,
   canManagePayrollRecord,
   canViewPayrollRecord,
 } from "@/lib/payroll-access";
@@ -64,7 +65,16 @@ export async function PATCH(
   if (!existing) return notFound();
 
   const canManage = await canManagePayrollRecord(session, existing);
-  if (!canManage) return forbidden();
+  const canAdjust = await canAdjustPayrollRecord(session, existing);
+  if (!canManage && !canAdjust) return forbidden();
+  if (
+    canAdjust && !canManage &&
+    (existing.status !== "DRAFT" || !Array.isArray(body.breakdown) ||
+      (body.status !== undefined && body.status !== existing.status) ||
+      body.baseSalary !== undefined || body.bonus !== undefined ||
+      body.deductions !== undefined || body.periodStart !== undefined ||
+      body.periodEnd !== undefined || body.recalculate)
+  ) return forbidden();
 
   const payrollEmployee = await prisma.employee.findUnique({
     where: { id: existing.employeeId },

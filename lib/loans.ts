@@ -23,6 +23,15 @@ function shiftMonth(yearMonth: string, offset: number) {
 }
 
 export function loanListWhere(session: SessionUser): Prisma.LoanWhereInput {
+  if (normalizeRole(session.role) === "SUPERVISOR" && session.employeeId) {
+    return {
+      OR: [
+        { employeeId: session.employeeId },
+        { employee: { managerId: session.employeeId } },
+        { employee: { managers: { some: { id: session.employeeId } } } },
+      ],
+    };
+  }
   if (!canApproveLoans(session.role)) {
     if (session.employeeId) return { employeeId: session.employeeId };
     return { id: "__none__" };
@@ -34,6 +43,16 @@ export function loanListWhere(session: SessionUser): Prisma.LoanWhereInput {
 
 export async function loanAccessible(session: SessionUser, loan: { employeeId: string }) {
   if (canApproveLoans(session.role)) return true;
+  if (normalizeRole(session.role) === "SUPERVISOR" && session.employeeId) {
+    if (loan.employeeId === session.employeeId) return true;
+    return Boolean(await prisma.employee.findFirst({
+      where: {
+        id: loan.employeeId,
+        OR: [{ managerId: session.employeeId }, { managers: { some: { id: session.employeeId } } }],
+      },
+      select: { id: true },
+    }));
+  }
   return session.employeeId != null && session.employeeId === loan.employeeId;
 }
 

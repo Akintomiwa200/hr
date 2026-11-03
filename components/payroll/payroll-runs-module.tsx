@@ -352,6 +352,7 @@ export function PayrollRunsModule({
 export function PayrollRunDetailModule({
   run,
   canOperate,
+  canAdjust = false,
   canExport,
 }: {
   run: PayrollRunRow & {
@@ -372,6 +373,7 @@ export function PayrollRunDetailModule({
     }>;
   };
   canOperate: boolean;
+  canAdjust?: boolean;
   canExport: boolean;
 }) {
   const router = useRouter();
@@ -544,7 +546,7 @@ export function PayrollRunDetailModule({
                         href={`/payroll/${record.id}`}
                         className="text-brand-600 hover:text-brand-700 font-medium"
                       >
-                        {canOperate ? "View / edit" : "View"}
+                        {canOperate ? "View / edit" : canAdjust && record.status === "DRAFT" ? "View / adjust" : "View"}
                       </Link>
                       {canOperate && (
                         <button

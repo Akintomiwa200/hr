@@ -7,25 +7,47 @@ import { PayrollRunsModule } from "@/components/payroll/payroll-runs-module";
 import {
   canBulkPayroll,
   canExportPayrollData,
+  canViewPayrollRuns,
+  payrollRunRecordWhere,
   payrollRunListWhere,
 } from "@/lib/payroll-access";
+import { normalizeRole } from "@/lib/roles";
 
 export default async function PayrollRunsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (!canBulkPayroll(session)) redirect("/payroll");
+  if (!canViewPayrollRuns(session)) redirect("/payroll");
 
-  const runs = await prisma.payrollRun.findMany({
-    where: await payrollRunListWhere(session),
-    orderBy: { periodStart: "desc" },
-    take: 100,
-  });
+  const where = await payrollRunListWhere(session);
+  const isSupervisor = normalizeRole(session.role) === "SUPERVISOR";
+  const runs = isSupervisor
+    ? (await prisma.payrollRun.findMany({
+        where,
+        orderBy: { periodStart: "desc" },
+        take: 100,
+        include: {
+          records: {
+            where: payrollRunRecordWhere(session),
+            select: { grossPay: true, netPay: true },
+          },
+        },
+      })).map(({ records, ...run }) => ({
+        ...run,
+        employeeCount: records.length,
+        totalGross: records.reduce((sum, record) => sum + record.grossPay, 0),
+        totalNet: records.reduce((sum, record) => sum + record.netPay, 0),
+      }))
+    : await prisma.payrollRun.findMany({
+        where,
+        orderBy: { periodStart: "desc" },
+        take: 100,
+      });
 
   return (
     <div>
       <PageHeader
         title="Group payroll runs"
-        description="Generate, review, and export payroll for all employees"
+        description={isSupervisor ? "View payroll runs for your direct reports" : "Generate, review, and export payroll for all employees"}
         action={<ModulePageActions helpSlug="payroll" />}
       />
       <PayrollRunsModule

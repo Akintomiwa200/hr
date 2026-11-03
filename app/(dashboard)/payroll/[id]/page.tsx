@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
 import { PayslipDetailModule } from "@/components/payroll/payslip-detail-module";
 import {
+  canAdjustPayrollRecord,
   canManagePayrollRecord,
   canViewPayrollRecord,
 } from "@/lib/payroll-access";
@@ -43,6 +44,7 @@ export default async function PayslipPage({
   if (!allowed) redirect("/payroll");
 
   const canManage = await canManagePayrollRecord(session, record);
+  const canAdjust = await canAdjustPayrollRecord(session, record);
   const breakdown = legacyBreakdownFromRecord(record);
   const viewer = getPayslipViewerContext(session, record, canManage);
 
@@ -68,6 +70,7 @@ export default async function PayslipPage({
         record={record}
         breakdown={breakdown}
         canManage={canManage}
+        canAdjust={canAdjust}
         viewer={viewer}
         companyName={company?.name ?? "Company"}
         companyLogo={company?.logo}

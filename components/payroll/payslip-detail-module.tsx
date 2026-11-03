@@ -233,6 +233,7 @@ export function PayslipDetailModule({
   record,
   breakdown: initialBreakdown,
   canManage,
+  canAdjust = false,
   viewer,
   companyName = "Smart HR",
   companyLogo,
@@ -241,6 +242,7 @@ export function PayslipDetailModule({
   record: PayslipRecord;
   breakdown: PayrollLineItem[];
   canManage: boolean;
+  canAdjust?: boolean;
   viewer: PayslipViewerContext;
   companyName?: string;
   companyLogo?: string | null;
@@ -425,19 +427,21 @@ export function PayslipDetailModule({
             <Mail className="w-4 h-4" />
             Email payslip
           </Button>
-          {canManage && !editing && (
+          {(canManage || canAdjust) && !editing && (
             <>
-              <Button variant="secondary" loading={loading} onClick={recalculate}>
-                <RefreshCw className="w-4 h-4" />
-                Recalculate
-              </Button>
+              {canManage && (
+                <Button variant="secondary" loading={loading} onClick={recalculate}>
+                  <RefreshCw className="w-4 h-4" />
+                  Recalculate
+                </Button>
+              )}
               <Button onClick={() => setEditing(true)}>
                 <Pencil className="w-4 h-4" />
                 {viewer.isPayrollAdmin ? "Edit record" : "Edit breakdown"}
               </Button>
             </>
           )}
-          {canManage && editing && (
+          {(canManage || canAdjust) && editing && (
             <>
               <Button
                 variant="secondary"
