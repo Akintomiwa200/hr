@@ -105,3 +105,12 @@ export function isSupportModelReady() {
     hasDelegate(client, "supportMessage", "create")
   );
 }
+
+export function isChatModelReady() {
+  const client = getPrismaClient();
+  return (
+    hasDelegate(client, "chatConversation", "findMany") &&
+    hasDelegate(client, "chatParticipant", "findMany") &&
+    hasDelegate(client, "chatMessage", "create")
+  );
+}

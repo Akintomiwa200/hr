@@ -70,6 +70,7 @@ export default async function DashboardLayout({
       <NavProvider initialSummary={navSummary}>
         <DashboardShell
           role={session.role}
+          userId={session.id}
           userName={`${firstName} ${lastName}`}
           userEmail={session.email}
           firstName={firstName}
@@ -79,6 +80,7 @@ export default async function DashboardLayout({
           companyName={company?.name}
           companyLogo={companyLogo}
           bonusesEnabled={bonusesEnabled}
+          chatEnabled={Boolean(session.companyId)}
         >
           {/* DEMO MODE: plan/feature gate disabled — see comment.md to re-enable. */}
           {/* <PlanFeatureGate planId={session.companyId ? companyPlan : null}> */}

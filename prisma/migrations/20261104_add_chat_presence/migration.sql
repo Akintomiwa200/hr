@@ -1,0 +1,3 @@
+ALTER TABLE "User"
+  ADD COLUMN "chatPresence" TEXT NOT NULL DEFAULT 'OFFLINE',
+  ADD COLUMN "chatPresenceAt" TIMESTAMP(3);

@@ -18,9 +18,13 @@ function isPrismaClientFresh(client: PrismaClient) {
   const hasAdditionalManagerRelation = runtimeDataModel?.models?.Employee?.fields?.some(
     (field) => field.name === "managers"
   );
+  const hasChatPresence = runtimeDataModel?.models?.User?.fields?.some(
+    (field) => field.name === "chatPresence"
+  );
 
   return (
     hasAdditionalManagerRelation &&
+    hasChatPresence &&
     hasDelegate(client, "notification", "findMany") &&
     hasDelegate(client, "notificationRead", "findMany") &&
     hasDelegate(client, "recruitmentStage", "count") &&
@@ -44,7 +48,10 @@ function isPrismaClientFresh(client: PrismaClient) {
     hasDelegate(client, "resignationSettings", "findMany") &&
     hasDelegate(client, "calendarEvent", "findMany") &&
     hasDelegate(client, "birthdayWish", "findMany") &&
-    hasDelegate(client, "auditLog", "findMany")
+    hasDelegate(client, "auditLog", "findMany") &&
+    hasDelegate(client, "chatConversation", "findMany") &&
+    hasDelegate(client, "chatParticipant", "findMany") &&
+    hasDelegate(client, "chatMessage", "create")
   );
 }
 

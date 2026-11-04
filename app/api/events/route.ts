@@ -17,6 +17,17 @@ export async function GET() {
 
       const send = (event: RealtimeEvent) => {
         if (closed) return;
+
+        // Targeted events (chat) carry a recipient list. Never deliver them to
+        // another user's stream, and never expose the audience to the browser.
+        const audience = event.data?.userIds;
+        if (Array.isArray(audience)) {
+          if (!audience.includes(session.id)) return;
+          const data = { ...event.data };
+          delete data.userIds;
+          event = { ...event, data };
+        }
+
         try {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify(event)}\n\n`)

@@ -69,6 +69,7 @@ export function Dialog({
           </div>
           <button
             type="button"
+            aria-label="Close dialog"
             onClick={onClose}
             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
           >

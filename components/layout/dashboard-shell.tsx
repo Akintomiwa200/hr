@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Sidebar, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/topbar";
+import { ChatDock } from "@/components/chat/chat-dock";
 import { useAutoHideScrollbar } from "@/hooks/use-auto-hide-scrollbar";
 import { cn } from "@/lib/utils";
 import type { Role } from "@prisma/client";
@@ -23,6 +24,7 @@ function useIsMobile(breakpoint = 1024) {
 
 export function DashboardShell({
   role,
+  userId,
   userName,
   userEmail,
   firstName,
@@ -32,9 +34,11 @@ export function DashboardShell({
   companyName,
   companyLogo,
   bonusesEnabled = false,
+  chatEnabled = false,
   children,
 }: {
   role: Role;
+  userId: string;
   userName: string;
   userEmail: string;
   firstName: string;
@@ -44,6 +48,7 @@ export function DashboardShell({
   companyName?: string;
   companyLogo?: string | null;
   bonusesEnabled?: boolean;
+  chatEnabled?: boolean;
   children: React.ReactNode;
 }) {
   const isMobile = useIsMobile();
@@ -135,6 +140,13 @@ export function DashboardShell({
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
       </div>
+
+      <ChatDock
+        currentUserId={userId}
+        currentUserName={userName}
+        currentUserAvatar={avatarUrl}
+        enabled={chatEnabled}
+      />
     </div>
   );
 }

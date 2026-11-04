@@ -34,6 +34,7 @@ import {
   PenLine,
   StickyNote,
   MessageSquare,
+  MessageCircle,
   HandCoins,
   Building2,
   Headset,
@@ -398,6 +399,16 @@ export const dashboardNavSections: NavSection[] = [
     title: "WORKSPACE",
     items: [
       {
+        id: "chat",
+        href: "/chat",
+        label: "Chat",
+        pageTitle: "Chat",
+        icon: MessageCircle,
+        roles: ALL_STAFF,
+        match: (pathname) =>
+          pathname === "/chat" || pathname.startsWith("/chat/"),
+      },
+      {
         id: "notifications",
         href: "/notifications",
         label: "Notifications",
@@ -637,6 +648,16 @@ export const employeeNavSections: NavSection[] = [
   {
     title: "WORKSPACE",
     items: [
+      {
+        id: "chat",
+        href: "/chat",
+        label: "Chat",
+        pageTitle: "Chat",
+        icon: MessageCircle,
+        roles: ALL_STAFF,
+        match: (pathname) =>
+          pathname === "/chat" || pathname.startsWith("/chat/"),
+      },
       {
         id: "notifications",
         href: "/notifications",

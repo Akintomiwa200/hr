@@ -33,6 +33,12 @@ export type RealtimeEventType =
   | "calendar_event_updated"
   | "birthday_updated"
   | "shift_updated"
+  | "chat_message"
+  | "chat_read"
+  | "chat_typing"
+  | "chat_updated"
+  | "chat_call_signal"
+  | "chat_presence"
   | "audit_updated";
 
 export type RealtimeEvent = {
