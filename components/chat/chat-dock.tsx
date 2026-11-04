@@ -28,7 +28,7 @@ export function ChatDock({
 
   useEffect(() => {
     if (!enabled) return;
-    let pending: ReturnType<typeof setTimeout> | null = null;
+    let pending: number | null = null;
     const getPresence = () =>
       document.visibilityState === "visible" && Date.now() - activityAt.current < 2 * 60_000
         ? "ONLINE"
