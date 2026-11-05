@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, Banknote, BriefcaseBusiness, CheckCircle2, Clock3, FilePlus2, Search, XCircle } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { notify, readApiError } from "@/lib/toast";
@@ -38,6 +39,11 @@ export function StaffChangesHub({ mode, title }: { mode: "PROMOTION" | "SALARY_I
   const allRequests = useMemo(() => data.requests.filter((item) => mode === "APPROVALS" || item.type === mode), [data.requests, mode]);
   const requests = useMemo(() => allRequests.filter((item) => (statusFilter === "ALL" || item.status === statusFilter) && `${item.title} ${item.employee.firstName} ${item.employee.lastName} ${item.employee.employeeCode}`.toLowerCase().includes(query.toLowerCase())), [allRequests, query, statusFilter]);
   const counts = { pending: allRequests.filter((item) => item.status === "PENDING").length, approved: allRequests.filter((item) => item.status === "APPROVED").length, rejected: allRequests.filter((item) => item.status === "REJECTED").length };
+  const stats: { label: string; count: number; icon: LucideIcon; styles: string }[] = [
+    { label: "Pending review", count: counts.pending, icon: Clock3, styles: "text-amber-600 bg-amber-50" },
+    { label: "Approved", count: counts.approved, icon: CheckCircle2, styles: "text-emerald-600 bg-emerald-50" },
+    { label: "Declined", count: counts.rejected, icon: XCircle, styles: "text-rose-600 bg-rose-50" },
+  ];
 
   const createRequest = async (event: React.FormEvent) => {
     event.preventDefault(); setBusy(true);
@@ -67,7 +73,7 @@ export function StaffChangesHub({ mode, title }: { mode: "PROMOTION" | "SALARY_I
       <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end"><div className="max-w-2xl"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15"><Icon className="h-5 w-5" /></div><p className="mt-5 text-xs font-semibold uppercase tracking-[.18em] text-violet-200">Staff reviews & changes</p><h2 className="mt-2 text-2xl font-semibold">{title}</h2><p className="mt-2 text-sm leading-6 text-violet-100">{promotion ? "Build a promotion case from role readiness, outcomes and supporting evidence. Recommendations move into the HR approval queue." : approvals ? "Review change requests alongside the employee context, record a reasoned decision and keep the audit trail together." : "Document a compensation change with its basis and supporting rationale. HR reviews each request before it takes effect."}</p></div>{!approvals && data.canRecommend && <button onClick={() => setFormOpen(true)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-violet-900 hover:bg-violet-50"><FilePlus2 className="h-4 w-4" />{promotion ? "New recommendation" : "New increment request"}</button>}</div>
     </section>
 
-    <div className="grid gap-3 sm:grid-cols-3">{[["Pending review", counts.pending, Clock3, "text-amber-600 bg-amber-50"], ["Approved", counts.approved, CheckCircle2, "text-emerald-600 bg-emerald-50"], ["Declined", counts.rejected, XCircle, "text-rose-600 bg-rose-50"]].map(([label, count, StatIcon, styles]) => { const Stat = StatIcon as typeof Clock3; return <div key={String(label)} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4"><div className={`rounded-lg p-2 ${styles}`}><Stat className="h-4 w-4" /></div><div><p className="text-xs text-gray-500">{label}</p><p className="text-xl font-semibold text-gray-900">{count}</p></div></div>; })}</div>
+    <div className="grid gap-3 sm:grid-cols-3">{stats.map(({ label, count, icon: Stat, styles }) => <div key={label} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4"><div className={`rounded-lg p-2 ${styles}`}><Stat className="h-4 w-4" /></div><div><p className="text-xs text-gray-500">{label}</p><p className="text-xl font-semibold text-gray-900">{count}</p></div></div>)}</div>
 
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-gray-900">{approvals ? "Decision queue" : promotion ? "Recommendation register" : "Increment request register"}</h3><p className="mt-1 text-sm text-gray-500">{approvals ? "Only pending items need a decision. Completed decisions remain available in the status filter." : "Track each request from submission through its HR decision."}</p></div><div className="flex flex-col gap-2 sm:flex-row"><label className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search staff or request" className={`${field} pl-9 sm:w-56`} /></label><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={`${field} sm:w-40`}><option value="ALL">All statuses</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Declined</option></select></div></div>
 
