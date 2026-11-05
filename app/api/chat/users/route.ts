@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { getSession } from "@/lib/auth";
 import { isChatModelReady } from "@/lib/prisma";
 import { forbidden, unauthorized } from "@/lib/api-auth";
-import { getChatCompanyId, listChatUsers } from "@/lib/chat";
+import { getChatCompanyId, listChatUsers, sweepStaleChatPresence } from "@/lib/chat";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -15,7 +15,10 @@ export async function GET(request: NextRequest) {
       { status: 503 }
     );
   }
-  if (!getChatCompanyId(session)) return forbidden();
+  const companyId = getChatCompanyId(session);
+  if (!companyId) return forbidden();
+
+  await sweepStaleChatPresence(companyId);
 
   const query = request.nextUrl.searchParams.get("q") ?? "";
   try {

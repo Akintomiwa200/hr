@@ -13,6 +13,7 @@ import {
   getSettingsNavItem,
   isNavMatch,
   type NavItem,
+  type NavSubItem,
 } from "@/lib/dashboard-nav";
 import { roleWorkspaceLabel, roleLabel, canManageOrgContent, hasRole } from "@/lib/roles";
 import { useEffect, useState } from "react";
@@ -21,6 +22,71 @@ import { useNavSummary } from "@/components/layout/nav-provider";
 
 const SIDEBAR_WIDTH = 260;
 const SIDEBAR_COLLAPSED_WIDTH = 72;
+
+function containsActiveId(item: NavItem | NavSubItem, activeId: string | null): boolean {
+  return item.id === activeId || Boolean(item.subItems?.some((child) => containsActiveId(child, activeId)));
+}
+
+function NestedNavItem({
+  item, role, pathname, activeId, onNavigate, depth = 0,
+}: {
+  item: NavSubItem;
+  role: Role;
+  pathname: string;
+  activeId: string | null;
+  onNavigate?: () => void;
+  depth?: number;
+}) {
+  const [isOpen, setIsOpen] = useState(
+    activeId === item.id || Boolean(item.subItems?.some((child) => isNavMatch(pathname, child)))
+  );
+  const visibleChildren = item.subItems?.filter((child) => hasRole(role, child.roles)) ?? [];
+  const active = activeId === item.id || Boolean(item.subItems?.some((child) => containsActiveId(child, activeId))) || (!item.subItems?.length && isNavMatch(pathname, item));
+
+  useEffect(() => {
+    if (active) setIsOpen(true);
+  }, [active]);
+
+  if (visibleChildren.length === 0) {
+    return (
+      <Link
+        href={item.href}
+        onClick={onNavigate}
+        className={cn(
+          "block rounded-md py-1.5 text-[12.5px] transition-colors",
+          depth > 0 ? "px-2" : "px-3",
+          active ? "bg-violet-50/50 font-medium text-violet-700" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+        )}
+      >
+        <span className="truncate">{item.label}</span>
+      </Link>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        className={cn(
+          "flex w-full items-center justify-between rounded-md py-1.5 text-left text-[12.5px] transition-colors",
+          depth > 0 ? "px-2" : "px-3",
+          active ? "font-medium text-violet-700" : "text-gray-600 hover:bg-gray-50"
+        )}
+      >
+        <span className="truncate">{item.label}</span>
+        <ChevronDown className={cn("ml-2 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform", isOpen && "rotate-180")} />
+      </button>
+      {isOpen && (
+        <div className="ml-2 space-y-0.5 border-l border-gray-100 pl-1">
+          {visibleChildren.map((child) => (
+            <NestedNavItem key={child.id} item={child} role={role} pathname={pathname} activeId={activeId} onNavigate={onNavigate} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function NavLink({
   item,
@@ -92,6 +158,7 @@ function NavCollapsible({
   collapsed,
   activeId,
   pathname,
+  role,
   bonusesEnabled,
   notificationCount,
   pendingLeaveCount,
@@ -102,6 +169,7 @@ function NavCollapsible({
   collapsed?: boolean;
   activeId: string | null;
   pathname: string;
+  role: Role;
   bonusesEnabled: boolean;
   notificationCount: number;
   pendingLeaveCount: number;
@@ -158,9 +226,9 @@ function NavCollapsible({
       {isOpen && item.subItems && (
         <div className="pl-9 pr-2 space-y-0.5 pt-0.5">
           {item.subItems
+            .filter((subItem) => hasRole(role, subItem.roles))
             .filter((subItem) => bonusesEnabled || !subItem.id.startsWith("bonus-"))
             .map((subItem) => {
-            const isSubActive = activeId === subItem.id || isNavMatch(pathname, subItem);
             const badge =
               subItem.id === "notifications"
                 ? notificationCount
@@ -168,6 +236,11 @@ function NavCollapsible({
                   ? pendingLeaveCount
                   : undefined;
 
+            if (subItem.subItems?.length) {
+              return <NestedNavItem key={subItem.id} item={subItem} role={role} pathname={pathname} activeId={activeId} onNavigate={onNavigate} />;
+            }
+
+            const isSubActive = activeId === subItem.id || isNavMatch(pathname, subItem);
             return (
               <Link
                 key={subItem.id}
@@ -233,7 +306,7 @@ function NavSection({
       <div className="space-y-0.5">
         
         {filtered.map((item) => {
-          const isItemActive = activeId === item.id || Boolean(item.subItems?.some((s) => activeId === s.id));
+          const isItemActive = activeId === item.id || Boolean(item.subItems?.some((s) => containsActiveId(s, activeId)));
           const badge =
             item.id === "notifications"
               ? notificationCount
@@ -252,6 +325,7 @@ function NavSection({
                 collapsed={collapsed}
                 activeId={activeId}
                 pathname={pathname}
+                role={role}
                 bonusesEnabled={bonusesEnabled}
                 notificationCount={notificationCount}
                 pendingLeaveCount={pendingLeaveCount}

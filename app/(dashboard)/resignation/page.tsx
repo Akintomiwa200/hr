@@ -27,7 +27,7 @@ export default async function ResignationPage() {
 
   const role = normalizeRole(session.role);
   const admin = isResignationAdmin(role);
-  const teamLead = role === "MANAGER" || role === "SUPERVISOR";
+  const teamLead = role === "MANAGER";
 
   const [resignations, settings] = await Promise.all([
     prisma.resignation.findMany({

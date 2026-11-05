@@ -88,6 +88,7 @@ export async function getCalendarData(session: {
     companyId: session.companyId ?? null,
     isPlatformAdmin: isSuperAdmin(session.role),
   });
+  const selfService = session.role === "EMPLOYEE" || session.role === "SUPERVISOR";
 
   const personalEventsPromise =
     session.userId && isCalendarEventModelReady()
@@ -108,9 +109,9 @@ export async function getCalendarData(session: {
     ? prisma.shiftAssignment.findMany({
         where: {
           ...(session.companyId ? { companyId: session.companyId } : {}),
-          ...(session.role === "EMPLOYEE" && session.employeeId
+          ...(selfService && session.employeeId
             ? { employeeId: session.employeeId }
-            : session.role === "EMPLOYEE"
+            : selfService
               ? { id: "__none__" }
               : {}),
         },
@@ -121,9 +122,9 @@ export async function getCalendarData(session: {
     : Promise.resolve([]);
 
   const leaveWhere: Prisma.LeaveRequestWhereInput =
-    session.role === "EMPLOYEE" && session.employeeId
+    selfService
       ? {
-          employeeId: session.employeeId,
+          ...(session.employeeId ? { employeeId: session.employeeId } : { employeeId: "__none__" }),
           status: { in: ["APPROVED", "PENDING"] },
         }
       : {
@@ -138,7 +139,7 @@ export async function getCalendarData(session: {
       include: { employee: true },
       orderBy: { startDate: "asc" },
     }),
-    session.role === "EMPLOYEE"
+    selfService
       ? Promise.resolve([])
       : prisma.interview.findMany({
           where: {
@@ -153,9 +154,9 @@ export async function getCalendarData(session: {
           orderBy: { scheduledAt: "asc" },
           take: 50,
         }),
-    session.role === "EMPLOYEE" && session.employeeId
+    selfService
       ? prisma.payrollRecord.findMany({
-          where: { employeeId: session.employeeId },
+          where: { employeeId: session.employeeId ?? "__none__" },
           include: { employee: true },
           orderBy: { periodStart: "desc" },
           take: 12,
@@ -180,9 +181,9 @@ export async function getCalendarData(session: {
       },
       orderBy: { firstName: "asc" },
     }),
-    session.role === "EMPLOYEE" && session.employeeId
+    selfService
       ? prisma.attendance.findMany({
-          where: { employeeId: session.employeeId },
+          where: { employeeId: session.employeeId ?? "__none__" },
           include: { employee: true },
           orderBy: { date: "desc" },
           take: 60,

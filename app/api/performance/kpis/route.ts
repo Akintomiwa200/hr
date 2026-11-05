@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { badRequest, isHr, requireSession, unauthorized } from "@/lib/api-auth";
+import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
+import { canManagePerformance } from "@/lib/roles";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { getCompanyScope, requireOrgCompanyId } from "@/lib/company-scope";
 
 function kpiCompanyWhere(companyId: string | null) {
-  if (!companyId) return {};
-  return {
-    OR: [{ companyId }, { companyId: null }],
-  };
+  if (!companyId) return { companyId: "__no_company__" };
+  return { companyId };
 }
 
 export async function GET() {
@@ -28,7 +27,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const session = await requireSession();
-  if (!session || !isHr(session)) return unauthorized();
+  if (!session || !canManagePerformance(session.role)) return unauthorized();
 
   const body = await request.json();
   const { title, description, metricType, targetValue, weight, departmentId, roleFilter } = body;

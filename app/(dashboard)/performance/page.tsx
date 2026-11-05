@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { canManageOrgContent, canManagePerformance } from "@/lib/roles";
+import { canManageOrgContent, canManagePerformance, hasRole, PERFORMANCE_VIEW_ROLES } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { ModulePageActions } from "@/components/help/module-page-actions";
@@ -14,6 +14,7 @@ import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 export default async function PerformancePage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (!hasRole(session.role, PERFORMANCE_VIEW_ROLES)) redirect("/dashboard");
 
   const workspace = getPerformanceWorkspace(session.role);
   const canManage = canManagePerformance(session.role);
@@ -22,11 +23,11 @@ export default async function PerformancePage() {
   const companyId = requireOrgCompanyId(scope);
 
   const companyKpiWhere = companyId
-    ? { OR: [{ companyId }, { companyId: null }] }
-    : {};
+    ? { companyId }
+    : { companyId: "__no_company__" };
   const companyCycleWhere = companyId
-    ? { OR: [{ companyId }, { companyId: null }] }
-    : {};
+    ? { companyId }
+    : { companyId: "__no_company__" };
 
   const [kpis, cycles, appraisals, departments, settings] = await Promise.all([
     prisma.kpiDefinition.findMany({
@@ -81,7 +82,7 @@ export default async function PerformancePage() {
         pollIntervalMs={4000}
       />
       <PageHeader
-        title={workspace.title}
+        title={workspace.mode === "self" ? "My Appraisals" : workspace.mode === "team" ? "Team Appraisals" : "Appraisals"}
         description={workspace.description}
         action={<ModulePageActions helpSlug="performance" helpLabel="Performance guide" />}
       />
@@ -97,6 +98,8 @@ export default async function PerformancePage() {
         currentEmployeeId={session.employeeId ?? undefined}
         stats={stats}
         settings={settings}
+        standalone
+        initialTab="appraisals"
       />
     </div>
   );

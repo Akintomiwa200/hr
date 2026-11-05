@@ -49,7 +49,7 @@ export default async function BuiltInRolePage({ params }: RolePageProps) {
     { title: "Payroll", description: "View payroll information available to this role.", allowed: PAYROLL_VIEW_ROLES.includes(role) },
     { title: "Manage payroll", description: "Run payroll and manage payroll records.", allowed: PAYROLL_ADMIN_ROLES.includes(role) },
     { title: "Payroll operations", description: "Run payroll, edit payslips, and import adjustments.", allowed: PAYROLL_OPERATIONS_ROLES.includes(role) },
-    { title: "Team payroll runs and adjustments", description: "Supervisors can view runs for their direct reports and adjust draft payslips only.", allowed: role === "SUPERVISOR" },
+    { title: "Payroll runs and adjustments", description: "Payroll runs and adjustments are restricted to payroll operators.", allowed: role === "SUPER_ADMIN" || PAYROLL_OPERATIONS_ROLES.includes(role) },
     { title: "Loans", description: "View and request loans.", allowed: LOAN_VIEW_ROLES.includes(role) },
     { title: "Approve loans", description: "Review loan requests and view company loan records.", allowed: LOAN_APPROVER_ROLES.includes(role) },
     { title: "Performance", description: "Open reviews, cycles, and appraisals.", allowed: PERFORMANCE_VIEW_ROLES.includes(role) },

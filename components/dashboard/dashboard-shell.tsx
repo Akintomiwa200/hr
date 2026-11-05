@@ -70,7 +70,7 @@ export function DashboardHero({
           backgroundSize: "32px 32px",
         }}
       />
-      <div className="relative px-5 sm:px-7 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+      <div className="relative flex min-w-0 flex-col justify-between gap-4 px-4 py-5 sm:flex-row sm:items-center sm:gap-5 sm:px-7 sm:py-6">
         <div className="min-w-0">
           {badge && (
             <div className="mb-2.5 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-medium ring-1 ring-white/20 backdrop-blur">
@@ -84,7 +84,7 @@ export function DashboardHero({
             <p className="mt-1.5 text-[13px] leading-relaxed text-white/80 max-w-2xl">{subtitle}</p>
           )}
         </div>
-        {controls && <div className="flex items-center gap-3 shrink-0">{controls}</div>}
+        {controls && <div className="w-full min-w-0 sm:w-auto sm:shrink-0">{controls}</div>}
       </div>
     </section>
   );
@@ -93,7 +93,7 @@ export function DashboardHero({
 /** Glassy control container used inside the hero. */
 export function HeroControls({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2.5 rounded-2xl bg-white/10 p-2 ring-1 ring-white/20 backdrop-blur">
+    <div className="flex w-full flex-col items-stretch justify-end gap-2 rounded-2xl bg-white/10 p-2 ring-1 ring-white/20 backdrop-blur sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5">
       {children}
     </div>
   );

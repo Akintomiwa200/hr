@@ -75,7 +75,7 @@ export function GreetingHeader({
             <button
               type="button"
               onClick={() => setOpen((value) => !value)}
-              className="inline-flex items-center gap-2 pl-3.5 pr-3 py-2.5 text-[13px] bg-white text-gray-800 rounded-xl shadow-sm hover:bg-gray-50 min-w-[210px] justify-between"
+              className="inline-flex w-full min-w-0 items-center justify-between gap-2 rounded-xl bg-white py-2.5 pl-3.5 pr-3 text-[13px] text-gray-800 shadow-sm hover:bg-gray-50 sm:w-auto sm:min-w-[210px]"
               aria-haspopup="listbox"
               aria-expanded={open}
             >
@@ -109,7 +109,7 @@ export function GreetingHeader({
           <button
             type="button"
             onClick={handleExport}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-[13px] font-semibold bg-white text-[#7B61FF] rounded-xl hover:bg-violet-50 shadow-sm"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-[13px] font-semibold text-[#7B61FF] shadow-sm hover:bg-violet-50 sm:w-auto"
           >
             <Download className="w-4 h-4" />
             Export Data

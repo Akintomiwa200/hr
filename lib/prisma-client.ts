@@ -51,7 +51,12 @@ function isPrismaClientFresh(client: PrismaClient) {
     hasDelegate(client, "auditLog", "findMany") &&
     hasDelegate(client, "chatConversation", "findMany") &&
     hasDelegate(client, "chatParticipant", "findMany") &&
-    hasDelegate(client, "chatMessage", "create")
+    hasDelegate(client, "chatMessage", "create") &&
+    hasDelegate(client, "learningCourse", "findMany") &&
+    hasDelegate(client, "learningAssignment", "findMany") &&
+    hasDelegate(client, "developmentRecord", "findMany") &&
+    hasDelegate(client, "staffChangeRequest", "findMany") &&
+    hasDelegate(client, "peerFeedbackRequest", "findMany")
   );
 }
 

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Button, Card, CardHeader } from "@/components/ui";
 import { notify, readApiError } from "@/lib/toast";
+import { useAppEvents } from "@/hooks/use-app-events";
 
 type IntegrationItem = {
   provider: string;
@@ -148,34 +149,21 @@ export function IntegrationsHub() {
     void load().finally(() => setLoading(false));
   }, [load]);
 
-  useEffect(() => {
-    let source: EventSource | null = null;
-    try {
-      source = new EventSource("/api/events");
-      source.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data) as { type?: string; data?: Record<string, unknown> };
-          if (
-            payload.type === "integration_sync" ||
-            payload.type === "integration_webhook" ||
-            payload.type === "employee_updated" ||
-            payload.type === "leave_updated" ||
-            payload.type === "job_updated" ||
-            payload.type === "payroll_updated"
-          ) {
-            const provider = String(payload.data?.provider ?? payload.type);
-            setLiveStatus(`Live update: ${provider.replace(/_/g, " ")}`);
-            void load();
-          }
-        } catch {
-          // ignore
-        }
-      };
-    } catch {
-      // SSE unavailable
-    }
-    return () => source?.close();
-  }, [load]);
+  useAppEvents({
+    types: [
+      "integration_sync",
+      "integration_webhook",
+      "employee_updated",
+      "leave_updated",
+      "job_updated",
+      "payroll_updated",
+    ],
+    onEvent: (type, data) => {
+      const provider = String(data?.provider ?? type ?? "integration");
+      setLiveStatus(`Live update: ${provider.replace(/_/g, " ")}`);
+      void load();
+    },
+  });
 
   const connect = (slug: string) => {
     window.location.href = `/api/integrations/${slug}/connect`;

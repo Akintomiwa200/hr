@@ -5,6 +5,7 @@ import { getCompanyScope } from "@/lib/company-scope";
 import { requireRoles, badRequest, notFound } from "@/lib/api-auth";
 import { normalizeRoleInput } from "@/lib/roles-catalog";
 import { revalidatePath } from "next/cache";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function PATCH(
   request: NextRequest,
@@ -53,6 +54,10 @@ export async function PATCH(
   });
 
   revalidatePath("/settings/roles");
+  broadcastAppEvent("settings_updated", {
+    companyId: existing.companyId,
+    source: "roles",
+  });
   return NextResponse.json(updated);
 }
 
@@ -82,5 +87,9 @@ export async function DELETE(
   await prisma.roleDefinition.delete({ where: { id: existing.id } });
 
   revalidatePath("/settings/roles");
+  broadcastAppEvent("settings_updated", {
+    companyId: existing.companyId,
+    source: "roles",
+  });
   return NextResponse.json({ success: true });
 }

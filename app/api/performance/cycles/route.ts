@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { badRequest, isHr, requireSession, unauthorized } from "@/lib/api-auth";
+import { badRequest, requireSession, unauthorized } from "@/lib/api-auth";
+import { canManagePerformance } from "@/lib/roles";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { getCompanyScope, requireOrgCompanyId } from "@/lib/company-scope";
 
 function cycleCompanyWhere(companyId: string | null) {
-  if (!companyId) return {};
-  return { OR: [{ companyId }, { companyId: null }] };
+  if (!companyId) return { companyId: "__no_company__" };
+  return { companyId };
 }
 
 export async function GET() {
@@ -29,7 +30,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const session = await requireSession();
-  if (!session || !isHr(session)) return unauthorized();
+  if (!session || !canManagePerformance(session.role)) return unauthorized();
 
   const body = await request.json();
   const {
@@ -51,10 +52,14 @@ export async function POST(request: NextRequest) {
   }
 
   const companyId = requireOrgCompanyId(getCompanyScope(session));
+  if (!companyId) return unauthorized();
   const scopedDeptIds = Array.isArray(departmentIds)
     ? departmentIds.filter(Boolean)
     : [];
   const scopedRoles = Array.isArray(roleFilters) ? roleFilters.filter(Boolean) : [];
+  const requestedKpiIds = Array.isArray(kpiIds) ? kpiIds.filter((value: unknown): value is string => typeof value === "string") : [];
+  const scopedKpis = await prisma.kpiDefinition.findMany({ where: { id: { in: requestedKpiIds }, companyId, isActive: true }, select: { id: true } });
+  if (scopedKpis.length !== requestedKpiIds.length) return badRequest("All selected KPIs must belong to your company and be active.");
   const allEmployees = includeAllEmployees !== false && scopedDeptIds.length === 0 && scopedRoles.length === 0;
 
   const cycle = await prisma.appraisalCycle.create({
@@ -71,7 +76,7 @@ export async function POST(request: NextRequest) {
       departmentIds: scopedDeptIds.length ? JSON.stringify(scopedDeptIds) : null,
       roleFilters: scopedRoles.length ? JSON.stringify(scopedRoles) : null,
       kpis: {
-        create: (kpiIds ?? []).map((kpiId: string) => ({ kpiId })),
+        create: requestedKpiIds.map((kpiId: string) => ({ kpiId })),
       },
     },
     include: { kpis: { include: { kpi: true } } },

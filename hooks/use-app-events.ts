@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { subscribeRealtime } from "@/lib/realtime-sse";
+import { subscribeRealtime, subscribeRealtimeStatus } from "@/lib/realtime-sse";
 import type { RealtimeEventType } from "@/lib/events";
 
 type Options = {
@@ -23,8 +23,11 @@ export function useAppEvents({
 }: Options) {
   const onEventRef = useRef(onEvent);
   const typesRef = useRef(types);
-  onEventRef.current = onEvent;
-  typesRef.current = types;
+
+  useEffect(() => {
+    onEventRef.current = onEvent;
+    typesRef.current = types;
+  }, [onEvent, types]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -34,5 +37,22 @@ export function useAppEvents({
       if (allowed && allowed.length > 0 && (!type || !allowed.includes(type))) return;
       onEventRef.current?.(type, data);
     });
+  }, [enabled]);
+}
+
+/** Called with `true` whenever the shared SSE stream (re)connects. */
+export function useRealtimeStatus(
+  onChange: (connected: boolean) => void,
+  enabled = true
+) {
+  const onChangeRef = useRef(onChange);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    return subscribeRealtimeStatus((connected) => onChangeRef.current(connected));
   }, [enabled]);
 }

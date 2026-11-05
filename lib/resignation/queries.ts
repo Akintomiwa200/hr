@@ -67,7 +67,7 @@ export function resignationScopeWhere(
     return { ...companyWhere, employeeId: "__none__" };
   }
 
-  if (role === "MANAGER" || role === "SUPERVISOR") {
+  if (role === "MANAGER") {
     return {
       ...companyWhere,
       OR: [

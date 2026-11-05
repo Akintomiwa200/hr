@@ -26,7 +26,7 @@ export function canApproveBonuses(role: SessionUser["role"]) {
  * module sees company-wide awards (subject to company scoping).
  */
 export function bonusSeesOnlyOwn(role: SessionUser["role"]) {
-  return normalizeRole(role) === "EMPLOYEE";
+  return ["EMPLOYEE", "SUPERVISOR"].includes(normalizeRole(role));
 }
 
 export function bonusAwardWhere(

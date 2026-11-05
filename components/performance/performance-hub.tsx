@@ -311,6 +311,8 @@ export function PerformanceHub({
   mode = isEmployee ? "self" : canManage ? "org" : "team",
   currentEmployeeId,
   settings: initialSettings,
+  initialTab = "appraisals",
+  standalone = false,
 }: {
   kpis: Kpi[];
   cycles: Cycle[];
@@ -323,10 +325,20 @@ export function PerformanceHub({
   currentEmployeeId?: string;
   stats?: { activeCycles: number; pendingSelf: number; pendingManager: number; completed: number; kpiCount: number };
   settings: PerformanceSettings;
+  initialTab?: "appraisals" | "cycles" | "kpis" | "insights" | "settings";
+  standalone?: boolean;
 }) {
   const [tab, setTab] = useState<
     "appraisals" | "cycles" | "kpis" | "insights" | "settings"
-  >("appraisals");
+  >(initialTab);
+  useEffect(() => {
+    if (standalone) return;
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    if (requestedTab === "appraisals") setTab("appraisals");
+    if (canManage && (requestedTab === "kpis" || requestedTab === "cycles" || requestedTab === "insights" || requestedTab === "settings")) {
+      setTab(requestedTab);
+    }
+  }, [canManage, standalone]);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [kpiSearch, setKpiSearch] = useState("");
   const [kpiOpen, setKpiOpen] = useState(false);
@@ -683,6 +695,7 @@ export function PerformanceHub({
 
   return (
     <>
+      {!standalone && <>
       {/* Command band */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#7B61FF] via-[#8B5CF6] to-brand-600 p-6 sm:p-7 shadow-[0_12px_40px_-12px_rgba(123,97,255,0.45)]">
         <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
@@ -838,11 +851,12 @@ export function PerformanceHub({
           </div>
         )
       )}
+      </>}
 
       {/* Tab shell */}
-      <div className="mt-5 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6">
-          <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
+      <div className={`${standalone ? "" : "mt-5"} overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm`}>
+        {(!standalone || (canManage && (tab === "cycles" || tab === "kpis"))) && <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6">
+          {!standalone && <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -859,7 +873,7 @@ export function PerformanceHub({
                 {t.label}
               </button>
             ))}
-          </div>
+          </div>}
           <div className="flex items-center gap-2">
             {canManage && tab === "cycles" && (
               <Button size="sm" onClick={() => setCycleOpen(true)}>
@@ -874,7 +888,7 @@ export function PerformanceHub({
               </Button>
             )}
           </div>
-        </div>
+        </div>}
 
         <div className="p-4 sm:p-6">
           {/* ============ APPRAISALS ============ */}

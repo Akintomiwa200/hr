@@ -41,7 +41,6 @@ import {
   ScrollText,
   NotebookPen,
   Cake,
-  Target,
 } from "lucide-react";
 import { CHECKLIST_ADMIN_ROLES, CHECKLIST_TEMPLATE_ROLES, CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
 import {
@@ -81,7 +80,18 @@ export type NavItem = {
   roles: Role[];
   badge?: number;
   match?: (pathname: string) => boolean;
-  subItems?: Omit<NavItem, "icon" | "subItems">[];
+  subItems?: NavSubItem[];
+};
+
+export type NavSubItem = {
+  id: string;
+  href: string;
+  label: string;
+  pageTitle: string;
+  roles: Role[];
+  badge?: number;
+  match?: (pathname: string) => boolean;
+  subItems?: NavSubItem[];
 };
 
 export type NavSection = {
@@ -371,11 +381,62 @@ export const dashboardNavSections: NavSection[] = [
         id: "training-development",
         href: "/performance",
         label: "Training & Development",
-        pageTitle: "Performance",
+        pageTitle: "Training & Development",
         icon: GraduationCap,
         roles: PERFORMANCE_VIEW_ROLES,
-        match: (pathname) =>
-          pathname === "/performance" || pathname.startsWith("/performance/"),
+        subItems: [
+          {
+            id: "kpi-goals",
+            href: "/performance?tab=kpis",
+            label: "KPIs & Goals",
+            pageTitle: "KPIs & Goals",
+            roles: PERFORMANCE_VIEW_ROLES,
+            subItems: [
+              { id: "target-setting", href: "/performance/kpis", label: "Target Setting & OKRs", pageTitle: "Target Setting & OKRs", roles: ["COMPANY_ADMIN", "HR"] },
+              { id: "kpi-dashboards", href: "/performance/kpi-dashboard", label: "KPI Dashboards", pageTitle: "KPI Dashboards", roles: ["COMPANY_ADMIN", "HR"] },
+              { id: "performance-tracking", href: "/performance/tracking", label: "Performance Tracking", pageTitle: "Performance Tracking", roles: PERFORMANCE_VIEW_ROLES },
+            ],
+          },
+          {
+            id: "learning-upskilling",
+            href: "/training",
+            label: "Learning & Upskilling",
+            pageTitle: "Learning & Upskilling",
+            roles: PERFORMANCE_VIEW_ROLES,
+            subItems: [
+              { id: "course-catalog", href: "/training/catalog", label: "Course Catalog", pageTitle: "Course Catalog", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "training-assignments", href: "/training/assignments", label: "Training Assignments", pageTitle: "Training Assignments", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "skills-competencies", href: "/training/skills", label: "Skills & Competencies", pageTitle: "Skills & Competencies", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "certifications-licenses", href: "/training/certifications", label: "Certifications & Licenses", pageTitle: "Certifications & Licenses", roles: PERFORMANCE_VIEW_ROLES },
+            ],
+          },
+          {
+            id: "appraisal-cycles",
+            href: "/performance",
+            label: "Appraisal Cycles",
+            pageTitle: "Appraisal Cycles",
+            roles: PERFORMANCE_VIEW_ROLES,
+            subItems: [
+              { id: "review-cycle-setup", href: "/performance/cycles", label: "Review Cycle Setup", pageTitle: "Review Cycle Setup", roles: ["COMPANY_ADMIN", "HR"] },
+              { id: "360-feedback", href: "/performance/feedback", label: "360° Feedback", pageTitle: "360° Feedback", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "self-assessments", href: "/performance/self-assessment", label: "Self-Assessments", pageTitle: "Self-Assessments", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "appraisal-analytics", href: "/performance/analytics", label: "Appraisal Analytics", pageTitle: "Appraisal Analytics", roles: ["COMPANY_ADMIN", "HR"] },
+            ],
+          },
+          {
+            id: "staff-reviews-changes",
+            href: "/performance/staff-changes",
+            label: "Staff Reviews & Changes",
+            pageTitle: "Staff Reviews & Changes",
+            roles: PERFORMANCE_VIEW_ROLES,
+            subItems: [
+              { id: "performance-review-forms", href: "/performance/review-forms", label: "Performance Review Forms", pageTitle: "Performance Review Forms", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "promotion-recommendations", href: "/performance/promotions", label: "Promotion Recommendations", pageTitle: "Promotion Recommendations", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "salary-increment-requests", href: "/performance/salary-increments", label: "Salary Increment Requests", pageTitle: "Salary Increment Requests", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "approval-workflows", href: "/performance/approvals", label: "Approval Workflows", pageTitle: "Approval Workflows", roles: ["COMPANY_ADMIN", "HR"] },
+            ],
+          },
+        ],
       },
       {
         id: "benefits-welfare",
@@ -559,7 +620,7 @@ export const employeeNavSections: NavSection[] = [
             href: "/attendance",
             label: "Attendance summary",
             pageTitle: "Attendance summary",
-            roles: ALL_STAFF,
+            roles: ALL_STAFF.filter((role) => role !== "MANAGER"),
             match: (pathname) =>
               pathname === "/attendance" ||
               (pathname.startsWith("/attendance/") &&
@@ -573,14 +634,6 @@ export const employeeNavSections: NavSection[] = [
             roles: ALL_STAFF,
           },
         ],
-      },
-      {
-        id: "my-team",
-        href: "/employees",
-        label: "My team",
-        pageTitle: "My team",
-        icon: UsersRound,
-        roles: ["SUPERVISOR"],
       },
       {
         id: "payroll-compensation",
@@ -600,14 +653,6 @@ export const employeeNavSections: NavSection[] = [
               pathname === "/payroll" || pathname.startsWith("/payroll/"),
           },
           {
-            id: "payroll-runs",
-            href: "/payroll/runs",
-            label: "Payroll runs",
-            pageTitle: "Payroll runs",
-            roles: ["SUPERVISOR"],
-            match: (pathname) => pathname.startsWith("/payroll/runs"),
-          },
-          {
             id: "loans",
             href: "/loans",
             label: "Loans",
@@ -618,14 +663,49 @@ export const employeeNavSections: NavSection[] = [
         ],
       },
       {
-        id: "kpi",
+        id: "training-development",
         href: "/performance",
-        label: "KPI",
-        pageTitle: "KPI",
-        icon: Target,
+        label: "Training & Development",
+        pageTitle: "Training & Development",
+        icon: GraduationCap,
         roles: PERFORMANCE_VIEW_ROLES,
-        match: (pathname) =>
-          pathname === "/performance" || pathname.startsWith("/performance/"),
+        subItems: [
+          {
+            id: "kpi-goals", href: "/performance?tab=kpis", label: "KPIs & Goals", pageTitle: "KPIs & Goals", roles: PERFORMANCE_VIEW_ROLES,
+            subItems: [
+              { id: "target-setting", href: "/performance/kpis", label: "Target Setting & OKRs", pageTitle: "Target Setting & OKRs", roles: ["COMPANY_ADMIN", "HR"] },
+              { id: "kpi-dashboards", href: "/performance/kpi-dashboard", label: "KPI Dashboards", pageTitle: "KPI Dashboards", roles: ["COMPANY_ADMIN", "HR"] },
+              { id: "performance-tracking", href: "/performance/tracking", label: "Performance Tracking", pageTitle: "Performance Tracking", roles: PERFORMANCE_VIEW_ROLES },
+            ],
+          },
+          {
+            id: "learning-upskilling", href: "/training", label: "Learning & Upskilling", pageTitle: "Learning & Upskilling", roles: PERFORMANCE_VIEW_ROLES,
+            subItems: [
+              { id: "course-catalog", href: "/training/catalog", label: "Course Catalog", pageTitle: "Course Catalog", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "training-assignments", href: "/training/assignments", label: "Training Assignments", pageTitle: "Training Assignments", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "skills-competencies", href: "/training/skills", label: "Skills & Competencies", pageTitle: "Skills & Competencies", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "certifications-licenses", href: "/training/certifications", label: "Certifications & Licenses", pageTitle: "Certifications & Licenses", roles: PERFORMANCE_VIEW_ROLES },
+            ],
+          },
+          {
+            id: "appraisal-cycles", href: "/performance", label: "Appraisal Cycles", pageTitle: "Appraisal Cycles", roles: PERFORMANCE_VIEW_ROLES,
+            subItems: [
+              { id: "review-cycle-setup", href: "/performance/cycles", label: "Review Cycle Setup", pageTitle: "Review Cycle Setup", roles: ["COMPANY_ADMIN", "HR"] },
+              { id: "360-feedback", href: "/performance/feedback", label: "360° Feedback", pageTitle: "360° Feedback", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "self-assessments", href: "/performance/self-assessment", label: "Self-Assessments", pageTitle: "Self-Assessments", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "appraisal-analytics", href: "/performance/analytics", label: "Appraisal Analytics", pageTitle: "Appraisal Analytics", roles: ["COMPANY_ADMIN", "HR"] },
+            ],
+          },
+          {
+            id: "staff-reviews-changes", href: "/performance/staff-changes", label: "Staff Reviews & Changes", pageTitle: "Staff Reviews & Changes", roles: PERFORMANCE_VIEW_ROLES,
+            subItems: [
+              { id: "performance-review-forms", href: "/performance/review-forms", label: "Performance Review Forms", pageTitle: "Performance Review Forms", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "promotion-recommendations", href: "/performance/promotions", label: "Promotion Recommendations", pageTitle: "Promotion Recommendations", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "salary-increment-requests", href: "/performance/salary-increments", label: "Salary Increment Requests", pageTitle: "Salary Increment Requests", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "approval-workflows", href: "/performance/approvals", label: "Approval Workflows", pageTitle: "Approval Workflows", roles: ["COMPANY_ADMIN", "HR"] },
+            ],
+          },
+        ],
       },
       {
         id: "benefits-welfare",
@@ -821,9 +901,10 @@ export function isNavMatch(
   item: Pick<NavItem, "href" | "match">
 ): boolean {
   if (item.match) return item.match(pathname);
-  if (pathname === item.href) return true;
-  if (item.href === "/dashboard") return false;
-  return pathname.startsWith(`${item.href}/`);
+  const hrefPath = item.href.split("?")[0];
+  if (pathname === hrefPath) return true;
+  if (hrefPath === "/dashboard") return false;
+  return pathname.startsWith(`${hrefPath}/`);
 }
 
 export function getActiveNavId(pathname: string, items: NavItem[]): string | null {
@@ -831,7 +912,14 @@ export function getActiveNavId(pathname: string, items: NavItem[]): string | nul
   let bestHrefLen = -1;
   let bestIndex = Infinity;
 
-  items.forEach((item, index) => {
+  const flattened: (NavItem | NavSubItem)[] = [];
+  const visit = (item: NavItem | NavSubItem) => {
+    flattened.push(item);
+    item.subItems?.forEach(visit);
+  };
+  items.forEach(visit);
+
+  flattened.forEach((item, index) => {
     if (!isNavMatch(pathname, item)) return;
 
     const hrefLen = item.href.length;
@@ -972,7 +1060,15 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
   },
   {
     test: (p) => p === "/performance",
-    title: "Performance",
+    title: "Appraisal",
+  },
+  {
+    test: (p) => p === "/performance/staff-changes",
+    title: "Staff Reviews & Changes",
+  },
+  {
+    test: (p) => p === "/training" || p.startsWith("/training/"),
+    title: "Training",
   },
   {
     test: (p) => p === "/recruitment/interviews",
@@ -1125,7 +1221,7 @@ const nestedPageTitles: { test: (pathname: string) => boolean; title: string }[]
 ];
 
 function employeePageTitle(pathname: string): string | null {
-  if (pathname === "/performance" || pathname.startsWith("/performance/")) return "KPI";
+  if (pathname === "/performance" || pathname.startsWith("/performance/")) return "Appraisal";
   if (pathname === "/attendance") return "Attendance summary";
   if (pathname === "/payroll") return "My payslips";
   if (pathname === "/loans" || pathname.startsWith("/loans/")) return "Loans & repayment";

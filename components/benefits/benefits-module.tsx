@@ -184,7 +184,7 @@ export function BenefitsModule({
       description:
         "Sponsored certifications, appraisals and growth plans that help you develop within the company.",
       icon: GraduationCap,
-      href: "/performance",
+      href: "/training",
       metric: `${live.training.completedReviews}`,
       metricLabel:
         live.training.completedReviews === 1
@@ -196,9 +196,10 @@ export function BenefitsModule({
       tone: live.training.activeCycles > 0 ? "warn" : "neutral",
       accent: "bg-sky-50 text-sky-600",
       actions: [
-        { label: "Open performance", href: "/performance" },
+        { label: "Open training", href: "/training" },
+        { label: "Appraisals", href: "/performance" },
         ...(access.canManagePerformance
-          ? [{ label: "Manage cycles", href: "/performance" }]
+          ? [{ label: "Manage appraisals", href: "/performance" }]
           : []),
       ],
     },
@@ -290,44 +291,72 @@ export function BenefitsModule({
     },
   ];
 
-  const employeeView = access.role === "EMPLOYEE";
+  const employeeView = access.role === "EMPLOYEE" || access.role === "SUPERVISOR";
+  const enabledBenefits = benefits.filter((benefit) => {
+    switch (benefit.id) {
+      case "loans":
+      case "professional":
+        return true;
+      case "leave":
+        return live.leave.allocationEnabled;
+      case "medical":
+        return live.medical.documentCount > 0;
+      case "pension":
+        return live.pension.configured;
+      case "bonus":
+        return live.bonuses.enabled;
+      case "family":
+        return live.leave.familyApproved > 0;
+      case "salary":
+        return live.bonuses.enabled && (live.bonuses.annualPlans > 0 || live.bonuses.holidayAllowanceEnabled);
+      case "transfer":
+        return live.mobility.openRoles > 0;
+      default:
+        return false;
+    }
+  });
   const visibleBenefits = employeeView
-    ? benefits.filter((benefit) => {
+    ? enabledBenefits.filter((benefit) => {
         switch (benefit.id) {
           case "medical": return live.medical.documentCount > 0;
           case "pension": return live.pension.configured;
           case "bonus": return live.bonuses.enabled;
-          case "professional": return live.training.activeCycles > 0 || live.training.completedReviews > 0;
+          case "professional": return true;
           case "salary": return live.bonuses.enabled && (live.bonuses.annualPlans > 0 || live.bonuses.holidayAllowanceEnabled);
           case "family":
           case "transfer": return false;
           default: return true;
         }
       })
-    : benefits;
+    : enabledBenefits;
 
   const summary = [
-    {
+    ...(live.leave.allocationEnabled ? [{
       label: "Annual leave balance",
       value:
         live.leave.balance != null
           ? `${live.leave.balance} days`
           : `${live.leave.annualDefaultDays} days`,
       hint: live.leave.allocationEnabled ? "tracked this year" : "default allowance",
-    },
+    }] : []),
     {
       label: "Loan outstanding",
       value: fmt(live.loans.outstanding),
       hint: `${live.loans.approved} active ${live.loans.approved === 1 ? "loan" : "loans"}`,
     },
     {
+      label: "Training & development",
+      value: `${live.training.activeCycles}`,
+      hint: live.training.activeCycles === 1 ? "active review cycle" : "active review cycles",
+    },
+    ...(live.bonuses.enabled ? [{
       label: "Bonus approved",
       value: live.bonuses.enabled ? fmt(live.bonuses.approvedValue) : "—",
       hint: live.bonuses.enabled
         ? `${live.bonuses.pending} pending approval`
         : "module not enabled",
-    },
-    ...(!employeeView ? [{
+    }] : []),
+    ...(!employeeView && live.mobility.openRoles > 0 ? [{
       label: "Open internal roles",
       value: `${live.mobility.openRoles}`,
       hint: "internal mobility",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -17,6 +17,8 @@ import {
 import { Card } from "@/components/ui";
 import { DashboardPricingCards } from "@/components/subscription/pricing-cards";
 import { notify, readApiError } from "@/lib/toast";
+import { useAppEvents, useRealtimeStatus } from "@/hooks/use-app-events";
+import { scheduleRouterRefresh } from "@/hooks/use-soft-refresh";
 import {
   getPlan,
   formatPlanPrice,
@@ -82,48 +84,20 @@ export function SubscriptionModule({
     setLastSynced(new Date());
   }, []);
 
-  useEffect(() => {
-    let source: EventSource | null = null;
+  useRealtimeStatus(setLive);
 
-    const onRealtime = (payload: { type?: string; data?: { source?: string } }) => {
+  useAppEvents({
+    types: ["subscription_updated", "dashboard_updated"],
+    onEvent: (type, data) => {
       if (
-        payload.type === "subscription_updated" ||
-        (payload.type === "dashboard_updated" &&
-          payload.data?.source === "subscription_updated")
+        type === "subscription_updated" ||
+        (type === "dashboard_updated" && data?.source === "subscription_updated")
       ) {
         void refresh();
-        router.refresh();
+        scheduleRouterRefresh(() => router.refresh());
       }
-    };
-
-    try {
-      source = new EventSource("/api/events");
-      source.onopen = () => setLive(true);
-      source.onmessage = (event) => {
-        setLive(true);
-        try {
-          onRealtime(JSON.parse(event.data) as { type?: string; data?: { source?: string } });
-        } catch {
-          // ignore
-        }
-      };
-      source.onerror = () => {
-        setLive(false);
-        source?.close();
-        source = null;
-      };
-    } catch {
-      const timer = setTimeout(() => setLive(false), 0);
-      return () => clearTimeout(timer);
-    }
-
-    const poll = setInterval(() => void refresh(), 30_000);
-
-    return () => {
-      source?.close();
-      clearInterval(poll);
-    };
-  }, [refresh, router]);
+    },
+  });
 
   async function activateFree() {
     if (!canManage || subscription.planId === "free") return;

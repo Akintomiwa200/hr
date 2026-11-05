@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Avatar } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
-import { useAppEvents } from "@/hooks/use-app-events";
+import { useAppEvents, useRealtimeStatus } from "@/hooks/use-app-events";
 import { ChatCallControls } from "@/components/chat/chat-call-controls";
 import { notify, readApiError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -423,6 +423,8 @@ export function ChatWorkspace({
   const typingTimer = useRef<number | null>(null);
   const typingActive = useRef(false);
   const stickToBottom = useRef(true);
+  const refreshInFlight = useRef(false);
+  const connectedBefore = useRef(false);
 
   const { firstName: ownFirstName, lastName: ownLastName } =
     splitPersonName(currentUserName);
@@ -562,15 +564,46 @@ export function ChatWorkspace({
     [markRead]
   );
 
-  useEffect(() => {
-    void loadConversations();
-  }, [loadConversations]);
+  const refreshActiveThread = useCallback(async () => {
+    if (
+      !activeId ||
+      document.visibilityState !== "visible" ||
+      refreshInFlight.current
+    ) {
+      return;
+    }
+    refreshInFlight.current = true;
+    try {
+      const response = await fetch(
+        `/api/chat/conversations/${activeId}/messages`,
+        { cache: "no-store" }
+      );
+      if (!response.ok) return;
+      const data = (await response.json()) as {
+        conversation?: ChatConversationDTO;
+        messages?: ChatMessageDTO[];
+      };
+      const conversation = data.conversation;
+      if (conversation) {
+        setThread((current) => {
+          if (!current || current.conversation.id !== activeId) return current;
+          let messages = current.messages;
+          for (const message of data.messages ?? []) {
+            messages = mergeMessage(messages, message);
+          }
+          return { ...current, conversation, messages };
+        });
+      }
+      void loadConversations(true);
+    } catch {
+      // Keep the current thread usable while offline; SSE and focus retry.
+    } finally {
+      refreshInFlight.current = false;
+    }
+  }, [activeId, loadConversations]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") void loadConversations(true);
-    }, 15_000);
-    return () => window.clearInterval(timer);
+    void loadConversations();
   }, [loadConversations]);
 
   useEffect(() => {
@@ -579,36 +612,36 @@ export function ChatWorkspace({
     }
   }, [initialConversationId, openConversation]);
 
-  // SSE gives instant same-process delivery; this authenticated refresh keeps
-  // chats current after reconnects and across server instances as well.
+  // No polling: SSE delivers messages, reads, typing and presence instantly.
+  // Re-sync only on tab focus (events missed while hidden) and after the
+  // shared stream reconnects (SSE does not replay missed events).
   useEffect(() => {
-    if (!activeId) return;
-    let inFlight = false;
-    const refresh = async () => {
-      if (inFlight || document.visibilityState !== "visible") return;
-      inFlight = true;
-      try {
-        const response = await fetch(`/api/chat/conversations/${activeId}/messages`, { cache: "no-store" });
-        if (!response.ok) return;
-        const data = await response.json() as { conversation?: ChatConversationDTO; messages?: ChatMessageDTO[] };
-        if (data.conversation) {
-          setThread((current) => {
-            if (!current || current.conversation.id !== activeId) return current;
-            let messages = current.messages;
-            for (const message of data.messages ?? []) messages = mergeMessage(messages, message);
-            return { ...current, conversation: data.conversation!, messages };
-          });
-        }
-        void loadConversations(true);
-      } catch {
-        // Keep the current thread usable while offline; SSE and refresh retry.
-      } finally {
-        inFlight = false;
-      }
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      void loadConversations(true);
+      if (activeId) void refreshActiveThread();
     };
-    const timer = window.setInterval(() => void refresh(), 2500);
-    return () => window.clearInterval(timer);
-  }, [activeId, loadConversations]);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [activeId, loadConversations, refreshActiveThread]);
+
+  useRealtimeStatus((connected) => {
+    if (!connected) return;
+    if (!connectedBefore.current) {
+      connectedBefore.current = true;
+      return;
+    }
+    if (document.visibilityState !== "visible") return;
+    void loadConversations(true);
+    if (activeId) void refreshActiveThread();
+  });
 
   useEffect(() => {
     const el = scrollRef.current;

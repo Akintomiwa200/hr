@@ -1215,12 +1215,12 @@ export function CompanyAdminDashboard({
   const liveLate = deviceStats.late;
 
   return (
-    <div className="w-full space-y-6 bg-[#f8f9fc] p-6 rounded-3xl -m-6">
+    <div className="w-full min-w-0 space-y-5 bg-[#f8f9fc] p-4 -m-4 rounded-2xl sm:space-y-6 sm:p-6 sm:rounded-3xl sm:-m-6">
       <DashboardLiveRefresh />
       {/* Top Header Section */}
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
-        <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Welcome {userName}!</h1>
+      <div className="flex min-w-0 flex-col gap-4 sm:gap-6 md:flex-row md:items-start md:justify-between md:mb-8">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">Welcome {userName}!</h1>
           <p className="text-[13px] text-gray-600 mt-2">
             {pendingLeaves > 0 ? (
               <>
@@ -1233,7 +1233,7 @@ export function CompanyAdminDashboard({
         </div>
         
         {/* Attendance Stats */}
-        <div className="flex items-center gap-8 bg-white px-8 py-4 rounded-2xl shadow-sm border border-gray-50">
+        <div className="grid grid-cols-3 items-center gap-2 rounded-2xl border border-gray-50 bg-white px-3 py-3 shadow-sm sm:flex sm:gap-8 sm:px-8 sm:py-4">
           <div className="text-center">
             <p className="text-[12px] text-gray-500 font-medium mb-1">On Time</p>
             <p className="text-3xl font-bold text-gray-900">{onTimeCount}</p>
@@ -1252,7 +1252,7 @@ export function CompanyAdminDashboard({
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column (Employees Chart) */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-50 flex flex-col relative">
+        <div className="relative flex min-w-0 flex-col rounded-2xl border border-gray-50 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex justify-between items-start mb-6">
             <h2 className="text-[16px] font-bold text-gray-900">Total Employees</h2>
             <p className="text-2xl font-bold text-gray-900">{totalEmployees}</p>
@@ -1273,7 +1273,7 @@ export function CompanyAdminDashboard({
         </div>
 
         {/* Middle Column (Spending Status replacing Payroll pulse) */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-50 flex flex-col overflow-hidden">
+        <div className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-50 bg-white p-4 shadow-sm sm:p-6">
           {(() => {
             const { planned, remaining, spentPercent } = data.spending;
 
@@ -1299,9 +1299,9 @@ export function CompanyAdminDashboard({
                   <span className="text-[13px] font-medium text-gray-400">{dateStr}</span>
                 </div>
                 
-                <div className="flex-1 flex items-center justify-between mt-2 relative">
+                <div className="relative mt-2 flex flex-1 items-center justify-between gap-2">
                   {/* Left Chart */}
-                  <div className="relative w-48 h-48 flex-shrink-0 flex items-center justify-center -ml-16">
+                  <div className="relative flex aspect-square h-auto w-[44%] min-w-28 max-w-48 flex-shrink-0 items-center justify-center">
                      <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90 -scale-x-100">
                        <circle cx="50" cy="50" r="45" fill="none" stroke="#f3f4f6" strokeWidth="2.5" strokeDasharray="141.37 282.74" strokeLinecap="round" />
                        <circle cx="50" cy="50" r="45" fill="none" stroke="#dc2626" strokeWidth="3" strokeDasharray={`${(spentPercent / 100) * 141.37} 282.74`} strokeLinecap="round" />
@@ -1309,23 +1309,23 @@ export function CompanyAdminDashboard({
                           <circle cx="50" cy="5" r="3" fill="#fff" stroke="#dc2626" strokeWidth="2" />
                        </g>
                      </svg>
-                     <div className="absolute inset-0 flex flex-col items-center justify-center left-14">
-                        <span className="text-3xl font-extrabold text-gray-900 tracking-tight">{spentPercent}<span className="text-sm text-gray-500 font-bold ml-0.5">%</span></span>
+                     <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">{spentPercent}<span className="ml-0.5 text-sm font-bold text-gray-500">%</span></span>
                         <span className="text-[12px] font-semibold text-gray-500 mt-1">Spent</span>
                      </div>
                   </div>
 
                   {/* Right Stats */}
-                  <div className="flex flex-col gap-7 ml-2">
+                  <div className="ml-1 flex min-w-0 flex-1 flex-col gap-5 sm:ml-2 sm:gap-7">
                      <div>
                         <p className="text-[13px] font-semibold text-gray-500 mb-0.5">Planned</p>
-                        <p className="text-[28px] font-extrabold text-gray-900 leading-none">
+                        <p className="text-xl font-extrabold leading-none text-gray-900 sm:text-[28px]">
                            {formatCompact(planned)}<span className="text-[14px] font-bold ml-1 text-gray-700">{getUnit(planned)}</span>
                         </p>
                      </div>
                      <div>
                         <p className="text-[13px] font-semibold text-gray-500 mb-0.5">Remaining</p>
-                        <p className="text-[28px] font-extrabold text-gray-900 leading-none">
+                        <p className="text-xl font-extrabold leading-none text-gray-900 sm:text-[28px]">
                            {formatCompact(remaining)}<span className="text-[14px] font-bold ml-1 text-gray-700">{getUnit(remaining)}</span>
                         </p>
                      </div>

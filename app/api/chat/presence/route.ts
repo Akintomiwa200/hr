@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { forbidden, unauthorized } from "@/lib/api-auth";
 import { broadcastChatEvent } from "@/lib/chat-events";
+import { sweepStaleChatPresence } from "@/lib/chat";
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -26,12 +27,21 @@ export async function POST(request: NextRequest) {
     data: { chatPresence: presence, chatPresenceAt: new Date() },
   });
 
-  if (previous.chatPresence !== presence) {
+  // Any heartbeat is also a chance to notice users who vanished without a
+  // `pagehide` (crashed tab, lost network) and broadcast them as offline.
+  await sweepStaleChatPresence(session.companyId);
+  const selfChanged = previous.chatPresence !== presence;
+
+  if (selfChanged) {
     const recipients = await prisma.user.findMany({
       where: { companyId: session.companyId, isActive: true, archivedAt: null },
       select: { id: true },
     });
-    broadcastChatEvent("chat_presence", { userId: session.id, presence }, recipients.map((user) => user.id));
+    broadcastChatEvent(
+      "chat_presence",
+      { userId: session.id, presence },
+      recipients.map((user) => user.id)
+    );
   }
 
   return NextResponse.json({ ok: true });

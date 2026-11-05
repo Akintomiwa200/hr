@@ -15,14 +15,23 @@ export default async function CycleDetailPage({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role === "EMPLOYEE") redirect("/performance");
+  if (session.role === "EMPLOYEE" || session.role === "SUPERVISOR") redirect("/performance");
 
   const { id } = await params;
+  const scope = getCompanyScope(session);
+  const companyId = requireOrgCompanyId(scope);
   const cycle = await prisma.appraisalCycle.findUnique({
-    where: { id },
+    where: { id, companyId: companyId ?? "__no_company__" },
     include: {
       kpis: { include: { kpi: true } },
       appraisals: {
+        where: canManagePerformance(session.role) ? undefined : {
+          OR: [
+            { employeeId: session.employeeId ?? "__none__" },
+            { managerId: session.employeeId ?? "__none__" },
+            { employee: { managerId: session.employeeId ?? "__none__" } },
+          ],
+        },
         include: {
           employee: { include: { department: true } },
           manager: true,
@@ -42,7 +51,7 @@ export default async function CycleDetailPage({
         })
       : [];
 
-  const settings = await getPerformanceSettings(requireOrgCompanyId(getCompanyScope(session)));
+  const settings = await getPerformanceSettings(companyId);
 
   return (
     <div>

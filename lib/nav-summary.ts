@@ -66,7 +66,7 @@ export async function getNotificationFeed(session: SessionUser): Promise<Notific
   const teamScope = canViewTeamScope(role) && session.employeeId;
   const isResignationApprover =
     isResignationAdmin(role) ||
-    ((role === "MANAGER" || role === "SUPERVISOR") && Boolean(session.employeeId));
+    (role === "MANAGER" && Boolean(session.employeeId));
 
   const pendingResignationWhere: Prisma.ResignationWhereInput | null = !isResignationApprover
     ? null
@@ -99,7 +99,7 @@ export async function getNotificationFeed(session: SessionUser): Promise<Notific
   const preferences = parseUserPreferences(userPrefs?.preferences);
 
   const teamWhere =
-    session.employeeId && (role === "MANAGER" || role === "SUPERVISOR")
+    session.employeeId && role === "MANAGER"
       ? { managerId: session.employeeId, status: "ACTIVE" as const, ...orgEmployee }
       : null;
 
@@ -131,7 +131,7 @@ export async function getNotificationFeed(session: SessionUser): Promise<Notific
             employee: {
               ...orgEmployee,
               ...(session.employeeId &&
-              (role === "MANAGER" || role === "SUPERVISOR")
+              role === "MANAGER"
                 ? { managerId: session.employeeId }
                 : {}),
             },

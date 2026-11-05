@@ -18,7 +18,7 @@ import {
 import { Button, Card, EmptyState, Input, Select, Textarea } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
-import { useAppEvents } from "@/hooks/use-app-events";
+import { useAppEvents, useRealtimeStatus } from "@/hooks/use-app-events";
 import {
   SUPPORT_CATEGORIES,
   SUPPORT_PRIORITIES,
@@ -214,8 +214,11 @@ export function SupportModule({
     },
   });
 
-  // Fallback polling in case SSE is unavailable.
+  // Fallback polling only while the shared SSE stream is down.
+  const [liveConnected, setLiveConnected] = useState(false);
+  useRealtimeStatus(setLiveConnected);
   useEffect(() => {
+    if (liveConnected) return;
     const timer = setInterval(() => {
       if (document.visibilityState !== "visible") return;
       const freshActive = active;
@@ -236,7 +239,7 @@ export function SupportModule({
       }
     }, 15000);
     return () => clearInterval(timer);
-  }, [active, refreshList]);
+  }, [active, liveConnected, refreshList]);
 
   const visible = useMemo(() => {
     const q = search.toLowerCase();

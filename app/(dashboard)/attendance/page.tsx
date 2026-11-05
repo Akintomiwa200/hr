@@ -11,6 +11,7 @@ import { AttendanceModule } from "@/components/attendance/attendance-module";
 export default async function AttendancePage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "MANAGER") redirect("/dashboard");
 
   const workspace = getAttendanceWorkspace(session.role);
   const showDevicePanel = canManageDevices(session.role) && workspace.mode === "org";

@@ -5,16 +5,29 @@ export type RealtimeHandler = (
   data?: Record<string, unknown>
 ) => void;
 
+export type RealtimeStatusHandler = (connected: boolean) => void;
+
 let source: EventSource | null = null;
 let subscriberCount = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let backoffMs = 1000;
 const handlers = new Set<RealtimeHandler>();
+const statusHandlers = new Set<RealtimeStatusHandler>();
 
 function dispatch(type?: RealtimeEventType, data?: Record<string, unknown>) {
   if (isSseHandshake(type, data)) return;
   for (const handler of handlers) {
     handler(type, data);
+  }
+}
+
+function emitStatus(connected: boolean) {
+  for (const handler of statusHandlers) {
+    try {
+      handler(connected);
+    } catch {
+      // A failing status listener must not break the shared stream.
+    }
   }
 }
 
@@ -26,6 +39,7 @@ function connect() {
     source = new EventSource("/api/events");
     source.onopen = () => {
       backoffMs = 1000;
+      emitStatus(true);
     };
     source.onmessage = (msg) => {
       try {
@@ -41,6 +55,7 @@ function connect() {
     source.onerror = () => {
       source?.close();
       source = null;
+      emitStatus(false);
       if (subscriberCount === 0) return;
       if (reconnectTimer) clearTimeout(reconnectTimer);
       reconnectTimer = setTimeout(() => {
@@ -61,6 +76,7 @@ function teardownIfIdle() {
   }
   source?.close();
   source = null;
+  emitStatus(false);
 }
 
 /** One shared browser SSE connection for the whole app. */
@@ -73,5 +89,21 @@ export function subscribeRealtime(handler: RealtimeHandler) {
     handlers.delete(handler);
     subscriberCount = Math.max(0, subscriberCount - 1);
     teardownIfIdle();
+  };
+}
+
+/**
+ * Observe whether the shared stream is connected. Handlers are told about
+ * reconnects so they can re-sync data that changed while the connection was
+ * down (SSE does not replay missed events).
+ */
+export function subscribeRealtimeStatus(handler: RealtimeStatusHandler) {
+  statusHandlers.add(handler);
+  if (source && source.readyState === EventSource.OPEN) {
+    handler(true);
+  }
+
+  return () => {
+    statusHandlers.delete(handler);
   };
 }

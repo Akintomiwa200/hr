@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageCircle } from "lucide-react";
-import { useAppEvents } from "@/hooks/use-app-events";
+import { useAppEvents, useRealtimeStatus } from "@/hooks/use-app-events";
 
 /** Floating entry point for the docked chat, with a live unread badge. */
 export function ChatLauncher({ onClick }: { onClick: () => void }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const refreshTimer = useRef<number | null>(null);
+  const connectedBefore = useRef(false);
 
   const loadUnread = useCallback(async () => {
     try {
@@ -50,6 +51,16 @@ export function ChatLauncher({ onClick }: { onClick: () => void }) {
   useAppEvents({
     types: ["chat_message", "chat_read", "chat_updated"],
     onEvent: scheduleRefresh,
+  });
+
+  // SSE does not replay events missed while the connection was down.
+  useRealtimeStatus((connected) => {
+    if (!connected) return;
+    if (!connectedBefore.current) {
+      connectedBefore.current = true;
+      return;
+    }
+    void loadUnread();
   });
 
   return (

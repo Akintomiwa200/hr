@@ -5,6 +5,14 @@ import { badRequest, isHr, requireSession, unauthorized } from "@/lib/api-auth";
 import { ensureRecruitmentDefaults } from "@/lib/recruitment/activity";
 import { resolveRecruitmentCompanyId } from "@/lib/recruitment/data";
 import { isRecruitmentModelsReady } from "@/lib/prisma";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+
+function notifyRecruitmentSettings(companyId: string | null) {
+  broadcastAppEvent("job_updated", {
+    action: "recruitment_settings",
+    companyId: companyId ?? undefined,
+  });
+}
 
 export async function GET() {
   const session = await requireSession();
@@ -66,6 +74,7 @@ export async function POST(request: NextRequest) {
       },
     });
     revalidatePath("/recruitment/settings");
+    notifyRecruitmentSettings(companyId);
     return NextResponse.json(stage);
   }
 
@@ -74,6 +83,7 @@ export async function POST(request: NextRequest) {
       data: { companyId, name: body.name, color: body.color ?? "violet" },
     });
     revalidatePath("/recruitment/settings");
+    notifyRecruitmentSettings(companyId);
     return NextResponse.json(tag);
   }
 
@@ -82,6 +92,7 @@ export async function POST(request: NextRequest) {
       data: { companyId, name: body.name },
     });
     revalidatePath("/recruitment/settings");
+    notifyRecruitmentSettings(companyId);
     return NextResponse.json(source);
   }
 
@@ -96,6 +107,7 @@ export async function POST(request: NextRequest) {
       },
     });
     revalidatePath("/recruitment/settings");
+    notifyRecruitmentSettings(companyId);
     return NextResponse.json(template);
   }
 
@@ -117,6 +129,8 @@ export async function PATCH(request: NextRequest) {
   const { type, id } = body;
   if (!type || !id) return badRequest("type and id are required");
 
+  const companyId = await resolveRecruitmentCompanyId(session.id, session.companyId);
+
   if (type === "stage") {
     const stage = await prisma.recruitmentStage.update({
       where: { id },
@@ -127,6 +141,7 @@ export async function PATCH(request: NextRequest) {
       },
     });
     revalidatePath("/recruitment/settings");
+    notifyRecruitmentSettings(companyId);
     return NextResponse.json(stage);
   }
 
@@ -141,6 +156,7 @@ export async function PATCH(request: NextRequest) {
       },
     });
     revalidatePath("/recruitment/settings");
+    notifyRecruitmentSettings(companyId);
     return NextResponse.json(template);
   }
 
@@ -162,6 +178,8 @@ export async function DELETE(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id");
   if (!type || !id) return badRequest("type and id are required");
 
+  const companyId = await resolveRecruitmentCompanyId(session.id, session.companyId);
+
   if (type === "stage") await prisma.recruitmentStage.delete({ where: { id } });
   else if (type === "tag") await prisma.recruitmentTag.delete({ where: { id } });
   else if (type === "source") await prisma.recruitmentSource.delete({ where: { id } });
@@ -169,5 +187,6 @@ export async function DELETE(request: NextRequest) {
   else return badRequest("Invalid delete type");
 
   revalidatePath("/recruitment/settings");
+  notifyRecruitmentSettings(companyId);
   return NextResponse.json({ success: true });
 }

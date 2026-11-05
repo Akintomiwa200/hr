@@ -9,6 +9,7 @@ import {
   findOrCreateDirectConversation,
   getChatCompanyId,
   listChatConversations,
+  sweepStaleChatPresence,
 } from "@/lib/chat";
 
 export async function GET() {
@@ -21,7 +22,10 @@ export async function GET() {
       { status: 503 }
     );
   }
-  if (!getChatCompanyId(session)) return forbidden();
+  const companyId = getChatCompanyId(session);
+  if (!companyId) return forbidden();
+
+  await sweepStaleChatPresence(companyId);
 
   const conversations = await listChatConversations(session);
   return NextResponse.json({ conversations });

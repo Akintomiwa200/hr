@@ -68,6 +68,9 @@ export async function GET(request: NextRequest) {
   }
 
   if (type === "attendance") {
+    if (session.role === "MANAGER") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const dateParam = request.nextUrl.searchParams.get("date");
     const dayStart = dateParam ? new Date(dateParam) : new Date();
     dayStart.setHours(0, 0, 0, 0);

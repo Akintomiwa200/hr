@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowRight, Loader2, Lock, Radio, Sparkles } from "lucide-react";
@@ -10,6 +10,7 @@ import {
   minPlanForModule,
   type PlanModule,
 } from "@/lib/plan-gates";
+import { useAppEvents, useRealtimeStatus } from "@/hooks/use-app-events";
 
 const MODULE_LABELS: Record<PlanModule, string> = {
   dashboard: "Dashboard",
@@ -85,39 +86,14 @@ export function PlanFeatureGate({
     }
   }, []);
 
-  useEffect(() => {
-    let source: EventSource | null = null;
+  useRealtimeStatus(setLive);
 
-    try {
-      source = new EventSource("/api/events");
-      source.onopen = () => setLive(true);
-      source.onmessage = (event) => {
-        setLive(true);
-        try {
-          const payload = JSON.parse(event.data) as { type?: string };
-          if (payload.type === "subscription_updated") {
-            void refreshPlan();
-          }
-        } catch {
-          // ignore
-        }
-      };
-      source.onerror = () => {
-        setLive(false);
-        source?.close();
-        source = null;
-      };
-    } catch {
-      const timer = setTimeout(() => setLive(false), 0);
-      return () => clearTimeout(timer);
-    }
-
-    const poll = setInterval(() => void refreshPlan(), 30_000);
-    return () => {
-      source?.close();
-      clearInterval(poll);
-    };
-  }, [refreshPlan]);
+  useAppEvents({
+    types: ["subscription_updated"],
+    onEvent: () => {
+      void refreshPlan();
+    },
+  });
 
   if (allowed) {
     return <>{children}</>;

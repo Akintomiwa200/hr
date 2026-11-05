@@ -8,6 +8,8 @@ export type RealtimeEventType =
   | "payroll_updated"
   | "performance_updated"
   | "appraisal_updated"
+  | "training_updated"
+  | "staff_review_updated"
   | "department_updated"
   | "job_updated"
   | "interview_updated"

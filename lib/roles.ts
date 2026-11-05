@@ -23,20 +23,20 @@ export const DASHBOARD_ROLES: Role[] = ALL_ROLES;
 export const ALL_STAFF: Role[] = ORG_ROLES;
 
 /**
- * Can open People directory / teams (scoped further by page logic).
- * Employees are intentionally excluded from the company directory and team
- * management; they only get their own profile through the sidebar.
+ * Can open the People employee list (scoped further by page logic).
+ * Employees only get their own profile through the sidebar; supervisors are
+ * self-service like employees and do not get the company directory.
  */
 export const PEOPLE_DIRECTORY_ROLES: Role[] = [
   "COMPANY_ADMIN",
   "HR",
   "MANAGER",
-  "SUPERVISOR",
 ];
 
-/** Can open people pages — employees may only open their own profile. */
+/** Can open people pages — employees/supervisors may only open their own profile. */
 export const PEOPLE_VIEW_ROLES: Role[] = [
   ...PEOPLE_DIRECTORY_ROLES,
+  "SUPERVISOR",
   "EMPLOYEE",
 ];
 
@@ -62,7 +62,6 @@ export const ORG_CHART_ROLES: Role[] = [
 export const LEAVE_APPROVER_ROLES: Role[] = [
   "COMPANY_ADMIN",
   "HR",
-  "MANAGER",
 ];
 
 /** Can enable leave allocation and manage employee yearly balances. */
@@ -104,7 +103,6 @@ export const LOAN_APPROVER_ROLES: Role[] = [
   "COMPANY_ADMIN",
   "HR",
   "ACCOUNT_OFFICER",
-  "MANAGER",
 ];
 
 /** Full recruitment module (jobs/candidates). */
@@ -120,12 +118,12 @@ export const ONBOARDING_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
 export const PERFORMANCE_ADMIN_ROLES: Role[] = [
   "COMPANY_ADMIN",
   "HR",
-  "MANAGER",
 ];
 
 /** Roles that can open the Performance module (reviews, cycles, appraisals). */
 export const PERFORMANCE_VIEW_ROLES: Role[] = [
   ...PERFORMANCE_ADMIN_ROLES,
+  "MANAGER",
   "SUPERVISOR",
   "EMPLOYEE",
 ];
@@ -142,7 +140,7 @@ export const SUPERVISOR_ROLES: Role[] = ["SUPERVISOR"];
 /** Full org-wide reports (HR analytics). */
 export const REPORTS_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
 /** Team-scoped reports for managers/supervisors. */
-export const REPORTS_TEAM_ROLES: Role[] = ["MANAGER", "SUPERVISOR"];
+export const REPORTS_TEAM_ROLES: Role[] = ["MANAGER"];
 /** Managers, HR and company admins can keep their own daily reporting workspace. */
 export const DAILY_REPORTING_ROLES: Role[] = ["COMPANY_ADMIN", "MANAGER", "HR"];
 
@@ -255,7 +253,6 @@ export function canViewTeamScope(role: Role) {
     "COMPANY_ADMIN",
     "HR",
     "MANAGER",
-    "SUPERVISOR",
   ]);
 }
 

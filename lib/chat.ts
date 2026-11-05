@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { broadcastChatEvent } from "@/lib/chat-events";
 import type {
   ChatConversationDTO,
   ChatConversationType,
@@ -12,6 +13,12 @@ import type {
 
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_GROUP_TITLE = 80;
+
+/** A heartbeat every 25s keeps presence fresh; 120s covers a few missed beats. */
+const CHAT_PRESENCE_TTL_MS = 120_000;
+/** Don't run the stale-user sweep on every request from every client. */
+const CHAT_PRESENCE_SWEEP_INTERVAL_MS = 20_000;
+const lastPresenceSweep = new Map<string, number>();
 
 export const chatUserSelect = {
   id: true,
@@ -87,9 +94,59 @@ function splitName(user: ChatUserRow) {
 }
 
 function getPresence(user: Pick<ChatUserRow, "chatPresence" | "chatPresenceAt">) {
-  if (!user.chatPresenceAt || Date.now() - user.chatPresenceAt.getTime() > 120_000) return "OFFLINE" as const;
+  if (
+    !user.chatPresenceAt ||
+    Date.now() - user.chatPresenceAt.getTime() > CHAT_PRESENCE_TTL_MS
+  ) {
+    return "OFFLINE" as const;
+  }
   if (user.chatPresence === "ONLINE" || user.chatPresence === "AWAY") return user.chatPresence;
   return "OFFLINE" as const;
+}
+
+/**
+ * Flip stale ONLINE/AWAY rows to OFFLINE and broadcast the change so every
+ * open chat updates immediately. Users who close a tab without firing
+ * `pagehide` (crash, network loss, kill) would otherwise appear online forever
+ * in the UI until each client happened to re-fetch.
+ */
+export async function sweepStaleChatPresence(companyId: string): Promise<string[]> {
+  const now = Date.now();
+  const lastSweep = lastPresenceSweep.get(companyId) ?? 0;
+  if (now - lastSweep < CHAT_PRESENCE_SWEEP_INTERVAL_MS) return [];
+  lastPresenceSweep.set(companyId, now);
+
+  const cutoff = new Date(now - CHAT_PRESENCE_TTL_MS);
+  const stale = await prisma.user.findMany({
+    where: {
+      companyId,
+      isActive: true,
+      archivedAt: null,
+      chatPresence: { in: ["ONLINE", "AWAY"] },
+      OR: [{ chatPresenceAt: null }, { chatPresenceAt: { lt: cutoff } }],
+    },
+    select: { id: true },
+    take: 500,
+  });
+
+  if (stale.length === 0) return [];
+  const userIds = stale.map((user) => user.id);
+
+  await prisma.user.updateMany({
+    where: { id: { in: userIds } },
+    data: { chatPresence: "OFFLINE", chatPresenceAt: new Date() },
+  });
+
+  const recipients = await prisma.user.findMany({
+    where: { companyId, isActive: true, archivedAt: null },
+    select: { id: true },
+  });
+  const audience = recipients.map((user) => user.id);
+  for (const userId of userIds) {
+    broadcastChatEvent("chat_presence", { userId, presence: "OFFLINE" }, audience);
+  }
+
+  return userIds;
 }
 
 export function serializeChatUser(user: ChatUserRow): ChatUserDTO {

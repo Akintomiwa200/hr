@@ -4,6 +4,7 @@ import { getCompanyScope, requireOrgCompanyId } from "@/lib/company-scope";
 import { requireRoles, badRequest } from "@/lib/api-auth";
 import { normalizeRoleInput } from "@/lib/roles-catalog";
 import { revalidatePath } from "next/cache";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function GET() {
   const guard = await requireRoles(["SUPER_ADMIN", "COMPANY_ADMIN", "HR"]);
@@ -54,5 +55,6 @@ export async function POST(request: NextRequest) {
   });
 
   revalidatePath("/settings/roles");
+  broadcastAppEvent("settings_updated", { companyId, source: "roles" });
   return NextResponse.json(role, { status: 201 });
 }

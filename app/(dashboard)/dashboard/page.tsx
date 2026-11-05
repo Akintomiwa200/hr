@@ -5,7 +5,6 @@ import {
   getHrDashboardData,
   getCompanyAdminDashboardData,
   getManagerDashboardData,
-  getSupervisorDashboardData,
   getEmployeeDashboardData,
   getSuperAdminDashboardData,
 } from "@/lib/dashboard-data";
@@ -15,7 +14,6 @@ import {
   HrDashboard,
   CompanyAdminDashboard,
   ManagerDashboard,
-  SupervisorDashboard,
   EmployeeDashboard,
   SuperAdminDashboard,
 } from "@/components/dashboard/role-dashboards";
@@ -90,11 +88,11 @@ export default async function DashboardPage({
       );
     }
     const [data, upcomingEvents] = await Promise.all([
-      getSupervisorDashboardData(session.employeeId, rangeKey),
+      getEmployeeDashboardData(session.employeeId, rangeKey),
       getUpcomingCalendarEvents(sessionContext),
     ]);
     return (
-      <SupervisorDashboard data={data} userName={userName} upcomingEvents={upcomingEvents} />
+      <EmployeeDashboard data={data} userName={userName} upcomingEvents={upcomingEvents} />
     );
   }
 

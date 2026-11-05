@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { isChatModelReady } from "@/lib/prisma";
 import { forbidden, unauthorized } from "@/lib/api-auth";
-import { getChatCompanyId, getChatUnreadCount } from "@/lib/chat";
+import { getChatCompanyId, getChatUnreadCount, sweepStaleChatPresence } from "@/lib/chat";
 
 export async function GET() {
   const session = await getSession();
@@ -14,7 +14,10 @@ export async function GET() {
       { status: 503 }
     );
   }
-  if (!getChatCompanyId(session)) return forbidden();
+  const companyId = getChatCompanyId(session);
+  if (!companyId) return forbidden();
+
+  await sweepStaleChatPresence(companyId);
 
   const unreadCount = await getChatUnreadCount(session);
   return NextResponse.json({ unreadCount });

@@ -26,7 +26,8 @@ export async function canViewPayrollRecord(
   if (role === "EMPLOYEE" && session.employeeId === record.employeeId) {
     return true;
   }
-  if ((role === "MANAGER" || role === "SUPERVISOR") && session.employeeId) {
+  if (role === "SUPERVISOR" && session.employeeId === record.employeeId) return true;
+  if (role === "MANAGER" && session.employeeId) {
     if (session.employeeId === record.employeeId) return true;
     const { prisma } = await import("@/lib/prisma");
     const employee = await prisma.employee.findFirst({
@@ -59,29 +60,16 @@ export async function canManagePayrollRecord(
   return false;
 }
 
-/** Supervisors may adjust draft payslips belonging to their direct reports. */
+/** Only payroll admins may adjust another employee's payslip. */
 export async function canAdjustPayrollRecord(
-  session: SessionUser,
-  record: { employeeId: string; status?: string }
+  _session: SessionUser,
+  _record: { employeeId: string; status?: string }
 ) {
-  if (normalizeRole(session.role) !== "SUPERVISOR" || !session.employeeId) return false;
-  if (record.status && record.status !== "DRAFT") return false;
-  const { prisma } = await import("@/lib/prisma");
-  const report = await prisma.employee.findFirst({
-    where: {
-      id: record.employeeId,
-      OR: [
-        { managerId: session.employeeId },
-        { managers: { some: { id: session.employeeId } } },
-      ],
-    },
-    select: { id: true },
-  });
-  return Boolean(report);
+  return false;
 }
 
 export function canViewPayrollRuns(session: SessionUser) {
-  return normalizeRole(session.role) === "SUPERVISOR" || canBulkPayroll(session);
+  return canBulkPayroll(session);
 }
 
 export function payrollRunRecordWhere(session: SessionUser) {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Loader2, Lock } from "lucide-react";
+import { useAppEvents } from "@/hooks/use-app-events";
 
 const INTENDED_KEY = "smart-hr-locked-intended";
 
@@ -27,7 +28,6 @@ export function LockGate({
   const [redirecting, setRedirecting] = useState(
     () => initiallyLocked && !isSubscriptionPath
   );
-  const checkingRef = useRef(false);
   const redirectingRef = useRef(redirecting);
 
   useEffect(() => {
@@ -82,40 +82,12 @@ export function LockGate({
     }
   }, [initiallyLocked, isSubscriptionPath, pathname, goToSubscription]);
 
-  useEffect(() => {
-    if (checkingRef.current) return;
-    checkingRef.current = true;
-
-    let source: EventSource | null = null;
-
-    try {
-      source = new EventSource("/api/events");
-      source.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data) as { type?: string };
-          if (payload.type === "subscription_updated") {
-            void refresh();
-          }
-        } catch {
-          // ignore
-        }
-      };
-      source.onerror = () => {
-        source?.close();
-        source = null;
-      };
-    } catch {
-      source = null;
-    }
-
-    const poll = setInterval(() => void refresh(), 30_000);
-
-    return () => {
-      source?.close();
-      if (poll) clearInterval(poll);
-      checkingRef.current = false;
-    };
-  }, [refresh]);
+  useAppEvents({
+    types: ["subscription_updated"],
+    onEvent: () => {
+      void refresh();
+    },
+  });
 
   if (redirecting) {
     return (

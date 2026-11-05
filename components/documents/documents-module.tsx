@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -12,7 +12,8 @@ import { ShareFolderDialog } from "@/components/documents/share-folder-dialog";
 import { UploadLinksDialog } from "@/components/documents/upload-links-dialog";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
-import { isSseHandshake } from "@/lib/events";
+import { useAppEvents } from "@/hooks/use-app-events";
+import { scheduleRouterRefresh } from "@/hooks/use-soft-refresh";
 
 export type FolderRow = {
   id: string;
@@ -58,29 +59,10 @@ export function DocumentsModule({
   const [form, setForm] = useState({ name: "", description: "" });
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const es = new EventSource("/api/events");
-    es.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as {
-          type?: string;
-          data?: Record<string, unknown>;
-        };
-        if (isSseHandshake(payload.type, payload.data)) return;
-        if (
-          payload.type &&
-          payload.type !== "document_updated" &&
-          payload.type !== "folder_updated"
-        ) {
-          return;
-        }
-        router.refresh();
-      } catch {
-        // ignore heartbeat / malformed payloads
-      }
-    };
-    return () => es.close();
-  }, [router]);
+  useAppEvents({
+    types: ["document_updated", "folder_updated"],
+    onEvent: () => scheduleRouterRefresh(() => router.refresh()),
+  });
 
   const saveFolder = async () => {
     setLoading(true);

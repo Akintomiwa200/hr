@@ -82,7 +82,7 @@ export async function getBenefitsLive(session: SessionUser): Promise<BenefitLive
     prisma.bonusType.count({
       where: { ...bonusTypeWhere(session), isActive: true, category: "ANNUAL" },
     }),
-    session.role === "EMPLOYEE"
+    ["EMPLOYEE", "SUPERVISOR"].includes(normalizeRole(session.role))
       ? prisma.performanceAppraisal.count({ where: { employee: employeeScope, cycle: { status: "ACTIVE" } } })
       : prisma.appraisalCycle.count({
           where: {
@@ -117,11 +117,11 @@ export async function getBenefitsLive(session: SessionUser): Promise<BenefitLive
       take: 200,
     }),
     prisma.documentFolder.count({
-      where: session.role === "EMPLOYEE" && session.employeeId
+      where: ["EMPLOYEE", "SUPERVISOR"].includes(normalizeRole(session.role)) && session.employeeId
         ? { OR: [{ employeeId: session.employeeId }, { documents: { some: { employeeId: session.employeeId } } }] }
         : folderCompanyWhere(scope),
     }),
-    session.role === "EMPLOYEE" ? Promise.resolve(0) : prisma.job.count({ where: { status: "OPEN", ...jobWhere } }),
+    ["EMPLOYEE", "SUPERVISOR"].includes(normalizeRole(session.role)) ? Promise.resolve(0) : prisma.job.count({ where: { status: "OPEN", ...jobWhere } }),
     prisma.payrollRecord.findMany({
       where: { employee: employeeScope },
       select: { breakdown: true, periodEnd: true },

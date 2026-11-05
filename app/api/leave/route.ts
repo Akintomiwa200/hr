@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         message: `${session.firstName ?? "An employee"} requested ${leaveType.toLowerCase()} leave`,
         href: "/leave",
       },
-      { roles: ["HR", "MANAGER", "COMPANY_ADMIN", "SUPERVISOR"] }
+      { roles: ["HR", "COMPANY_ADMIN"] }
     );
   }
 

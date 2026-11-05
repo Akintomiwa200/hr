@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Download, Eye, EyeOff, FileText, FolderOpen, Link2, LockKeyhole, Trash2, Upload } from "lucide-react";
@@ -9,7 +9,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { UploadLinksDialog } from "@/components/documents/upload-links-dialog";
 import { notify, readApiError } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
-import { isSseHandshake } from "@/lib/events";
+import { useAppEvents } from "@/hooks/use-app-events";
+import { scheduleRouterRefresh } from "@/hooks/use-soft-refresh";
 import { DIRECT_UPLOAD_EXTENSIONS, DIRECT_UPLOAD_MAX_BYTES } from "@/lib/cloudinary-direct-upload";
 import { uploadCloudinaryFile } from "@/components/documents/cloudinary-browser-upload";
 
@@ -60,29 +61,10 @@ export function FolderDetailModule({
   const [form, setForm] = useState({ title: "", files: [] as File[], employeeId: "", visibility: "PRIVATE", protectionPin: "" });
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    const es = new EventSource("/api/events");
-    es.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as {
-          type?: string;
-          data?: Record<string, unknown>;
-        };
-        if (isSseHandshake(payload.type, payload.data)) return;
-        if (
-          payload.type &&
-          payload.type !== "document_updated" &&
-          payload.type !== "folder_updated"
-        ) {
-          return;
-        }
-        router.refresh();
-      } catch {
-        // ignore heartbeat / malformed payloads
-      }
-    };
-    return () => es.close();
-  }, [router]);
+  useAppEvents({
+    types: ["document_updated", "folder_updated"],
+    onEvent: () => scheduleRouterRefresh(() => router.refresh()),
+  });
 
   const upload = async () => {
     setLoading(true);

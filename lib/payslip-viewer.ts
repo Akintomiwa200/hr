@@ -102,13 +102,12 @@ export function getPayslipViewerContext(
   if (role === "SUPERVISOR") {
     return {
       ...base,
-      pageTitle: "Team payslip",
-      pageDescription: `View-only payslip for ${employeeName}`,
+      pageTitle: "My payslip",
+      pageDescription: "View and download your payslip",
       backLabel: "Back to payroll",
-      receiptKind: "Team member payslip",
-      documentSubtitle: "Supervisor view — read-only access",
-      payeeLabel: employeeName,
-      showEmployeeProfileLink: true,
+      receiptKind: "Personal payslip",
+      documentSubtitle: "Personal payslip",
+      payeeLabel: "You",
       downloadLabel: "Download payslip",
     };
   }

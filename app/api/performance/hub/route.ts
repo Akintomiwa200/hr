@@ -22,11 +22,11 @@ export async function GET() {
   const companyId = requireOrgCompanyId(scope);
 
   const companyKpiWhere = companyId
-    ? { OR: [{ companyId }, { companyId: null }] }
-    : {};
+    ? { companyId }
+    : { companyId: "__no_company__" };
   const companyCycleWhere = companyId
-    ? { OR: [{ companyId }, { companyId: null }] }
-    : {};
+    ? { companyId }
+    : { companyId: "__no_company__" };
 
   const [kpis, cycles, appraisals, departments, settings] = await Promise.all([
     prisma.kpiDefinition.findMany({

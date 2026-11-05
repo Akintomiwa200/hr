@@ -23,11 +23,17 @@ export async function canViewAppraisal(
   session: SessionUser,
   appraisal: { employeeId: string; managerId: string }
 ) {
+  const scope = getCompanyScope(session);
+  const employeeInScope = await prisma.employee.findFirst({
+    where: { id: appraisal.employeeId, ...employeeCompanyWhere(scope) },
+    select: { id: true },
+  });
+  if (!employeeInScope) return false;
   const role = normalizeRole(session.role);
   if (isSuperAdmin(role) || isCompanyAdmin(role) || isHrRole(role)) return true;
   if (session.employeeId === appraisal.employeeId) return true;
-  if (session.employeeId === appraisal.managerId) return true;
-  if ((role === "MANAGER" || role === "SUPERVISOR") && session.employeeId) {
+  if (role === "MANAGER" && session.employeeId === appraisal.managerId) return true;
+  if (role === "MANAGER" && session.employeeId) {
     const report = await prisma.employee.findFirst({
       where: { id: appraisal.employeeId, managerId: session.employeeId },
       select: { id: true },
@@ -60,6 +66,7 @@ export function canEditManagerAppraisal(
     );
   }
   return (
+    role === "MANAGER" &&
     session.employeeId === appraisal.managerId &&
     appraisal.status === "MANAGER_REVIEW"
   );
@@ -75,7 +82,7 @@ export async function appraisalListWhere(session: SessionUser) {
   if (role === "EMPLOYEE" && session.employeeId) {
     return { employeeId: session.employeeId, ...companyFilter };
   }
-  if ((role === "MANAGER" || role === "SUPERVISOR") && session.employeeId) {
+  if (role === "MANAGER" && session.employeeId) {
     return {
       AND: [
         companyFilter,

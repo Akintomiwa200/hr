@@ -19,31 +19,13 @@ function base(role: Role) {
 
 export function getLeaveWorkspace(role: Role): ModuleWorkspace {
   const r = base(role);
-  if (r === "EMPLOYEE") {
+  if (r === "EMPLOYEE" || r === "SUPERVISOR" || r === "MANAGER") {
     return {
       title: "My leave",
       description: "Request time off and track your approval status",
       mode: "self",
       canActForSelf: true,
       canActForTeam: false,
-    };
-  }
-  if (r === "SUPERVISOR") {
-    return {
-      title: "Team leave",
-      description: "View your team’s leave requests and manage your own time off",
-      mode: "team",
-      canActForSelf: true,
-      canActForTeam: false,
-    };
-  }
-  if (isTeamLeadRole(r)) {
-    return {
-      title: "Team leave",
-      description: "Approve requests for your reports and manage your own time off",
-      mode: "team",
-      canActForSelf: true,
-      canActForTeam: true,
     };
   }
   return {
@@ -57,7 +39,7 @@ export function getLeaveWorkspace(role: Role): ModuleWorkspace {
 
 export function getAttendanceWorkspace(role: Role): ModuleWorkspace {
   const r = base(role);
-  if (r === "EMPLOYEE") {
+  if (r === "EMPLOYEE" || r === "SUPERVISOR") {
     return {
       title: "My attendance",
       description: "Check in, check out, and review your daily history",
@@ -66,7 +48,7 @@ export function getAttendanceWorkspace(role: Role): ModuleWorkspace {
       canActForTeam: false,
     };
   }
-  if (isTeamLeadRole(r)) {
+  if (r === "MANAGER") {
     return {
       title: "Team attendance",
       description: "See who on your team is present, late, or remote today",
@@ -86,6 +68,15 @@ export function getAttendanceWorkspace(role: Role): ModuleWorkspace {
 
 export function getPeopleWorkspace(role: Role): ModuleWorkspace {
   const r = base(role);
+  if (r === "SUPERVISOR") {
+    return {
+      title: "My profile",
+      description: "View your own employee profile and work history",
+      mode: "self",
+      canActForSelf: true,
+      canActForTeam: false,
+    };
+  }
   if (canManageEmployees(r)) {
     return {
       title: "People admin",
@@ -115,7 +106,7 @@ export function getPeopleWorkspace(role: Role): ModuleWorkspace {
 
 export function getPerformanceWorkspace(role: Role): ModuleWorkspace {
   const r = base(role);
-  if (r === "EMPLOYEE") {
+  if (r === "EMPLOYEE" || r === "SUPERVISOR") {
     return {
       title: "My performance",
       description: "Complete self-appraisals, track KPIs, and view review results",
@@ -124,19 +115,10 @@ export function getPerformanceWorkspace(role: Role): ModuleWorkspace {
       canActForTeam: false,
     };
   }
-  if (r === "SUPERVISOR") {
-    return {
-      title: "Team reviews",
-      description: "Score appraisals for your reports and follow review progress",
-      mode: "team",
-      canActForSelf: true,
-      canActForTeam: true,
-    };
-  }
   if (r === "MANAGER") {
     return {
       title: "Performance leadership",
-      description: "Run cycles, define KPIs for your scope, and complete manager reviews",
+      description: "Complete manager reviews for your assigned team",
       mode: "team",
       canActForSelf: true,
       canActForTeam: true,
@@ -153,7 +135,7 @@ export function getPerformanceWorkspace(role: Role): ModuleWorkspace {
 
 export function getReportsWorkspace(role: Role): ModuleWorkspace {
   const r = base(role);
-  if (r === "EMPLOYEE") {
+  if (r === "EMPLOYEE" || r === "SUPERVISOR") {
     return {
       title: "My reports",
       description: "Personal leave and time-off insights available to you",
@@ -162,7 +144,7 @@ export function getReportsWorkspace(role: Role): ModuleWorkspace {
       canActForTeam: false,
     };
   }
-  if (isTeamLeadRole(r)) {
+  if (r === "MANAGER") {
     return {
       title: "Team reports",
       description: "Headcount, leave, and people insights for your direct reports",
@@ -229,7 +211,7 @@ export function getPayrollWorkspace(role: Role): ModuleWorkspace {
 
 export function getTeamsWorkspace(role: Role): ModuleWorkspace {
   const r = base(role);
-  if (r === "EMPLOYEE") {
+  if (r === "EMPLOYEE" || r === "SUPERVISOR") {
     return {
       title: "Teams directory",
       description: "See how teams are organized across the company (view only)",

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Sidebar, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/topbar";
 import { ChatDock } from "@/components/chat/chat-dock";
+import { ChatCallProvider } from "@/components/chat/chat-call-provider";
+import { RealtimeProvider } from "@/components/providers/realtime-provider";
 import { useAutoHideScrollbar } from "@/hooks/use-auto-hide-scrollbar";
 import { cn } from "@/lib/utils";
 import type { Role } from "@prisma/client";
@@ -91,62 +93,66 @@ export function DashboardShell({
       : SIDEBAR_WIDTH;
 
   return (
-    <div className="h-screen overflow-hidden bg-surface">
-      {isMobile && mobileOpen && (
-        <button
-          type="button"
-          aria-label="Close menu"
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
-          onClick={closeMobile}
-        />
-      )}
-
-      <Sidebar
-        role={role}
-        userName={userName}
-        userEmail={userEmail}
-        avatarUrl={avatarUrl}
-        collapsed={!isMobile && sidebarCollapsed}
-        mobileOpen={mobileOpen}
-        onCloseMobile={closeMobile}
-        employeeId={employeeId}
-        companyName={companyName}
-        companyLogo={companyLogo}
-        bonusesEnabled={bonusesEnabled}
-      />
-
-      <div
-        className="flex h-screen flex-col overflow-hidden transition-[margin] duration-200 ease-in-out"
-        style={{ marginLeft: sidebarWidth }}
-      >
-        <TopBar
-          firstName={firstName}
-          lastName={lastName}
-          userEmail={userEmail}
-          role={role}
-          employeeId={employeeId}
-          avatarUrl={avatarUrl}
-          sidebarCollapsed={isMobile ? !mobileOpen : sidebarCollapsed}
-          onToggleSidebar={toggleSidebar}
-          isMobile={isMobile}
-        />
-        <main
-          ref={mainScroll.ref}
-          className={cn(
-            "flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5 lg:px-6 pt-5 sm:pt-6 pb-8",
-            mainScroll.className
+    <RealtimeProvider>
+      <ChatCallProvider enabled={chatEnabled}>
+        <div className="h-screen overflow-hidden bg-surface">
+          {isMobile && mobileOpen && (
+            <button
+              type="button"
+              aria-label="Close menu"
+              className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+              onClick={closeMobile}
+            />
           )}
-        >
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
-        </main>
-      </div>
 
-      <ChatDock
-        currentUserId={userId}
-        currentUserName={userName}
-        currentUserAvatar={avatarUrl}
-        enabled={chatEnabled}
-      />
-    </div>
+          <Sidebar
+            role={role}
+            userName={userName}
+            userEmail={userEmail}
+            avatarUrl={avatarUrl}
+            collapsed={!isMobile && sidebarCollapsed}
+            mobileOpen={mobileOpen}
+            onCloseMobile={closeMobile}
+            employeeId={employeeId}
+            companyName={companyName}
+            companyLogo={companyLogo}
+            bonusesEnabled={bonusesEnabled}
+          />
+
+          <div
+            className="flex h-screen flex-col overflow-hidden transition-[margin] duration-200 ease-in-out"
+            style={{ marginLeft: sidebarWidth }}
+          >
+            <TopBar
+              firstName={firstName}
+              lastName={lastName}
+              userEmail={userEmail}
+              role={role}
+              employeeId={employeeId}
+              avatarUrl={avatarUrl}
+              sidebarCollapsed={isMobile ? !mobileOpen : sidebarCollapsed}
+              onToggleSidebar={toggleSidebar}
+              isMobile={isMobile}
+            />
+            <main
+              ref={mainScroll.ref}
+              className={cn(
+                "flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5 lg:px-6 pt-5 sm:pt-6 pb-8",
+                mainScroll.className
+              )}
+            >
+              <div className="mx-auto w-full max-w-6xl">{children}</div>
+            </main>
+          </div>
+
+          <ChatDock
+            currentUserId={userId}
+            currentUserName={userName}
+            currentUserAvatar={avatarUrl}
+            enabled={chatEnabled}
+          />
+        </div>
+      </ChatCallProvider>
+    </RealtimeProvider>
   );
 }

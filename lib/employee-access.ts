@@ -53,7 +53,7 @@ export async function canViewEmployee(
     return false;
   }
 
-  if (isTeamLeadRole(role) && session.employeeId) {
+  if (role === "MANAGER" && session.employeeId) {
     const report = await prisma.employee.findFirst({
       where: {
         id: employeeId,
@@ -79,7 +79,7 @@ export async function canViewEmployeeTimeData(
   if (!(await assertEmployeeInCompany(session, employeeId))) return false;
   if (!session.employeeId) return false;
 
-  if (isTeamLeadRole(role)) {
+  if (role === "MANAGER") {
     const report = await prisma.employee.findFirst({
       where: {
         id: employeeId,
@@ -102,14 +102,6 @@ export async function canApproveEmployeeLeave(
   if (!session.employeeId) return false;
   if (!(await assertEmployeeInCompany(session, employeeId))) return false;
 
-  if (isTeamLeadRole(role)) {
-    const report = await prisma.employee.findFirst({
-      where: { id: employeeId, OR: [{ managerId: session.employeeId }, { managers: { some: { id: session.employeeId } } }] },
-      select: { id: true },
-    });
-    return !!report;
-  }
-
   return false;
 }
 
@@ -118,6 +110,7 @@ export function teamScopedEmployeeWhere(
 ): Prisma.EmployeeWhereInput | undefined {
   if (!isTeamLeadRole(session.role)) return undefined;
   if (!session.employeeId) return { id: "__none__" };
+  if (normalizeRole(session.role) === "SUPERVISOR") return { id: session.employeeId };
   return {
     OR: [{ id: session.employeeId }, { managerId: session.employeeId }, { managers: { some: { id: session.employeeId } } }],
   };
@@ -131,7 +124,7 @@ export async function peopleDirectoryEmployeeWhere(
     return undefined;
   }
 
-  if (role === "EMPLOYEE") {
+  if (role === "EMPLOYEE" || role === "SUPERVISOR") {
     return undefined;
   }
 

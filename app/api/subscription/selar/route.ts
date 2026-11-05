@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getPlan, isPaidPlan, type SubscriptionPlanId } from "@/lib/subscription-plans";
 import { getSelarPlanLink, buildSelarCheckoutUrl, selarConfigured } from "@/lib/selar";
 import { audit } from "@/lib/audit";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { isCompanyAdmin, isSuperAdmin, normalizeRole } from "@/lib/roles";
 
 export async function POST(request: NextRequest) {
@@ -77,6 +78,11 @@ export async function POST(request: NextRequest) {
     action: "SETTING",
     entityLabel: "Selar checkout",
     meta: { planId, reference },
+  });
+
+  broadcastAppEvent("subscription_updated", {
+    companyId: company.id,
+    source: "selar_checkout",
   });
 
   return NextResponse.json({ checkoutUrl, reference, planId });

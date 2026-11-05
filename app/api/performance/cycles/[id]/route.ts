@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { activateAppraisalCycle } from "@/lib/performance/cycles";
-import { isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
+import { notFound, requireSession, unauthorized } from "@/lib/api-auth";
+import { canManagePerformance } from "@/lib/roles";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { getCompanyScope, requireOrgCompanyId } from "@/lib/company-scope";
 
 export async function GET(
   _request: NextRequest,
@@ -13,11 +15,20 @@ export async function GET(
   if (!session) return unauthorized();
 
   const { id } = await params;
+  const companyId = requireOrgCompanyId(getCompanyScope(session));
+  if (!companyId) return notFound();
   const cycle = await prisma.appraisalCycle.findUnique({
-    where: { id },
+    where: { id, companyId },
     include: {
       kpis: { include: { kpi: true } },
       appraisals: {
+        where: canManagePerformance(session.role) ? undefined : {
+          OR: [
+            { employeeId: session.employeeId ?? "__none__" },
+            { managerId: session.employeeId ?? "__none__" },
+            { employee: { managerId: session.employeeId ?? "__none__" } },
+          ],
+        },
         include: {
           employee: true,
           manager: true,
@@ -36,10 +47,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await requireSession();
-  if (!session || !isHr(session)) return unauthorized();
+  if (!session || !canManagePerformance(session.role)) return unauthorized();
 
   const { id } = await params;
   const body = await request.json();
+  const companyId = requireOrgCompanyId(getCompanyScope(session));
+  if (!companyId) return notFound();
+  const existing = await prisma.appraisalCycle.findFirst({ where: { id, companyId }, select: { id: true } });
+  if (!existing) return notFound();
 
   if (body.action === "activate") {
     try {

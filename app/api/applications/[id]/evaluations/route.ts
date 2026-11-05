@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { badRequest, isHr, notFound, requireSession, unauthorized } from "@/lib/api-auth";
 import { logApplicationActivity } from "@/lib/recruitment/activity";
+import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 
 export async function GET(
   _request: NextRequest,
@@ -55,5 +56,6 @@ export async function POST(
   });
 
   revalidatePath(`/recruitment/candidates/${id}`);
+  broadcastAppEvent("job_updated", { id: existing.jobId, action: "evaluation" });
   return NextResponse.json(evaluation);
 }
