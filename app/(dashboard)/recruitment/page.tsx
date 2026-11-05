@@ -15,9 +15,7 @@ export default async function RecruitmentPage() {
   const session = requireRecruitmentPage(await getSession());
 
   const scope = getCompanyScope(session);
-  const companyFilter = scope.companyId
-    ? { OR: [{ companyId: scope.companyId }, { companyId: null }] }
-    : {};
+  const companyFilter = scope.companyId ? { companyId: scope.companyId } : { id: "__no_company__" };
 
   const [jobs, departments, ctx] = await Promise.all([
     prisma.job.findMany({

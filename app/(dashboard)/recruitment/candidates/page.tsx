@@ -17,11 +17,9 @@ export default async function CandidatesPage() {
 
   const scope = getCompanyScope(session);
   const companyFilter = scope.companyId
-    ? { job: { OR: [{ companyId: scope.companyId }, { companyId: null }] } }
-    : {};
-  const jobCompanyFilter = scope.companyId
-    ? { OR: [{ companyId: scope.companyId }, { companyId: null }] }
-    : {};
+    ? { job: { companyId: scope.companyId } }
+    : { id: "__no_company__" };
+  const jobCompanyFilter = scope.companyId ? { companyId: scope.companyId } : { id: "__no_company__" };
 
   const [applications, jobs, ctx] = await Promise.all([
     prisma.jobApplication.findMany({

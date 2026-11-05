@@ -20,7 +20,7 @@ export function employeeCompanyWhere(
   scope: CompanyScope
 ): Prisma.EmployeeWhereInput {
   if (scope.isPlatformAdmin && !scope.companyId) return {};
-  if (!scope.companyId) return {};
+  if (!scope.companyId) return { id: "__no_company__" };
   return { user: { companyId: scope.companyId } };
 }
 

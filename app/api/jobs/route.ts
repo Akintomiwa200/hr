@@ -15,7 +15,9 @@ export async function GET() {
 
   const companyId = await resolveRecruitmentCompanyId(session.id, session.companyId);
   const jobs = await prisma.job.findMany({
-    where: companyId ? { OR: [{ companyId }, { companyId: null }] } : {},
+    // Jobs include applicant records, so only return jobs owned by this tenant.
+    // A null companyId is not a shared job; legacy rows must not leak between tenants.
+    where: companyId ? { companyId } : { id: "__no_company__" },
     include: {
       department: true,
       applications: true,

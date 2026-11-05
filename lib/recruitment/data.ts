@@ -54,7 +54,7 @@ export async function getRecruitmentContext(companyId: string | null | undefined
       ? prisma.recruitmentEmailTemplate.findMany({ where: { companyId }, orderBy: { updatedAt: "desc" } })
       : Promise.resolve([]),
     prisma.employee.findMany({
-      where: companyId ? { user: { companyId } } : {},
+      where: companyId ? { user: { companyId } } : { id: "__no_company__" },
       select: { id: true, firstName: true, lastName: true, email: true },
       orderBy: { firstName: "asc" },
     }),

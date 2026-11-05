@@ -9,17 +9,17 @@ import {
 } from "@/lib/dashboard-date-range";
 
 function orgEmployeeWhere(companyId?: string | null) {
-  if (!companyId) return {};
+  if (!companyId) return { id: "__no_company__" };
   return { user: { companyId } };
 }
 
 function orgDepartmentWhere(companyId?: string | null) {
-  if (!companyId) return {};
-  return { OR: [{ companyId }, { companyId: null }] };
+  if (!companyId) return { id: "__no_company__" };
+  return { companyId };
 }
 
 function orgDeviceWhere(companyId?: string | null) {
-  if (!companyId) return {};
+  if (!companyId) return { id: "__no_company__" };
   return { companyId };
 }
 type AttendanceStatus = "PRESENT" | "ABSENT" | "LATE" | "EARLY" | "REMOTE" | "HALF_DAY";
@@ -870,8 +870,10 @@ export async function getCompanyAdminDashboardData(
     }),
     companyId
       ? prisma.integration.count({ where: { companyId, status: "CONNECTED" } }).catch(() => 0)
-      : prisma.integration.count({ where: { status: "CONNECTED" } }).catch(() => 0),
-    prisma.appraisalCycle.count({ where: { status: "ACTIVE" } }),
+      : Promise.resolve(0),
+    companyId
+      ? prisma.appraisalCycle.count({ where: { companyId, status: "ACTIVE" } })
+      : Promise.resolve(0),
   ]);
   return {
     ...hr,
