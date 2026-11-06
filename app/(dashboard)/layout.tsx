@@ -81,6 +81,7 @@ export default async function DashboardLayout({
           companyLogo={companyLogo}
           bonusesEnabled={bonusesEnabled}
           chatEnabled={Boolean(session.companyId)}
+          platformContext={session.platformContext}
         >
           {/* DEMO MODE: plan/feature gate disabled — see comment.md to re-enable. */}
           {/* <PlanFeatureGate planId={session.companyId ? companyPlan : null}> */}

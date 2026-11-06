@@ -54,7 +54,7 @@ export type AuditAction = (typeof auditActions)[number];
 
 export type AuditActor = Pick<
   SessionUser,
-  "id" | "email" | "firstName" | "lastName" | "role" | "companyId"
+  "id" | "email" | "firstName" | "lastName" | "role" | "companyId" | "platformContext"
 >;
 
 export type AuditEntry = {
@@ -74,7 +74,10 @@ export function actorDisplayName(actor: AuditActor): string {
 
 /** Fire-and-forget write; never throws into the calling route. */
 export function audit(entry: AuditEntry) {
-  const meta = entry.meta as Prisma.InputJsonObject | undefined;
+  const meta = {
+    ...entry.meta,
+    ...(entry.actor.platformContext ? { platformAdminContext: true } : {}),
+  } as Prisma.InputJsonObject;
   return prisma.auditLog
     .create({
       data: {
@@ -86,7 +89,7 @@ export function audit(entry: AuditEntry) {
         module: entry.module,
         entityId: entry.entityId ?? null,
         entityLabel: entry.entityLabel ?? null,
-        meta: meta ?? undefined,
+        meta,
         ipAddress: entry.ipAddress ?? null,
       },
     })

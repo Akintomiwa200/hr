@@ -9,6 +9,7 @@ import { RealtimeProvider } from "@/components/providers/realtime-provider";
 import { useAutoHideScrollbar } from "@/hooks/use-auto-hide-scrollbar";
 import { cn } from "@/lib/utils";
 import type { Role } from "@prisma/client";
+import { CompanyWorkspaceSwitcher } from "@/components/admin/company-workspace-switcher";
 
 function useIsMobile(breakpoint = 1024) {
   const [isMobile, setIsMobile] = useState(false);
@@ -37,6 +38,7 @@ export function DashboardShell({
   companyLogo,
   bonusesEnabled = false,
   chatEnabled = false,
+  platformContext = false,
   children,
 }: {
   role: Role;
@@ -51,6 +53,7 @@ export function DashboardShell({
   companyLogo?: string | null;
   bonusesEnabled?: boolean;
   chatEnabled?: boolean;
+  platformContext?: boolean;
   children: React.ReactNode;
 }) {
   const isMobile = useIsMobile();
@@ -143,6 +146,17 @@ export function DashboardShell({
                 mainScrollClassName
               )}
             >
+              {platformContext && (
+                <div className="mx-auto mb-4 flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+                  <div>
+                    <p className="text-xs font-semibold text-violet-950">Platform support workspace</p>
+                    <p className="mt-0.5 text-[11px] text-violet-800">
+                      {companyName ? `Viewing ${companyName} as a company administrator.` : "Viewing this tenant as a company administrator."} Return to platform controls at any time.
+                    </p>
+                  </div>
+                  <CompanyWorkspaceSwitcher exit />
+                </div>
+              )}
               <div className="mx-auto w-full max-w-6xl">{children}</div>
             </main>
           </div>

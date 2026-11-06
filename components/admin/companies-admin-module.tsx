@@ -5,6 +5,7 @@ import { Building2, Search, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { planLabel } from "@/lib/subscription-plans";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
+import { CompanyCreateButton } from "@/components/admin/company-create-button";
 import { CompanyRowMenu, type CompanyMenuRow } from "./company-row-menu";
 
 const selectClass =
@@ -64,7 +65,7 @@ export function CompaniesAdminModule({ companies }: { companies: CompanyMenuRow[
       <PageLiveRefresh
         types={["subscription_updated", "settings_updated", "dashboard_updated"]}
       />
-      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
         <div>
           <h2 className="text-[13px] font-semibold text-gray-900">All companies</h2>
           <p className="mt-0.5 text-[11px] text-gray-500">
@@ -73,10 +74,13 @@ export function CompaniesAdminModule({ companies }: { companies: CompanyMenuRow[
             users, employees, billing, and activity.
           </p>
         </div>
-        <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-          Live subscription sync
-        </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+            Live subscription sync
+          </span>
+          <CompanyCreateButton />
+        </div>
       </div>
 
       <div className="flex flex-col gap-2 border-b border-gray-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">

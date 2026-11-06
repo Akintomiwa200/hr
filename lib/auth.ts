@@ -21,6 +21,8 @@ export interface SessionUser {
   avatar?: string;
   /** True when the company is locked pending a subscription (real-time gate). */
   locked?: boolean;
+  /** True while a platform admin is temporarily viewing one tenant workspace. */
+  platformContext?: boolean;
 }
 
 const secret = new TextEncoder().encode(
@@ -28,6 +30,29 @@ const secret = new TextEncoder().encode(
 );
 
 const COOKIE_NAME = "smart-hr-session";
+const PLATFORM_CONTEXT_COOKIE = "smart-hr-platform-company";
+
+export async function createPlatformCompanyContext(userId: string, companyId: string) {
+  const token = await new SignJWT({ companyId })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(userId)
+    .setIssuedAt()
+    .setExpirationTime("4h")
+    .sign(secret);
+  const cookieStore = await cookies();
+  cookieStore.set(PLATFORM_CONTEXT_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 4,
+    path: "/",
+  });
+}
+
+export async function clearPlatformCompanyContext() {
+  const cookieStore = await cookies();
+  cookieStore.delete(PLATFORM_CONTEXT_COOKIE);
+}
 
 export async function createSession(user: SessionUser) {
   const token = await new SignJWT({
@@ -84,6 +109,28 @@ export async function getSession(): Promise<SessionUser | null> {
     if (!dbUser || !dbUser.isActive || dbUser.archivedAt) return null;
 
     let companyId = dbUser.companyId;
+    let platformContext = false;
+    if (dbUser.role === Role.SUPER_ADMIN && !companyId) {
+      const contextToken = cookieStore.get(PLATFORM_CONTEXT_COOKIE)?.value;
+      if (contextToken) {
+        try {
+          const { payload } = await jwtVerify(contextToken, secret);
+          const selectedCompanyId = payload.companyId;
+          if (payload.sub === dbUser.id && typeof selectedCompanyId === "string") {
+            const selectedCompany = await prisma.company.findUnique({
+              where: { id: selectedCompanyId },
+              select: { id: true, isActive: true },
+            });
+            if (selectedCompany?.isActive) {
+              companyId = selectedCompany.id;
+              platformContext = true;
+            }
+          }
+        } catch {
+          // Expired or invalid context cookies do not grant tenant access.
+        }
+      }
+    }
     let locked = false;
     if (companyId) {
       const company = await prisma.company.findUnique({
@@ -120,6 +167,7 @@ export async function getSession(): Promise<SessionUser | null> {
       role: effectiveRole,
       companyId,
       locked,
+      platformContext,
       employeeId: dbUser.employee?.id,
       firstName: dbUser.employee?.firstName || userPrefs.firstName || defaultFirst,
       lastName: dbUser.employee?.lastName || userPrefs.lastName || defaultLast,
@@ -133,6 +181,7 @@ export async function getSession(): Promise<SessionUser | null> {
 export async function destroySession() {
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_NAME);
+  cookieStore.delete(PLATFORM_CONTEXT_COOKIE);
 }
 
 export { canManageEmployees, canManagePayroll, canApproveLeave };

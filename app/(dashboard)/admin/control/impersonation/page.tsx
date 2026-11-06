@@ -16,6 +16,7 @@ export default async function PlatformImpersonationPage() {
   const logs = await prisma.auditLog.findMany({
     where: {
       OR: [
+        { module: "platform-context" },
         { module: { contains: "imperson", mode: "insensitive" } },
         { action: { contains: "imperson", mode: "insensitive" } },
         { entityLabel: { contains: "imperson", mode: "insensitive" } },
@@ -26,11 +27,17 @@ export default async function PlatformImpersonationPage() {
     take: 100,
   });
 
+  const tenantIds = [...new Set(logs.map((log) => log.entityId).filter((id): id is string => Boolean(id)))];
+  const tenantRows = tenantIds.length
+    ? await prisma.company.findMany({ where: { id: { in: tenantIds } }, select: { id: true, name: true } })
+    : [];
+  const tenantById = new Map(tenantRows.map((company) => [company.id, company]));
+
   const administrators = new Set(
     logs.map((log) => log.actorUserId ?? log.actorName)
   ).size;
   const companies = new Set(
-    logs.map((log) => log.company?.name).filter(Boolean)
+    logs.map((log) => log.company?.name ?? tenantById.get(log.entityId ?? "")?.name).filter(Boolean)
   ).size;
 
   return (
@@ -39,8 +46,8 @@ export default async function PlatformImpersonationPage() {
         types={["audit_updated", "dashboard_updated", "support_updated"]}
       />
       <PageHeader
-        title="Impersonation logs & access"
-        description="Audit events that describe support access across client tenants."
+        title="Company workspace access"
+        description="Enter a tenant from its company profile, work in the company-admin workspace, and return to platform controls at any time."
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -55,16 +62,17 @@ export default async function PlatformImpersonationPage() {
       </div>
 
       <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-blue-900">
-        No dedicated impersonation workflow is configured in this deployment.
-        This page surfaces matching audit events only and never grants tenant
-        access from the platform console.
+        Platform workspace access is signed, limited to four hours, scoped to
+        one active company at a time, and recorded in the platform audit trail.
+        Tenant changes made through audited workflows are marked as platform
+        support actions.
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
           <div>
             <h2 className="text-[13px] font-semibold text-gray-900">
-              Support access events
+              Company workspace access events
             </h2>
             <p className="mt-1 text-xs text-gray-500">
               {logs.length
@@ -92,6 +100,10 @@ export default async function PlatformImpersonationPage() {
             <tbody className="divide-y divide-gray-50">
               {logs.map((log) => (
                 <tr key={log.id} className="hover:bg-gray-50/60">
+                  {(() => {
+                    const tenant = log.company ?? tenantById.get(log.entityId ?? "");
+                    return (
+                      <>
                   <td className="whitespace-nowrap px-5 py-3 text-[12px] text-gray-500">
                     {formatPlatformDateTime(log.createdAt)}
                   </td>
@@ -116,12 +128,12 @@ export default async function PlatformImpersonationPage() {
                     {log.module}
                   </td>
                   <td className="px-5 py-3 text-[12.5px] text-gray-600">
-                    {log.company ? (
+                    {tenant ? (
                       <Link
-                        href={`/admin/companies/${log.company.id}`}
+                        href={`/admin/companies/${tenant.id}`}
                         className="hover:text-violet-700"
                       >
-                        {log.company.name}
+                        {tenant.name}
                       </Link>
                     ) : (
                       <span className="text-gray-400">Platform</span>
@@ -130,6 +142,9 @@ export default async function PlatformImpersonationPage() {
                   <td className="max-w-[240px] truncate px-5 py-3 text-[12px] text-gray-500">
                     {log.entityLabel ?? "—"}
                   </td>
+                      </>
+                    );
+                  })()}
                 </tr>
               ))}
               {logs.length === 0 && (

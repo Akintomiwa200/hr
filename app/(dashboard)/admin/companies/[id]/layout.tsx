@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { planLabel } from "@/lib/subscription-plans";
 import { Badge, PageHeader } from "@/components/ui";
 import { CompanyTabNav } from "@/components/admin/company-tab-nav";
+import { CompanyWorkspaceSwitcher } from "@/components/admin/company-workspace-switcher";
 import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function CompanyDetailLayout({
@@ -59,11 +60,16 @@ export default async function CompanyDetailLayout({
         title={company.name}
         description={`${company.slug} · ${planLabel(company.plan)} · ${company.subscriptionStatus}`}
         action={
-          <div className="flex flex-col items-end gap-1.5">
-            <Badge variant={company.isActive ? "success" : "neutral"}>
-              {company.isActive ? "Active" : "Inactive"}
-            </Badge>
-            {company.isLocked && <Badge variant="warning">Locked</Badge>}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex flex-col items-end gap-1.5">
+              <Badge variant={company.isActive ? "success" : "neutral"}>
+                {company.isActive ? "Active" : "Inactive"}
+              </Badge>
+              {company.isLocked && <Badge variant="warning">Locked</Badge>}
+            </div>
+            {company.isActive && (
+              <CompanyWorkspaceSwitcher companyId={company.id} companyName={company.name} />
+            )}
           </div>
         }
       />
