@@ -95,8 +95,8 @@ export function DepartmentDetailModule({
   const router = useRouter();
   const [memberSearch, setMemberSearch] = useState("");
   const [jobSearch, setJobSearch] = useState("");
-  const membersScroll = useAutoHideScrollbar();
-  const jobsScroll = useAutoHideScrollbar();
+  const { ref: membersScrollRef, className: membersScrollClassName } = useAutoHideScrollbar();
+  const { ref: jobsScrollRef, className: jobsScrollClassName } = useAutoHideScrollbar();
 
   const memberIds = useMemo(() => new Set(members.map((m) => m.id)), [members]);
 
@@ -363,8 +363,8 @@ export function DepartmentDetailModule({
           </div>
 
           <div
-            ref={membersScroll.ref as React.Ref<HTMLDivElement>}
-            className={cn("p-3 max-h-[480px] overflow-y-auto overscroll-contain", membersScroll.className)}
+            ref={membersScrollRef as React.Ref<HTMLDivElement>}
+            className={cn("p-3 max-h-[480px] overflow-y-auto overscroll-contain", membersScrollClassName)}
           >
             {members.length === 0 ? (
               <EmptyState
@@ -451,8 +451,8 @@ export function DepartmentDetailModule({
           </div>
 
           <div
-            ref={jobsScroll.ref as React.Ref<HTMLDivElement>}
-            className={cn("p-3 max-h-[480px] overflow-y-auto overscroll-contain", jobsScroll.className)}
+            ref={jobsScrollRef as React.Ref<HTMLDivElement>}
+            className={cn("p-3 max-h-[480px] overflow-y-auto overscroll-contain", jobsScrollClassName)}
           >
             {jobs.length === 0 ? (
               <EmptyState

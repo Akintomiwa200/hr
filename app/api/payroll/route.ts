@@ -72,7 +72,6 @@ export async function POST(request: NextRequest) {
 
   await ensurePayrollSettings(session.companyId);
 
-  let items: PayrollLineItem[];
   let pendingDeductionIds: string[] = [];
   // Rebuild from the current employee salary at save time. A preview can stay
   // open while HR changes the employee's compensation in another tab.
@@ -90,7 +89,7 @@ export async function POST(request: NextRequest) {
     manualItems: previewManualItems ?? manualItems,
     companyId: session.companyId,
   });
-  items = result.items;
+  const items: PayrollLineItem[] = result.items;
   pendingDeductionIds = result.meta.pendingDeductionIds;
 
   const summary = summarizePayroll(items);

@@ -165,7 +165,7 @@ export function OrgChartTree({
   nodes: OrgChartNode[];
   emptyMessage?: string;
 }) {
-  const scroll = useAutoHideScrollbar();
+  const { ref: scrollRef, className: scrollClassName } = useAutoHideScrollbar();
 
   if (nodes.length === 0) {
     return (
@@ -179,10 +179,10 @@ export function OrgChartTree({
 
   return (
     <div
-      ref={scroll.ref as React.Ref<HTMLDivElement>}
+      ref={scrollRef as React.Ref<HTMLDivElement>}
       className={cn(
         "w-full overflow-x-auto overflow-y-visible py-8 px-6 -mx-2",
-        scroll.className
+        scrollClassName
       )}
     >
       <ul className="inline-flex min-w-max justify-center gap-14 mx-auto list-none m-0 p-0">

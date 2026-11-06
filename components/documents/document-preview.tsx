@@ -131,7 +131,11 @@ export function DocumentPreview({ documentId, fileName, mimeType, protectedFile 
   }, [documentId, fileName, mimeType]);
 
   const isPdf = mimeType?.toLowerCase() === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
-  useEffect(() => { if (!protectedFile) void load(undefined, isPdf ? 1 : undefined); }, [load, isPdf, protectedFile]);
+  useEffect(() => {
+    queueMicrotask(() => {
+      if (!protectedFile) void load(undefined, isPdf ? 1 : undefined);
+    });
+  }, [load, isPdf, protectedFile]);
 
   async function openProtected(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

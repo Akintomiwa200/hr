@@ -447,26 +447,31 @@ export function ApiDocsModule({
   }, [catalog, query]);
 
   useEffect(() => {
-    const hash = window.location.hash.replace("#", "");
-    if (!hash) return;
-    if (hash === "guide") {
-      setView("guide");
-      return;
-    }
-    const cat = catalog.categories.find((c) => c.id === hash);
-    if (cat) {
-      setView("reference");
-      setActiveCategory(cat.id);
-    }
+    queueMicrotask(() => {
+      const hash = window.location.hash.replace("#", "");
+      if (!hash) return;
+      if (hash === "guide") {
+        setView("guide");
+        return;
+      }
+      const cat = catalog.categories.find((c) => c.id === hash);
+      if (cat) {
+        setView("reference");
+        setActiveCategory(cat.id);
+      }
+    });
   }, [catalog.categories]);
 
-  useEffect(() => {
-    if (filteredCategories.length === 0) return;
-    const stillVisible = filteredCategories.some((c) => c.id === activeCategory);
-    if (!stillVisible) {
+  const [prevFilteredCategories, setPrevFilteredCategories] = useState(filteredCategories);
+  if (prevFilteredCategories !== filteredCategories) {
+    setPrevFilteredCategories(filteredCategories);
+    if (
+      filteredCategories.length > 0 &&
+      !filteredCategories.some((c) => c.id === activeCategory)
+    ) {
       setActiveCategory(filteredCategories[0].id);
     }
-  }, [filteredCategories, activeCategory]);
+  }
 
   const selectCategory = (id: string) => {
     setView("reference");

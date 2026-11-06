@@ -293,9 +293,11 @@ export function AttendanceModule({
   const [saving, setSaving] = useState(false);
   const [liveAt, setLiveAt] = useState<Date | null>(null);
 
-  useEffect(() => {
+  const [prevOverview, setPrevOverview] = useState(overview);
+  if (prevOverview !== overview) {
+    setPrevOverview(overview);
     setData(overview);
-  }, [overview]);
+  }
 
   const loadOverview = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -413,10 +415,13 @@ export function AttendanceModule({
     return devices.filter((d) => d.branchId === branchId);
   }, [devices, branchId]);
 
-  useEffect(() => {
-    if (deviceId === "ALL") return;
-    if (!devicesByBranch.some((d) => d.id === deviceId)) setDeviceId("ALL");
-  }, [deviceId, devicesByBranch]);
+  const [prevDevicesByBranch, setPrevDevicesByBranch] = useState(devicesByBranch);
+  if (prevDevicesByBranch !== devicesByBranch) {
+    setPrevDevicesByBranch(devicesByBranch);
+    if (deviceId !== "ALL" && !devicesByBranch.some((d) => d.id === deviceId)) {
+      setDeviceId("ALL");
+    }
+  }
 
   const selectedDevice = useMemo(
     () => (deviceId === "ALL" ? null : devices.find((d) => d.id === deviceId) ?? null),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -60,9 +60,11 @@ export function OrgChartModule({
   const [search, setSearch] = useState("");
 
   // Keep filter in sync with the URL so "Org Chart" (no ?dept=) always shows the full company.
-  useEffect(() => {
+  const [prevResolvedFilter, setPrevResolvedFilter] = useState(resolvedFilter);
+  if (prevResolvedFilter !== resolvedFilter) {
+    setPrevResolvedFilter(resolvedFilter);
     setDepartmentFilter(resolvedFilter);
-  }, [resolvedFilter]);
+  }
 
   function selectDepartment(next: string) {
     setDepartmentFilter(next);

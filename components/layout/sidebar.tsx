@@ -43,9 +43,11 @@ function NestedNavItem({
   const visibleChildren = item.subItems?.filter((child) => hasRole(role, child.roles)) ?? [];
   const active = activeId === item.id || Boolean(item.subItems?.some((child) => containsActiveId(child, activeId))) || (!item.subItems?.length && isNavMatch(pathname, item));
 
-  useEffect(() => {
+  const [prevActive, setPrevActive] = useState(active);
+  if (prevActive !== active) {
+    setPrevActive(active);
     if (active) setIsOpen(true);
-  }, [active]);
+  }
 
   if (visibleChildren.length === 0) {
     return (
@@ -179,9 +181,11 @@ function NavCollapsible({
   const Icon = item.icon;
 
   // Re-open if it becomes active from outside
-  useEffect(() => {
+  const [prevIsActive, setPrevIsActive] = useState(isActive);
+  if (prevIsActive !== isActive) {
+    setPrevIsActive(isActive);
     if (isActive) setIsOpen(true);
-  }, [isActive]);
+  }
 
   if (collapsed) {
     return (
@@ -387,13 +391,18 @@ export function Sidebar({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [failedLogoSrc, setFailedLogoSrc] = useState<string | null>(null);
-  const navScroll = useAutoHideScrollbar();
+  const { ref: navScrollRef, className: navScrollClassName } = useAutoHideScrollbar();
   const { summary } = useNavSummary();
 
   useEffect(() => {
     onCloseMobile?.();
-    setMenuOpen(false);
   }, [pathname, onCloseMobile]);
+
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    setMenuOpen(false);
+  }
 
   const visibleItems = getAllNavItems(role);
   const activeId = getActiveNavId(pathname, visibleItems);
@@ -451,11 +460,11 @@ export function Sidebar({
       </div>
 
       <nav
-        ref={navScroll.ref}
+        ref={navScrollRef}
         className={cn(
           "flex-1 overflow-y-auto overflow-x-hidden overscroll-contain",
           collapsed ? "px-2" : "px-3",
-          navScroll.className
+          navScrollClassName
         )}
       >
         {navSections.map((section) => (

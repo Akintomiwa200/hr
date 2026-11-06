@@ -23,11 +23,12 @@ export function ChatDock({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const activityAt = useRef(Date.now());
+  const activityAt = useRef(0);
   const lastPresence = useRef<string | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
+    activityAt.current = Date.now();
     let pending: number | null = null;
     const getPresence = () =>
       document.visibilityState === "visible" && Date.now() - activityAt.current < 2 * 60_000

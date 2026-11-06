@@ -70,8 +70,10 @@ export function ChecklistTemplateDetailModule({
   }, [templateId]);
 
   useEffect(() => {
-    setLoading(true);
-    void load();
+    queueMicrotask(() => {
+      setLoading(true);
+      void load();
+    });
   }, [load]);
 
   useAppEvents({

@@ -31,7 +31,7 @@ export function ChatLauncher({ onClick }: { onClick: () => void }) {
   }, [loadUnread]);
 
   useEffect(() => {
-    void loadUnread();
+    queueMicrotask(() => void loadUnread());
 
     const handleFocus = () => void loadUnread();
     const handleVisibility = () => {

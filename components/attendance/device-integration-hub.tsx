@@ -197,7 +197,7 @@ export function DeviceIntegrationHub() {
     loadDocsAbortRef.current?.abort();
     const controller = new AbortController();
     loadDocsAbortRef.current = controller;
-    void loadDocs(false, controller.signal);
+    queueMicrotask(() => void loadDocs(false, controller.signal));
     return () => {
       controller.abort();
       loadDocsAbortRef.current = null;

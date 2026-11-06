@@ -56,13 +56,15 @@ export function DashboardShell({
   const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const mainScroll = useAutoHideScrollbar();
+  const { ref: mainScrollRef, className: mainScrollClassName } = useAutoHideScrollbar();
 
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
-  useEffect(() => {
+  const [prevIsMobile, setPrevIsMobile] = useState(isMobile);
+  if (prevIsMobile !== isMobile) {
+    setPrevIsMobile(isMobile);
     if (!isMobile) setMobileOpen(false);
-  }, [isMobile]);
+  }
 
   useEffect(() => {
     const html = document.documentElement;
@@ -135,10 +137,10 @@ export function DashboardShell({
               isMobile={isMobile}
             />
             <main
-              ref={mainScroll.ref}
+              ref={mainScrollRef}
               className={cn(
                 "flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5 lg:px-6 pt-5 sm:pt-6 pb-8",
-                mainScroll.className
+                mainScrollClassName
               )}
             >
               <div className="mx-auto w-full max-w-6xl">{children}</div>

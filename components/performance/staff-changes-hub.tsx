@@ -33,7 +33,7 @@ export function StaffChangesHub({ mode, title }: { mode: "PROMOTION" | "SALARY_I
     if (!response.ok) throw new Error(await readApiError(response, "Could not load staff reviews."));
     setData(await response.json()); setLoading(false);
   }, []);
-  useEffect(() => { load().catch((e) => { setLoading(false); notify.error(e.message); }); }, [load]);
+  useEffect(() => { queueMicrotask(() => { load().catch((e) => { setLoading(false); notify.error(e.message); }); }); }, [load]);
   useAppEvents({ types: ["staff_review_updated", "appraisal_updated"], onEvent: () => { void load(); } });
 
   const allRequests = useMemo(() => data.requests.filter((item) => mode === "APPROVALS" || item.type === mode), [data.requests, mode]);

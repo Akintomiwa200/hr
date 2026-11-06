@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Settings2 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
@@ -21,7 +21,11 @@ export function PayrollSettingsPanel({
   const [form, setForm] = useState(settings);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => setForm(settings), [settings]);
+  const [prevSettings, setPrevSettings] = useState(settings);
+  if (prevSettings !== settings) {
+    setPrevSettings(settings);
+    setForm(settings);
+  }
 
   const save = async () => {
     setLoading(true);

@@ -62,7 +62,7 @@ export function LearningHub({ roleLabel, section }: { roleLabel: string; section
     }
   }, []);
 
-  useEffect(() => { void load(true); }, [load]);
+  useEffect(() => { queueMicrotask(() => void load(true)); }, [load]);
   useAppEvents({ types: ["training_updated"], onEvent: () => { void load(false); } });
 
   const submit = async (payload: Record<string, string>) => {
@@ -180,8 +180,9 @@ function AssignmentRow({ assignment, busy, onUpdate, showEmployee }: { assignmen
 }
 
 function RecordCard({ record, certification, showEmployee }: { record: RecordItem; certification: boolean; showEmployee: boolean }) {
-  const expired = record.expiresAt ? new Date(record.expiresAt).getTime() < Date.now() : false;
-  const expiringSoon = record.expiresAt ? !expired && new Date(record.expiresAt).getTime() < Date.now() + 1000 * 60 * 60 * 24 * 60 : false;
+  const [now] = useState(() => Date.now());
+  const expired = record.expiresAt ? new Date(record.expiresAt).getTime() < now : false;
+  const expiringSoon = record.expiresAt ? !expired && new Date(record.expiresAt).getTime() < now + 1000 * 60 * 60 * 24 * 60 : false;
   return <article className="flex min-h-[190px] flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><div className="flex items-start justify-between gap-3"><span className={`flex h-11 w-11 items-center justify-center rounded-xl ${certification ? "bg-amber-50 text-amber-700" : "bg-sky-50 text-sky-700"}`}>{certification ? <Award className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}</span>{certification && record.expiresAt && <Status value={expired ? "EXPIRED" : expiringSoon ? "EXPIRING" : "VALID"} />}</div><h2 className="mt-4 font-semibold text-gray-900">{record.title}</h2>{record.level && <p className="mt-1 text-sm text-gray-500">{certification ? "Level / reference" : "Proficiency"}: {record.level}</p>}<div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-5 text-xs text-gray-500"><span>{showEmployee ? `${record.employee.firstName} ${record.employee.lastName}` : "Your profile"}</span>{record.expiresAt && <span>{expired ? "Expired" : "Expires"} {new Date(record.expiresAt).toLocaleDateString()}</span>}</div></article>;
 }
 

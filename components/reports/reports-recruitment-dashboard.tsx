@@ -108,13 +108,13 @@ function DoughnutChartSvg({ chart }: { chart: ChartSegment[] }) {
   const total = chart.reduce((s, x) => s + x.value, 0);
 
   let acc = -90;
-  const segments = chart.map((seg) => {
+  const segments: Array<{ seg: ChartSegment; dash: number; rotation: number }> = [];
+  for (const seg of chart) {
     const f = seg.value / total;
     const dash = f * C - pad;
-    const rotation = acc;
+    segments.push({ seg, dash, rotation: acc });
     acc += f * 360;
-    return { seg, dash, rotation };
-  });
+  }
 
   return (
     <svg viewBox="0 0 200 200" className="h-full w-full">

@@ -72,9 +72,11 @@ export function ChecklistInstanceDetailModule({
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const [prevInitial, setPrevInitial] = useState(initial);
+  if (prevInitial !== initial) {
+    setPrevInitial(initial);
     setInstance(initial);
-  }, [initial]);
+  }
 
   useEffect(() => {
     void fetch("/api/employees?status=ACTIVE")

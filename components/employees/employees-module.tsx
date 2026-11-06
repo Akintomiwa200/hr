@@ -156,9 +156,11 @@ export function EmployeesModule({
     emptyEmployeeForm(departments)
   );
 
-  useEffect(() => {
+  const [prevInitialEmployees, setPrevInitialEmployees] = useState(initialEmployees);
+  if (prevInitialEmployees !== initialEmployees) {
+    setPrevInitialEmployees(initialEmployees);
     setEmployees(initialEmployees);
-  }, [initialEmployees]);
+  }
 
   useAppEvents({
     types: ["employee_updated", "department_updated", "checklist_updated"],
@@ -251,12 +253,14 @@ export function EmployeesModule({
   }
 
   useEffect(() => {
-    if (!canManage) return;
-    if (searchParams.get("add") !== "1") return;
-    setFormData(emptyEmployeeForm(departments));
-    setCreateSuccess(null);
-    setCreateOpen(true);
-    router.replace("/employees", { scroll: false });
+    queueMicrotask(() => {
+      if (!canManage) return;
+      if (searchParams.get("add") !== "1") return;
+      setFormData(emptyEmployeeForm(departments));
+      setCreateSuccess(null);
+      setCreateOpen(true);
+      router.replace("/employees", { scroll: false });
+    });
   }, [canManage, searchParams, router, departments]);
 
   function openEdit(emp: EmployeeRow) {

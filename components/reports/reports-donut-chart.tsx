@@ -14,8 +14,9 @@ export function ReportsDonutChart({
   const cx = size / 2;
   const cy = size / 2;
   let angle = -90;
+  const arcs: Array<(ChartSegment & { d: string; pct: number }) | null> = [];
 
-  const arcs = segments.map((seg) => {
+  for (const seg of segments) {
     const sweep = (seg.value / total) * 360;
     const start = angle;
     angle += sweep;
@@ -26,13 +27,16 @@ export function ReportsDonutChart({
     const y1 = cy + r * Math.sin(rad(start));
     const x2 = cx + r * Math.cos(rad(end));
     const y2 = cy + r * Math.sin(rad(end));
-    if (seg.value === 0) return null;
+    if (seg.value === 0) {
+      arcs.push(null);
+      continue;
+    }
     const d =
       sweep >= 359.99
         ? `M ${cx - r} ${cy} A ${r} ${r} 0 1 1 ${cx + r} ${cy} A ${r} ${r} 0 1 1 ${cx - r} ${cy}`
         : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
-    return { ...seg, d, pct: Math.round((seg.value / total) * 100) };
-  });
+    arcs.push({ ...seg, d, pct: Math.round((seg.value / total) * 100) });
+  }
 
   return (
     <div className="flex flex-col lg:flex-row items-center gap-8">

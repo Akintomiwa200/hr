@@ -64,15 +64,17 @@ export function ChecklistTaskDetailSheet({
   const [posting, setPosting] = useState(false);
 
   useEffect(() => {
-    if (!taskId) {
-      setTask(null);
-      return;
-    }
-    setLoading(true);
-    fetch(`/api/checklist/tasks/${taskId}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then(setTask)
-      .finally(() => setLoading(false));
+    queueMicrotask(() => {
+      if (!taskId) {
+        setTask(null);
+        return;
+      }
+      setLoading(true);
+      fetch(`/api/checklist/tasks/${taskId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then(setTask)
+        .finally(() => setLoading(false));
+    });
   }, [taskId]);
 
   const patch = async (data: Record<string, unknown>) => {

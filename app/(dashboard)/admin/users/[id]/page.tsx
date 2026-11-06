@@ -18,6 +18,7 @@ import { employmentLabel, resolveEmploymentType } from "@/lib/employment";
 import { Avatar, Badge, Card, PageHeader, statusBadge } from "@/components/ui";
 import { PlatformUserRowMenu } from "@/components/admin/platform-user-row-menu";
 import type { PlatformUserRow } from "@/components/admin/platform-users-module";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 function parsePreferences(value: string | null): Record<string, unknown> {
   if (!value) return {};
@@ -143,6 +144,14 @@ export default async function PlatformUserProfilePage({
 
   return (
     <div className="w-full">
+      <PageLiveRefresh
+        types={[
+          "dashboard_updated",
+          "employee_updated",
+          "subscription_updated",
+          "audit_updated",
+        ]}
+      />
       <Link
         href="/admin/users"
         className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[12.5px] font-medium text-gray-600 transition-colors hover:bg-gray-50"

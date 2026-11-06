@@ -603,12 +603,12 @@ export function ChatWorkspace({
   }, [activeId, loadConversations]);
 
   useEffect(() => {
-    void loadConversations();
+    queueMicrotask(() => void loadConversations());
   }, [loadConversations]);
 
   useEffect(() => {
     if (initialConversationId) {
-      void openConversation(initialConversationId);
+      queueMicrotask(() => void openConversation(initialConversationId));
     }
   }, [initialConversationId, openConversation]);
 

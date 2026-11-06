@@ -35,7 +35,7 @@ export function ChecklistSettingsModule({ canManage }: { canManage: boolean }) {
   }, [tab]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   useAppEvents({

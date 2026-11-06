@@ -71,7 +71,7 @@ export function OffboardingPeopleModule({
   }, []);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   useAppEvents({

@@ -57,10 +57,7 @@ export function CompanyRowMenu({
   } | null>(null);
 
   useEffect(() => {
-    if (!open) {
-      setMenuPos(null);
-      return;
-    }
+    if (!open) return;
     const update = () => {
       if (!ref.current) return;
       const rect = ref.current.getBoundingClientRect();
@@ -154,17 +151,17 @@ export function CompanyRowMenu({
     };
   }, [open]);
 
-  useEffect(() => {
-    if (editOpen) {
-      setForm({
-        name: company.name,
-        email: company.email ?? "",
-        phone: company.phone ?? "",
-        address: company.address ?? "",
-        billingEmail: company.billingEmail ?? "",
-      });
-    }
-  }, [editOpen, company]);
+  function openEditDialog() {
+    setForm({
+      name: company.name,
+      email: company.email ?? "",
+      phone: company.phone ?? "",
+      address: company.address ?? "",
+      billingEmail: company.billingEmail ?? "",
+    });
+    setOpen(false);
+    setEditOpen(true);
+  }
 
   async function patchCompany(body: Record<string, unknown>, successMessage: string) {
     setBusy(true);
@@ -262,10 +259,7 @@ export function CompanyRowMenu({
             <button
               type="button"
               disabled={busy}
-              onClick={() => {
-                setOpen(false);
-                setEditOpen(true);
-              }}
+              onClick={openEditDialog}
               className="flex w-full items-center gap-2.5 px-3 py-2.5 text-[13px] text-gray-600 hover:bg-gray-50"
             >
               <Pencil className="h-4 w-4" />

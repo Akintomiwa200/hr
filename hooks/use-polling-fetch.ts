@@ -18,7 +18,10 @@ export function usePollingFetch(
 ) {
   const fetcherRef = useRef(fetcher);
   const busyRef = useRef(false);
-  fetcherRef.current = fetcher;
+
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  }, [fetcher]);
 
   const run = useCallback(async (signal: AbortSignal) => {
     if (skipIfBusy && busyRef.current) return;

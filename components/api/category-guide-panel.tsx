@@ -133,7 +133,7 @@ Content-Type: application/json
 {
   "action": "toggle",
   "employeeCode": "EMP001",
-  "externalId": "punch-${Date.now()}"
+  "externalId": "punch-1700000000000"
 }
 
 # Errors: 404 employee, 409 ALREADY_COMPLETED, 400 NO_CHECK_IN`}

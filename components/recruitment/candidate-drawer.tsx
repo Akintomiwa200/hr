@@ -79,10 +79,12 @@ export function CandidateDrawer({
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
 
-  useEffect(() => {
+  const [prevCandidate, setPrevCandidate] = useState(candidate);
+  if (prevCandidate !== candidate) {
+    setPrevCandidate(candidate);
     setDetail(candidate);
     setTab("profile");
-  }, [candidate]);
+  }
 
   useEffect(() => {
     if (!open || !candidate?.id) return;

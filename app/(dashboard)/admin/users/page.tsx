@@ -9,6 +9,7 @@ import {
   PlatformUsersModule,
   type PlatformUserRow,
 } from "@/components/admin/platform-users-module";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 function parsePreferences(value: string | null): Record<string, unknown> {
   if (!value) return {};
@@ -96,6 +97,14 @@ export default async function PlatformUsersPage() {
 
   return (
     <div className="w-full">
+      <PageLiveRefresh
+        types={[
+          "dashboard_updated",
+          "employee_updated",
+          "subscription_updated",
+          "audit_updated",
+        ]}
+      />
       <PageHeader
         title="Platform users"
         description="Every account attached to a company on Smart HR, across all tenants."

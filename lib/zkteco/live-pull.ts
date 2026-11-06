@@ -25,6 +25,8 @@ const CHILD_TIMEOUT_MS = 60_000;
 const IMPORT_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 
 const IMPORT_LIMIT = 5000;
+const MAX_PULL_OUTPUT_BYTES = 16 * 1024 * 1024;
+const MAX_PULL_ERROR_BYTES = 64 * 1024;
 
 const lastPullAt = new Map<string, number>();
 
@@ -54,21 +56,23 @@ function trimForImport(punches: Pulled[]) {
 
   if (punches.length === 0) return punches;
 
-  const sorted = [...punches].sort((a, b) => b.punchedAt.getTime() - a.punchedAt.getTime());
+  // Sort and compact the existing array to avoid cloning large device logs.
+  punches.sort((a, b) => b.punchedAt.getTime() - a.punchedAt.getTime());
 
-  const deviceNow = sorted[0]?.punchedAt.getTime() ?? Date.now();
+  const deviceNow = punches[0]?.punchedAt.getTime() ?? Date.now();
 
   const serverNow = Date.now();
 
-  const filtered = sorted.filter((p) => {
-
-    const t = p.punchedAt.getTime();
-
-    return t >= deviceNow - IMPORT_WINDOW_MS || t >= serverNow - IMPORT_WINDOW_MS;
-
-  });
-
-  return filtered.slice(0, IMPORT_LIMIT);
+  let kept = 0;
+  for (const punch of punches) {
+    const t = punch.punchedAt.getTime();
+    if (t >= deviceNow - IMPORT_WINDOW_MS || t >= serverNow - IMPORT_WINDOW_MS) {
+      punches[kept++] = punch;
+    }
+  }
+  punches.length = kept;
+  punches.length = Math.min(punches.length, IMPORT_LIMIT);
+  return punches;
 
 }
 
@@ -134,6 +138,9 @@ function downloadInChild(ip: string, port: number) {
 
     let err = "";
 
+    let outputExceeded = false;
+    let outputBytes = 0;
+
     const killer = setTimeout(() => {
 
       child.kill();
@@ -147,14 +154,22 @@ function downloadInChild(ip: string, port: number) {
     child.stderr.setEncoding("utf8");
 
     child.stdout.on("data", (chunk) => {
-
+      if (outputExceeded) return;
+      outputBytes += Buffer.byteLength(chunk, "utf8");
+      if (outputBytes > MAX_PULL_OUTPUT_BYTES) {
+        outputExceeded = true;
+        child.kill();
+        reject(new Error("device pull output exceeded the 16 MB safety limit"));
+        return;
+      }
       out += chunk;
 
     });
 
     child.stderr.on("data", (chunk) => {
-
-      err += chunk;
+      if (err.length < MAX_PULL_ERROR_BYTES) {
+        err += chunk.slice(0, MAX_PULL_ERROR_BYTES - err.length);
+      }
 
     });
 
@@ -169,6 +184,8 @@ function downloadInChild(ip: string, port: number) {
     child.on("close", (code) => {
 
       clearTimeout(killer);
+
+      if (outputExceeded) return;
 
       if (code !== 0) {
 

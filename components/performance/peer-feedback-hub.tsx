@@ -19,7 +19,7 @@ export function PeerFeedbackHub() {
     if (!response.ok) throw new Error(await readApiError(response, "Could not load feedback."));
     setData(await response.json());
   }, []);
-  useEffect(() => { load().catch((e) => notify.error(e.message)); }, [load]);
+  useEffect(() => { queueMicrotask(() => { load().catch((e) => notify.error(e.message)); }); }, [load]);
   useAppEvents({ types: ["staff_review_updated", "appraisal_updated"], onEvent: () => { void load(); } });
 
   const assign = async (event: React.FormEvent) => {

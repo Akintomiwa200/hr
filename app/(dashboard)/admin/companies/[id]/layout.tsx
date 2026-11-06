@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { planLabel } from "@/lib/subscription-plans";
 import { Badge, PageHeader } from "@/components/ui";
 import { CompanyTabNav } from "@/components/admin/company-tab-nav";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function CompanyDetailLayout({
   children,
@@ -36,6 +37,16 @@ export default async function CompanyDetailLayout({
 
   return (
     <div className="w-full">
+      <PageLiveRefresh
+        types={[
+          "dashboard_updated",
+          "subscription_updated",
+          "employee_updated",
+          "document_updated",
+          "support_updated",
+          "audit_updated",
+        ]}
+      />
       <Link
         href="/admin/companies"
         className="mb-4 inline-flex items-center gap-1.5 text-[12px] font-medium text-gray-500 hover:text-[#7B61FF]"

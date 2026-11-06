@@ -124,7 +124,7 @@ export function LoansModule({
   }, [statusFilter]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   useAppEvents({

@@ -60,22 +60,27 @@ export function SearchModule({ initialQuery = "" }: { initialQuery?: string }) {
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setQuery(searchParams.get("q") ?? initialQuery);
-  }, [searchParams, initialQuery]);
+  const urlQuery = searchParams.get("q") ?? initialQuery;
+  const [prevUrlQuery, setPrevUrlQuery] = useState(urlQuery);
+  if (prevUrlQuery !== urlQuery) {
+    setPrevUrlQuery(urlQuery);
+    setQuery(urlQuery);
+  }
 
   useEffect(() => {
-    const q = searchParams.get("q")?.trim();
-    if (!q) {
-      setResults(null);
-      return;
-    }
+    queueMicrotask(() => {
+      const q = searchParams.get("q")?.trim();
+      if (!q) {
+        setResults(null);
+        return;
+      }
 
-    setLoading(true);
-    fetch(`/api/search?q=${encodeURIComponent(q)}`)
-      .then((res) => res.json())
-      .then((data) => setResults(data))
-      .finally(() => setLoading(false));
+      setLoading(true);
+      fetch(`/api/search?q=${encodeURIComponent(q)}`)
+        .then((res) => res.json())
+        .then((data) => setResults(data))
+        .finally(() => setLoading(false));
+    });
   }, [searchParams]);
 
   const submit = (e: React.FormEvent) => {

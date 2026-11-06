@@ -72,7 +72,7 @@ export function PayrollDeductionsModule({
   }, [statusFilter]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   useAppEvents({

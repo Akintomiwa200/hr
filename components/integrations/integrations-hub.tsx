@@ -146,7 +146,7 @@ export function IntegrationsHub() {
   }, []);
 
   useEffect(() => {
-    void load().finally(() => setLoading(false));
+    queueMicrotask(() => void load().finally(() => setLoading(false)));
   }, [load]);
 
   useAppEvents({
@@ -166,7 +166,7 @@ export function IntegrationsHub() {
   });
 
   const connect = (slug: string) => {
-    window.location.href = `/api/integrations/${slug}/connect`;
+    window.location.assign(`/api/integrations/${slug}/connect`);
   };
 
   const connectBambooHr = async () => {

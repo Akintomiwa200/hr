@@ -243,13 +243,15 @@ export function CalendarModule({
     return map;
   }, [holidays]);
 
+  const selectedYear = selectedDate.getFullYear();
+
   const birthdaysByDay = useMemo(() => {
     const map = new Map<string, { id: string; firstName: string; lastName: string; employeeCode: string; avatar: string | null; jobTitle: string }[]>();
     for (const emp of employees) {
       if (!emp.dateOfBirth) continue;
       const d = new Date(emp.dateOfBirth);
       if (Number.isNaN(d.getTime())) continue;
-      d.setFullYear(selectedDate.getFullYear());
+      d.setFullYear(selectedYear);
       const key = dateKey(d);
       const list = map.get(key) ?? [];
       list.push({
@@ -263,7 +265,7 @@ export function CalendarModule({
       map.set(key, list);
     }
     return map;
-  }, [employees, selectedDate.getFullYear()]);
+  }, [employees, selectedYear]);
 
   const personalByDay = useMemo(() => {
     const map = new Map<string, CalendarPersonalEvent[]>();

@@ -45,7 +45,7 @@ export function ChecklistTaskDocumentsPage({
   }, [taskId]);
 
   useEffect(() => {
-    void reload();
+    queueMicrotask(() => void reload());
   }, [reload]);
 
   const complete = async () => {

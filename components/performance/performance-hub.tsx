@@ -332,12 +332,14 @@ export function PerformanceHub({
     "appraisals" | "cycles" | "kpis" | "insights" | "settings"
   >(initialTab);
   useEffect(() => {
-    if (standalone) return;
-    const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    if (requestedTab === "appraisals") setTab("appraisals");
-    if (canManage && (requestedTab === "kpis" || requestedTab === "cycles" || requestedTab === "insights" || requestedTab === "settings")) {
-      setTab(requestedTab);
-    }
+    queueMicrotask(() => {
+      if (standalone) return;
+      const requestedTab = new URLSearchParams(window.location.search).get("tab");
+      if (requestedTab === "appraisals") setTab("appraisals");
+      if (canManage && (requestedTab === "kpis" || requestedTab === "cycles" || requestedTab === "insights" || requestedTab === "settings")) {
+        setTab(requestedTab);
+      }
+    });
   }, [canManage, standalone]);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [kpiSearch, setKpiSearch] = useState("");

@@ -44,7 +44,7 @@ export function DeviceIntegrationPanel({ appUrl }: { appUrl: string }) {
   };
 
   useEffect(() => {
-    loadStatus();
+    queueMicrotask(() => void loadStatus());
   }, []);
 
   useDeviceLive(() => {

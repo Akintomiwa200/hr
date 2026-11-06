@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- standalone Node script, not part of the app bundle. */
 const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer-core");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, Plus, Settings2, Trash2, Wand2 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
@@ -43,7 +43,11 @@ export function LeaveAllocationsPanel({
   const [loading, setLoading] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, { annual: number; sick: number }>>({});
 
-  useEffect(() => setForm(settings), [settings]);
+  const [prevSettings, setPrevSettings] = useState(settings);
+  if (prevSettings !== settings) {
+    setPrevSettings(settings);
+    setForm(settings);
+  }
 
   const refresh = async () => {
     const res = await fetch(`/api/leave/allocations?year=${year}`);

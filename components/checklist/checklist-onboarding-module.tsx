@@ -40,11 +40,13 @@ export function ChecklistOnboardingModule({
   });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const [prevTemplates, setPrevTemplates] = useState(templates);
+  if (prevTemplates !== templates) {
+    setPrevTemplates(templates);
     if (!form.templateId && templates[0]?.id) {
       setForm((f) => ({ ...f, templateId: templates[0].id }));
     }
-  }, [templates, form.templateId]);
+  }
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -59,7 +61,7 @@ export function ChecklistOnboardingModule({
   }, [type]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   useAppEvents({

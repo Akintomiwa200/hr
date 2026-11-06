@@ -69,6 +69,7 @@ export function GoogleCalendarConnect() {
               Disconnect
             </Button>
           ) : (
+            // eslint-disable-next-line @next/next/no-html-link-for-pages -- OAuth handoff must be a full-page navigation, not a client route.
             <a href="/api/integrations/google-workspace/connect">
               <Button>
                 <Link2 className="w-4 h-4" />

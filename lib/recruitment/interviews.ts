@@ -140,7 +140,7 @@ export async function rescheduleInterview(
   const end = new Date(scheduledAt.getTime() + durationMinutes * 60_000);
 
   let googleMeetLink = existing.googleMeetLink;
-  let calendarSynced = existing.calendarSynced;
+  const calendarSynced = existing.calendarSynced;
 
   if (existing.googleCalendarEventId && calendarSynced) {
     try {

@@ -91,7 +91,7 @@ export function OnboardingPeopleModule({
   }, []);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   useAppEvents({

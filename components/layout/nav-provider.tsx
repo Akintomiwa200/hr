@@ -8,7 +8,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { subscribeRealtime } from "@/lib/realtime-sse";
+import {
+  subscribeRealtime,
+  subscribeRealtimeStatus,
+} from "@/lib/realtime-sse";
 import type { NavSummary } from "@/lib/nav-summary-types";
 
 type NavContextValue = {
@@ -59,7 +62,10 @@ export function NavProvider({
   const [summary, setSummary] = useState(initialSummary);
   const [live, setLive] = useState(false);
   const summaryRef = useRef(summary);
-  summaryRef.current = summary;
+
+  useEffect(() => {
+    summaryRef.current = summary;
+  }, [summary]);
 
   const refresh = useCallback(async () => {
     try {
@@ -95,16 +101,16 @@ export function NavProvider({
       }, 2000);
     };
 
-    setLive(true);
     const unsubscribe = subscribeRealtime((type) => {
       if (!type || !REFRESH_EVENT_TYPES.has(type)) return;
       setLive(true);
       onUpdate();
     });
+    const unsubscribeStatus = subscribeRealtimeStatus(setLive);
 
     return () => {
       unsubscribe();
-      setLive(false);
+      unsubscribeStatus();
       if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [refresh]);

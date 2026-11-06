@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Megaphone, Send } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { notify, readApiError } from "@/lib/toast";
 
 export function PlatformBroadcastComposer() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ title: "", content: "", priority: "NORMAL" });
@@ -16,7 +18,7 @@ export function PlatformBroadcastComposer() {
       if (!response.ok) throw new Error(await readApiError(response, "Could not publish broadcast."));
       const result = await response.json();
       notify.success("Broadcast published to " + result.notifiedCompanies + " active companies.");
-      setForm({ title: "", content: "", priority: "NORMAL" }); setOpen(false); window.location.reload();
+      setForm({ title: "", content: "", priority: "NORMAL" }); setOpen(false); router.refresh();
     } catch (error) { notify.error(error instanceof Error ? error.message : "Could not publish broadcast."); }
     finally { setBusy(false); }
   }
