@@ -1,0 +1,4 @@
+[build.environment]
+# These values are public configuration: the Africa's Talking sandbox account
+# label and Zoho endpoint domains. Keep the scanner enabled for actual secrets.
+SECRETS_SCAN_OMIT_KEYS = "AFRICASTALKING_USERNAME,ZOHO_API_DOMAIN,ZOHO_ACCOUNTS_URL"
