@@ -3,6 +3,7 @@ import { Building2, Clock, ScrollText } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, StatCard } from "@/components/ui";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 function formatDateTime(value: Date) {
   return new Date(value).toLocaleString("en-NG", {
@@ -28,6 +29,7 @@ export default async function PlatformActivityPage() {
 
   return (
     <div className="w-full">
+      <PageLiveRefresh types={["audit_updated", "dashboard_updated"]} />
       <PageHeader
         title="Activity log"
         description="The latest audited actions taken across every company on the platform."

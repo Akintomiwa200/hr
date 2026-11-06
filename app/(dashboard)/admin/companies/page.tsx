@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { CompaniesAdminModule } from "@/components/admin/companies-admin-module";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function CompaniesPage() {
   const session = await getSession();
@@ -15,6 +16,7 @@ export default async function CompaniesPage() {
 
   return (
     <div className="w-full">
+      <PageLiveRefresh types={["subscription_updated", "dashboard_updated", "audit_updated"]} />
       <div className="mb-6">
         <h1 className="text-[22px] font-bold text-gray-900 tracking-tight">Companies</h1>
         <p className="text-sm text-gray-500 mt-1">

@@ -16,6 +16,7 @@ import {
 } from "@/lib/subscription-plans";
 import { PageHeader, Card, CardHeader, Badge } from "@/components/ui";
 import { PlatformCurrencySettings } from "@/components/settings/platform-currency-settings";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 
 export default async function PlatformSettingsPage() {
   const session = await getSession();
@@ -36,6 +37,7 @@ export default async function PlatformSettingsPage() {
 
   return (
     <div className="w-full">
+      <PageLiveRefresh types={["settings_updated", "dashboard_updated", "audit_updated"]} />
       <PageHeader
         title="Platform settings"
         description="Platform-wide defaults for currency and subscription checkout."

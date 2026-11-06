@@ -11,6 +11,7 @@ import {
   setAppCurrencyCode,
 } from "@/lib/currency-server";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
+import { audit } from "@/lib/audit";
 
 export async function GET() {
   const session = await requireSession();
@@ -38,6 +39,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const saved = await setAppCurrencyCode(currencyCode, session.id);
+  await audit({ actor: session, module: "platform-settings", action: "SETTING", entityLabel: "Platform currency", meta: { currencyCode: saved } });
   broadcastAppEvent("settings_updated", { currencyCode: saved });
 
   return NextResponse.json({

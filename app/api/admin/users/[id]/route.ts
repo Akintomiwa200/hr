@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import { ORG_ROLES } from "@/lib/roles";
+import { audit } from "@/lib/audit";
 
 type AccountAction = "deactivate" | "reactivate" | "archive" | "restore";
 
@@ -92,6 +93,7 @@ export async function PATCH(
     });
 
     broadcastAppEvent("dashboard_updated", { source: "platform_user_lifecycle", userId: id });
+    await audit({ actor: session, module: "platform-users", action: action === "deactivate" ? "SUSPEND" : action === "reactivate" ? "REACTIVATE" : action === "archive" ? "ARCHIVE" : "REACTIVATE", entityId: id, entityLabel: target.email, meta: { action } });
 
     return NextResponse.json({
       ok: true,
@@ -199,6 +201,7 @@ export async function PATCH(
   }
 
   broadcastAppEvent("dashboard_updated", { source: "platform_user_updated", userId: id });
+  await audit({ actor: session, module: "platform-users", action: "UPDATE", entityId: id, entityLabel: email ?? target.email, meta: { role, firstName, lastName, emailChanged: !!email } });
 
   return NextResponse.json({ ok: true, message: `${email ?? target.email} updated` });
 }
@@ -260,6 +263,7 @@ export async function DELETE(
   }
 
   broadcastAppEvent("dashboard_updated", { source: "platform_user_deleted", userId: id });
+  await audit({ actor: session, module: "platform-users", action: "DELETE", entityId: id, entityLabel: target.email, meta: { permanent: true } });
 
   return NextResponse.json({ ok: true, message: `${target.email} permanently deleted` });
 }

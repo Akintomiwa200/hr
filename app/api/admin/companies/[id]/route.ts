@@ -9,6 +9,7 @@ import type { SubscriptionPlanId } from "@/lib/subscription-plans";
 import { broadcastAppEvent } from "@/lib/realtime-broadcast";
 import type { SubscriptionStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { audit } from "@/lib/audit";
 
 export async function PATCH(
   request: NextRequest,
@@ -69,6 +70,8 @@ export async function PATCH(
       data: profilePatch,
     });
   }
+
+  await audit({ actor: session, module: "platform-tenants", action: body.isLocked ? "SUSPEND" : "UPDATE", entityId: id, entityLabel: body.name ?? company.name, meta: { planId: body.planId, subscriptionStatus: body.subscriptionStatus, isActive: body.isActive, isLocked: body.isLocked, changedFields: Object.keys(body) } });
 
   broadcastAppEvent("subscription_updated", { companyId: id, planId: body.planId });
   broadcastAppEvent("settings_updated", { companyId: id, source: "company_admin_patch" });
@@ -160,6 +163,7 @@ export async function DELETE(
 
   broadcastAppEvent("subscription_updated", { companyId: id, deleted: true });
   broadcastAppEvent("dashboard_updated", { companyId: id, deleted: true });
+  await audit({ actor: session, module: "platform-tenants", action: "DELETE", entityId: id, entityLabel: company.name, meta: { deletedCompany: true } });
 
   return NextResponse.json({ ok: true, id, name: company.name });
 }

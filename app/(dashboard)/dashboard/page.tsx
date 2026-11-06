@@ -10,6 +10,7 @@ import {
 } from "@/lib/dashboard-data";
 import { getUpcomingCalendarEvents } from "@/lib/calendar-summary";
 import { parseDashboardRangeKey } from "@/lib/dashboard-date-range";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 import {
   HrDashboard,
   CompanyAdminDashboard,
@@ -41,7 +42,7 @@ export default async function DashboardPage({
 
   if (session.role === "SUPER_ADMIN") {
     const data = await getSuperAdminDashboardData();
-    return <SuperAdminDashboard data={data} userName={userName} />;
+    return <><PageLiveRefresh types={["dashboard_updated", "subscription_updated", "audit_updated", "support_updated"]} /><SuperAdminDashboard data={data} userName={userName} /></>;
   }
 
   if (session.role === "COMPANY_ADMIN") {

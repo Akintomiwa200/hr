@@ -4,6 +4,7 @@ import { Building2, CreditCard, Lock, Users, Wallet } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, StatCard } from "@/components/ui";
+import { PageLiveRefresh } from "@/components/dashboard/page-live-refresh";
 import {
   SUBSCRIPTION_PLANS,
   formatNairaAmount,
@@ -57,6 +58,7 @@ export default async function PlatformBillingPage() {
 
   return (
     <div className="w-full">
+      <PageLiveRefresh types={["subscription_updated", "dashboard_updated", "audit_updated"]} />
       <PageHeader
         title="Billing & plans"
         description="Subscription health across every company on the platform."
