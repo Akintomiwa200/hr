@@ -9,6 +9,7 @@
     "dev:clean": "node scripts/clean-dev.mjs && node node_modules/next/dist/bin/next dev",
     "dev:fresh": "node scripts/clean-dev.mjs && node scripts/db-sync.mjs && node node_modules/next/dist/bin/next dev",
     "build": "node --max-old-space-size=4096 node_modules/next/dist/bin/next build",
+    "typecheck": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit --incremental false",
     "prebuild": "node scripts/db-sync.mjs",
     "start": "node node_modules/next/dist/bin/next start",
     "prestart": "node scripts/db-sync.mjs",
