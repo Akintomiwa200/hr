@@ -208,6 +208,13 @@ model Company {
   chatConversations ChatConversation[]
   learningCourses LearningCourse[]
   learningAssignments LearningAssignment[]
+  learningModules LearningModule[]
+  learningLessons LearningLesson[]
+  learningPaths LearningPath[]
+  learningPathCourses LearningPathCourse[]
+  lessonProgress LessonProgress[]
+  trainingRequests TrainingRequest[]
+  courseFeedback CourseFeedback[]
   developmentRecords DevelopmentRecord[]
   staffChangeRequests StaffChangeRequest[]
   peerFeedbackRequests PeerFeedbackRequest[]
@@ -485,6 +492,10 @@ model Employee {
   reviewedResignations Resignation[] @relation("ResignationReviewer")
   learningAssignments LearningAssignment[] @relation("LearningAssignee")
   assignedLearningAssignments LearningAssignment[] @relation("LearningAssigner")
+  createdLearningCourses LearningCourse[] @relation("LearningCourseCreator")
+  trainingRequests TrainingRequest[] @relation("TrainingRequestEmployee")
+  reviewedTrainingRequests TrainingRequest[] @relation("TrainingRequestReviewer")
+  courseFeedback CourseFeedback[] @relation("CourseFeedbackEmployee")
   developmentRecords DevelopmentRecord[]
   staffChangeRequests StaffChangeRequest[] @relation("StaffChangeEmployee")
   requestedStaffChanges StaffChangeRequest[] @relation("StaffChangeRequester")
@@ -1418,42 +1429,209 @@ model PerformanceAppraisal {
 }
 
 model LearningCourse {
+  id                 String    @id @default(cuid())
+  companyId          String
+  title              String
+  code               String?
+  description        String?
+  objectives         String?
+  category           String?
+  level              String?
+  format             String    @default("SELF_PACED")
+  status             String    @default("DRAFT")
+  provider           String?
+  url                String?
+  thumbnailUrl       String?
+  tags               String?
+  durationMinutes    Int?
+  passingScore       Int?
+  certificateEnabled Boolean   @default(false)
+  createdById        String?
+  publishedAt        DateTime?
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  company     Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy   Employee?            @relation("LearningCourseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  assignments LearningAssignment[]
+  modules     LearningModule[]
+  pathCourses LearningPathCourse[]
+  feedback    CourseFeedback[]
+
+  @@index([companyId, isActive])
+  @@index([companyId, status])
+}
+
+model LearningModule {
+  id          String   @id @default(cuid())
+  companyId   String
+  courseId    String
+  title       String
+  description String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  course  LearningCourse  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons LearningLesson[]
+
+  @@index([courseId, position])
+}
+
+model LearningLesson {
+  id              String   @id @default(cuid())
+  companyId       String
+  moduleId        String
+  title           String
+  description     String?
+  type            String   @default("READING")
+  content         String?
+  url             String?
+  durationMinutes Int?
+  position        Int      @default(0)
+  isPreview       Boolean  @default(false)
+  quiz            Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company  Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  module   LearningModule   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress LessonProgress[]
+
+  @@index([moduleId, position])
+}
+
+model LearningPath {
   id          String   @id @default(cuid())
   companyId   String
   title       String
   description String?
-  provider    String?
-  url         String?
+  level       String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  courses     LearningPathCourse[]
   assignments LearningAssignment[]
 
   @@index([companyId, isActive])
 }
 
-model LearningAssignment {
-  id           String    @id @default(cuid())
-  companyId    String
-  courseId     String
-  employeeId   String
-  assignedById String
-  dueDate      DateTime?
-  status       String    @default("ASSIGNED")
-  completedAt  DateTime?
-  notes        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+model LearningPathCourse {
+  id        String   @id @default(cuid())
+  companyId String
+  pathId    String
+  courseId  String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
 
-  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  course   LearningCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  employee Employee     @relation("LearningAssignee", fields: [employeeId], references: [id], onDelete: Cascade)
-  assignedBy Employee   @relation("LearningAssigner", fields: [assignedById], references: [id])
+  company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  path    LearningPath   @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  course  LearningCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([pathId, courseId])
+  @@index([pathId, position])
+}
+
+model LearningAssignment {
+  id              String    @id @default(cuid())
+  companyId       String
+  courseId        String
+  employeeId      String
+  assignedById    String
+  pathId          String?
+  source          String    @default("ASSIGNED")
+  dueDate         DateTime?
+  status          String    @default("ASSIGNED")
+  progressPercent Int       @default(0)
+  startedAt       DateTime?
+  lastActivityAt  DateTime?
+  completedAt     DateTime?
+  score           Int?
+  feedback        String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  company       Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  course        LearningCourse   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  employee      Employee         @relation("LearningAssignee", fields: [employeeId], references: [id], onDelete: Cascade)
+  assignedBy    Employee         @relation("LearningAssigner", fields: [assignedById], references: [id])
+  path          LearningPath?    @relation(fields: [pathId], references: [id], onDelete: SetNull)
+  lessonProgress LessonProgress[]
+  courseFeedback CourseFeedback?
 
   @@unique([courseId, employeeId])
   @@index([companyId, employeeId, status])
+  @@index([companyId, pathId])
+}
+
+model LessonProgress {
+  id               String    @id @default(cuid())
+  companyId        String
+  assignmentId     String
+  lessonId         String
+  status           String    @default("NOT_STARTED")
+  score            Int?
+  timeSpentMinutes Int?
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  company    Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignment LearningAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  lesson     LearningLesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, lessonId])
+  @@index([companyId, lessonId])
+}
+
+model TrainingRequest {
+  id            String    @id @default(cuid())
+  companyId     String
+  employeeId    String
+  title         String
+  provider      String?
+  url           String?
+  cost          Float?
+  currency      String?
+  startDate     DateTime?
+  endDate       DateTime?
+  justification String
+  status        String    @default("PENDING")
+  reviewerId    String?
+  reviewNote    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation("TrainingRequestEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  reviewer Employee? @relation("TrainingRequestReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
+  @@index([companyId, employeeId])
+}
+
+model CourseFeedback {
+  id           String   @id @default(cuid())
+  companyId    String
+  courseId     String
+  assignmentId String?  @unique
+  employeeId   String
+  rating       Int
+  comment      String?
+  createdAt    DateTime @default(now())
+
+  company    Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  course     LearningCourse      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  assignment LearningAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  employee   Employee            @relation("CourseFeedbackEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, courseId])
 }
 
 model DevelopmentRecord {

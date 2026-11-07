@@ -4,12 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Award,
   BookOpen,
-  Check,
   CheckCircle2,
   Clock3,
   FileBadge2,
   GraduationCap,
-  LoaderCircle,
   Plus,
   RefreshCw,
   Search,

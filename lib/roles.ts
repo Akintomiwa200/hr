@@ -130,6 +130,18 @@ export const PERFORMANCE_VIEW_ROLES: Role[] = [
 
 export const CONTENT_ADMIN_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
 
+/** Author courses, modules, lessons, paths and publish them to the company catalog. */
+export const LEARNING_CREATOR_ROLES: Role[] = ["COMPANY_ADMIN", "HR"];
+/** Assign training, review team progress and approve training requests. */
+export const LEARNING_MANAGER_ROLES: Role[] = [
+  "COMPANY_ADMIN",
+  "HR",
+  "MANAGER",
+  "SUPERVISOR",
+];
+/** Everyone who can learn: browse the catalog and complete their own assignments. */
+export const LEARNING_VIEW_ROLES: Role[] = [...ORG_ROLES];
+
 /** Support desk participants: companies raise tickets, super admins are agents. */
 export const SUPPORT_ROLES: Role[] = ["SUPER_ADMIN", "COMPANY_ADMIN", "HR"];
 
@@ -262,6 +274,18 @@ export function canManageOrgContent(role: Role) {
 
 export function canManagePerformance(role: Role) {
   return hasRole(role, PERFORMANCE_ADMIN_ROLES);
+}
+
+export function canCreateLearning(role: Role) {
+  return hasRole(role, LEARNING_CREATOR_ROLES);
+}
+
+export function canManageLearning(role: Role) {
+  return hasRole(role, LEARNING_MANAGER_ROLES);
+}
+
+export function canViewLearning(role: Role) {
+  return hasRole(role, LEARNING_VIEW_ROLES);
 }
 
 export function canManageBenefitPrograms(role: Role) {

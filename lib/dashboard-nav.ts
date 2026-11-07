@@ -3,12 +3,9 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   Bell,
-  Search,
   Calendar,
   Users,
-  Network,
   UsersRound,
-  CalendarOff,
   Clock,
   Wallet,
   Medal,
@@ -18,7 +15,6 @@ import {
   CalendarClock,
   Megaphone,
   FileText,
-  CircleHelp,
   Settings,
   Activity,
   Router,
@@ -43,10 +39,9 @@ import {
   Cake,
   ShieldCheck,
 } from "lucide-react";
-import { CHECKLIST_ADMIN_ROLES, CHECKLIST_TEMPLATE_ROLES, CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
+import { CHECKLIST_ADMIN_ROLES, CHECKLIST_VIEW_ROLES } from "@/lib/checklist/access";
 import {
   ALL_STAFF,
-  ALL_ROLES,
   DEVICE_ADMIN_ROLES,
   DASHBOARD_ROLES,
   INTEGRATION_ADMIN_ROLES,
@@ -58,6 +53,8 @@ import {
   PEOPLE_ADMIN_ROLES,
   PEOPLE_DIRECTORY_ROLES,
   PERFORMANCE_VIEW_ROLES,
+  LEARNING_CREATOR_ROLES,
+  LEARNING_MANAGER_ROLES,
   CONTENT_ADMIN_ROLES,
   DAILY_REPORTING_ROLES,
   BONUS_ADMIN_ROLES,
@@ -405,10 +402,27 @@ export const dashboardNavSections: NavSection[] = [
             pageTitle: "Learning & Upskilling",
             roles: PERFORMANCE_VIEW_ROLES,
             subItems: [
+              { id: "training-overview", href: "/training", label: "Overview", pageTitle: "Learning & Upskilling", roles: PERFORMANCE_VIEW_ROLES },
               { id: "course-catalog", href: "/training/catalog", label: "Course Catalog", pageTitle: "Course Catalog", roles: PERFORMANCE_VIEW_ROLES },
-              { id: "training-assignments", href: "/training/assignments", label: "Training Assignments", pageTitle: "Training Assignments", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "my-learning", href: "/training/my-learning", label: "My Learning", pageTitle: "My Learning", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "learning-paths", href: "/training/paths", label: "Learning Paths", pageTitle: "Learning Paths", roles: PERFORMANCE_VIEW_ROLES },
               { id: "skills-competencies", href: "/training/skills", label: "Skills & Competencies", pageTitle: "Skills & Competencies", roles: PERFORMANCE_VIEW_ROLES },
               { id: "certifications-licenses", href: "/training/certifications", label: "Certifications & Licenses", pageTitle: "Certifications & Licenses", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "training-requests", href: "/training/requests", label: "Training Requests", pageTitle: "Training Requests", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "training-assignments", href: "/training/assignments", label: "Training Assignments", pageTitle: "Training Assignments", roles: LEARNING_MANAGER_ROLES },
+              {
+                id: "creator-studio",
+                href: "/training/creator",
+                label: "Creator Studio",
+                pageTitle: "Creator Studio",
+                roles: LEARNING_CREATOR_ROLES,
+                subItems: [
+                  { id: "creator-courses", href: "/training/creator/courses", label: "Course Manager", pageTitle: "Course Manager", roles: LEARNING_CREATOR_ROLES },
+                  { id: "creator-paths", href: "/training/creator/paths", label: "Path Builder", pageTitle: "Path Builder", roles: LEARNING_CREATOR_ROLES },
+                  { id: "creator-analytics", href: "/training/creator/analytics", label: "Analytics", pageTitle: "Learning Analytics", roles: LEARNING_CREATOR_ROLES },
+                  { id: "creator-requests", href: "/training/creator/requests", label: "Requests", pageTitle: "Training Requests", roles: LEARNING_MANAGER_ROLES },
+                ],
+              },
             ],
           },
           {
@@ -682,10 +696,27 @@ export const employeeNavSections: NavSection[] = [
           {
             id: "learning-upskilling", href: "/training", label: "Learning & Upskilling", pageTitle: "Learning & Upskilling", roles: PERFORMANCE_VIEW_ROLES,
             subItems: [
+              { id: "training-overview", href: "/training", label: "Overview", pageTitle: "Learning & Upskilling", roles: PERFORMANCE_VIEW_ROLES },
               { id: "course-catalog", href: "/training/catalog", label: "Course Catalog", pageTitle: "Course Catalog", roles: PERFORMANCE_VIEW_ROLES },
-              { id: "training-assignments", href: "/training/assignments", label: "Training Assignments", pageTitle: "Training Assignments", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "my-learning", href: "/training/my-learning", label: "My Learning", pageTitle: "My Learning", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "learning-paths", href: "/training/paths", label: "Learning Paths", pageTitle: "Learning Paths", roles: PERFORMANCE_VIEW_ROLES },
               { id: "skills-competencies", href: "/training/skills", label: "Skills & Competencies", pageTitle: "Skills & Competencies", roles: PERFORMANCE_VIEW_ROLES },
               { id: "certifications-licenses", href: "/training/certifications", label: "Certifications & Licenses", pageTitle: "Certifications & Licenses", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "training-requests", href: "/training/requests", label: "Training Requests", pageTitle: "Training Requests", roles: PERFORMANCE_VIEW_ROLES },
+              { id: "training-assignments", href: "/training/assignments", label: "Training Assignments", pageTitle: "Training Assignments", roles: LEARNING_MANAGER_ROLES },
+              {
+                id: "creator-studio",
+                href: "/training/creator",
+                label: "Creator Studio",
+                pageTitle: "Creator Studio",
+                roles: LEARNING_CREATOR_ROLES,
+                subItems: [
+                  { id: "creator-courses", href: "/training/creator/courses", label: "Course Manager", pageTitle: "Course Manager", roles: LEARNING_CREATOR_ROLES },
+                  { id: "creator-paths", href: "/training/creator/paths", label: "Path Builder", pageTitle: "Path Builder", roles: LEARNING_CREATOR_ROLES },
+                  { id: "creator-analytics", href: "/training/creator/analytics", label: "Analytics", pageTitle: "Learning Analytics", roles: LEARNING_CREATOR_ROLES },
+                  { id: "creator-requests", href: "/training/creator/requests", label: "Requests", pageTitle: "Training Requests", roles: LEARNING_MANAGER_ROLES },
+                ],
+              },
             ],
           },
           {
