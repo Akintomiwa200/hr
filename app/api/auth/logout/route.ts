@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { destroySession } from "@/lib/auth";
-import { getAppUrlFromRequest } from "@/lib/app-url";
+import { getAppUrl } from "@/lib/app-url";
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   await destroySession();
-  return NextResponse.redirect(new URL("/login", getAppUrlFromRequest(request)));
+  // Always return to the canonical sign-in page, never the current host/path.
+  return NextResponse.redirect(new URL("/login", getAppUrl()));
 }

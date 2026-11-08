@@ -290,6 +290,10 @@ export async function POST(request: NextRequest) {
       return await handleCourseAction(action, body, companyId, session.employeeId ?? null);
     }
 
+    if (action === "lesson.progress") {
+      return await handleLessonProgress(session, body, companyId);
+    }
+
     if (action.startsWith("module.") || action.startsWith("lesson.")) {
       if (!access.isCreator) return forbidden();
       return await handleContentAction(action, body, companyId);
@@ -320,10 +324,6 @@ export async function POST(request: NextRequest) {
 
     if (action === "enroll") {
       return await handleEnroll(session, body, companyId);
-    }
-
-    if (action === "lesson.progress") {
-      return await handleLessonProgress(session, body, companyId);
     }
 
     if (action === "record.create" || action === "record.delete") {
