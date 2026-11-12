@@ -6,16 +6,18 @@ export function MarketingPageHeader({
   description,
   eyebrow = "Smart HR",
   align = "left",
+  seamlessBackground = false,
 }: {
   title: string;
   description: string;
   eyebrow?: string;
   align?: "left" | "center";
+  seamlessBackground?: boolean;
 }) {
   const centered = align === "center";
 
   return (
-    <section className="border-b border-gray-100/80 pt-28 lg:pt-32 bg-[radial-gradient(ellipse_at_top,_rgba(123,97,255,0.08)_0%,_transparent_55%),linear-gradient(to_bottom,#fafafa_0%,#ffffff_45%)]">
+    <section className={`pt-28 lg:pt-32 ${seamlessBackground ? "border-b-0 bg-transparent" : "border-b border-gray-100/80 bg-[radial-gradient(ellipse_at_top,_rgba(123,97,255,0.08)_0%,_transparent_55%),linear-gradient(to_bottom,#fafafa_0%,#ffffff_45%)]"}`}>
       <div
         className={`max-w-6xl mx-auto px-6 py-12 lg:py-16 ${
           centered ? "text-center" : ""

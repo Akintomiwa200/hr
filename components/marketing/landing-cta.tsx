@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
-export function LandingCta() {
+export function LandingCta({ transparentBackground = false }: { transparentBackground?: boolean } = {}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
 
@@ -14,7 +14,7 @@ export function LandingCta() {
   }
 
   return (
-    <section className="py-16 lg:py-20 px-4 sm:px-6 bg-white">
+    <section className={`py-16 lg:py-20 px-4 sm:px-6 ${transparentBackground ? "bg-transparent" : "bg-white"}`}>
       <div className="max-w-5xl mx-auto">
         <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-r from-[#ddd6fe] via-[#ede9fe] to-[#ddd6fe] px-6 py-14 sm:px-12 sm:py-16 lg:py-20 text-center">
           {/* Concentric circle pattern */}

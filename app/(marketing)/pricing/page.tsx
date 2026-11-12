@@ -1,5 +1,5 @@
-import { MarketingPageHeader } from "@/components/marketing/marketing-page";
-import { LandingPricing } from "@/components/marketing/landing-pricing";
+import PricingSectionWithNestedFeatureLists from "@/components/wensity/blocks/pricing-section-with-nested-feature-lists";
+import { PricingFaq } from "@/components/marketing/pricing-faq";
 import { LandingCta } from "@/components/marketing/landing-cta";
 
 export const metadata = {
@@ -9,15 +9,10 @@ export const metadata = {
 
 export default function PricingPage() {
   return (
-    <>
-      <MarketingPageHeader
-        title="Pricing"
-        description="Choose a plan that aligns with your workflow, scales with your organization, and delivers real value without hidden fees."
-        eyebrow="Product"
-        align="center"
-      />
-      <LandingPricing />
-      <LandingCta />
-    </>
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_rgba(123,97,255,0.08)_0%,_transparent_55%),linear-gradient(to_bottom,#fafafa_0%,_#ffffff_40%)]">
+      <PricingSectionWithNestedFeatureLists />
+      <PricingFaq />
+      <LandingCta transparentBackground />
+    </div>
   );
 }

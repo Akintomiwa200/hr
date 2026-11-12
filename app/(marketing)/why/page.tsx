@@ -1,7 +1,6 @@
-import { MarketingPageHeader } from "@/components/marketing/marketing-page";
-import { LandingWhy } from "@/components/marketing/landing-why";
-import { LandingTrusted } from "@/components/marketing/landing-trusted";
 import { LandingCta } from "@/components/marketing/landing-cta";
+import HowItWorksSectionWithZigzagTimeline from "@/components/wensity/blocks/how-it-works-section-with-zigzag-timeline";
+import HowItWorksSectionWithDottedCurveSteps from "@/components/wensity/blocks/how-it-works-section-with-dotted-curve-steps";
 
 export const metadata = {
   title: "Why Smart HR — Smart HR",
@@ -11,14 +10,9 @@ export const metadata = {
 export default function WhyPage() {
   return (
     <>
-      <MarketingPageHeader
-        title="Why Smart HR"
-        description="A platform built for HR teams, managers, and employees — fast to adopt, easy to scale, and designed for real office workflows."
-        eyebrow="Company"
-        align="center"
-      />
-      <LandingWhy />
-      <LandingTrusted />
+
+      <HowItWorksSectionWithZigzagTimeline />
+      <HowItWorksSectionWithDottedCurveSteps />
       <LandingCta />
     </>
   );

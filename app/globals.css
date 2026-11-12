@@ -9,6 +9,7 @@
   --color-brand-600: #6b51ef;
   --color-brand-700: #5a42d9;
   --color-surface: #f8f9fc;
+  --color-background: #ffffff;
 }
 
 @layer base {

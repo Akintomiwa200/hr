@@ -31,7 +31,7 @@ export const marketingPages: Record<string, PageConfig> = {
     category: "Product",
     title: "Integrations",
     description:
-      "Connect Smart HR with the tools your team already uses — identity, collaboration, finance, and attendance devices.",
+      "Connect Smart HR with Google Workspace, Microsoft 365, Zoho, BambooHR, QuickBooks, and custom webhooks.",
     relatedLinks: [
       { label: "Features", href: "/features" },
       { label: "Security", href: "/security" },
@@ -181,7 +181,8 @@ export const marketingPages: Record<string, PageConfig> = {
   contact: {
     category: "Company",
     title: "Contact",
-    description: "Get in touch with our team — we’d love to hear from you.",
+    description:
+      "Talk to our team about Smart HR, get help with your account, or find answers in the Help Center.",
     relatedLinks: [
       { label: "Help Center", href: "/help" },
       { label: "Pricing", href: "/pricing" },
