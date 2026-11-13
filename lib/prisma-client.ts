@@ -67,7 +67,15 @@ function isPrismaClientFresh(client: PrismaClient) {
 }
 
 function createPrismaClient() {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+  const poolMax = Number.parseInt(process.env.DATABASE_POOL_MAX ?? "5", 10);
+  const adapter = new PrismaPg({
+    connectionString: process.env.DATABASE_URL,
+    // Bound connections per app process so horizontal scaling cannot create
+    // an unbounded number of idle PostgreSQL connections.
+    max: Number.isFinite(poolMax) && poolMax > 0 ? poolMax : 5,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+  });
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],

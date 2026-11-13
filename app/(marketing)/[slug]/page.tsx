@@ -5,6 +5,9 @@ import ContactSectionWithHelpFormQuote from "@/components/wensity/blocks/contact
 import ContactSectionWithMapPreview from "@/components/wensity/blocks/contact-section-with-map-preview";
 import CtaSectionWithInstagramThumbnailGrid from "@/components/wensity/blocks/cta-section-with-instagram-thumbnail-grid";
 import { IntegrationsPage } from "@/components/marketing/integrations-page";
+import { AboutPage } from "@/components/marketing/about-page";
+import { LandingCta } from "@/components/marketing/landing-cta";
+import { EditorialPage } from "@/components/marketing/editorial-page";
 import { marketingPages, withSectionIds } from "@/lib/marketing-pages";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -32,6 +35,22 @@ export default async function MarketingSlugPage({ params }: Props) {
     return <IntegrationsPage />;
   }
 
+  if (slug === "about") {
+    return <><AboutPage /><LandingCta /></>;
+  }
+
+  if (slug === "blog" || slug === "changelog") {
+    return <>
+      <EditorialPage
+        kind={slug}
+        title={page.title}
+        description={page.description}
+        sections={withSectionIds(page.sections)}
+      />
+      <LandingCta />
+    </>;
+  }
+
   if (slug === "contact") {
     return (
       <>
@@ -56,13 +75,15 @@ export default async function MarketingSlugPage({ params }: Props) {
   }
 
   return (
-    <MarketingContentPage
-      title={page.title}
-      description={page.description}
-      sections={withSectionIds(page.sections)}
-      cta={page.cta}
-      category={page.category ?? "Smart HR"}
-      relatedLinks={page.relatedLinks}
-    />
+    <>
+      <MarketingContentPage
+        title={page.title}
+        description={page.description}
+        sections={withSectionIds(page.sections)}
+        cta={page.cta}
+        category={page.category ?? "Smart HR"}
+        relatedLinks={page.relatedLinks}
+      />
+    </>
   );
 }

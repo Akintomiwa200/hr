@@ -100,6 +100,14 @@ export const marketingPages: Record<string, PageConfig> = {
         heading: "June 2026",
         body: "Initial release with employee management, attendance tracking, payroll records, recruitment pipeline, org chart, and performance reviews.",
       },
+      {
+        heading: "Platform improvements",
+        body: "We continue to refine navigation, accessibility, and everyday workflows so HR teams can move between people data and action with less friction.",
+      },
+      {
+        heading: "What’s next",
+        body: "Upcoming releases focus on clearer reporting, dependable integrations, and better tools for managers and employees. Follow this page for shipped updates.",
+      },
     ],
     cta: { label: "Explore features", href: "/features" },
   },
@@ -149,6 +157,14 @@ export const marketingPages: Record<string, PageConfig> = {
       {
         heading: "Stay updated",
         body: "Follow the Changelog for release notes, or contact us to join our product newsletter for HR leaders.",
+      },
+      {
+        heading: "People operations, made practical",
+        body: "Our articles turn common HR questions into useful guidance for hiring, attendance, leave, payroll, and employee development.",
+      },
+      {
+        heading: "Ideas from the field",
+        body: "We share lessons from the day-to-day work of HR teams and managers, with examples you can adapt to your own organization.",
       },
     ],
     cta: { label: "View changelog", href: "/changelog" },
