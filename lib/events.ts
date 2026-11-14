@@ -36,11 +36,17 @@ export type RealtimeEventType =
   | "birthday_updated"
   | "shift_updated"
   | "chat_message"
+  | "chat_reaction"
+  | "chat_mention"
+  | "chat_message_updated"
+  | "chat_message_deleted"
   | "chat_read"
   | "chat_typing"
   | "chat_updated"
   | "chat_call_signal"
   | "chat_presence"
+  | "chat_status"
+  | "chat_profile"
   | "audit_updated";
 
 export type RealtimeEvent = {

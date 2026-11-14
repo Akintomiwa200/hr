@@ -8,9 +8,12 @@ import {
   Maximize2,
   MessageCircle,
   MessageSquarePlus,
+  MoreVertical,
+  Pencil,
   Plus,
   Search,
   Send,
+  Trash2,
   Users,
   X,
 } from "lucide-react";
@@ -18,11 +21,31 @@ import { Avatar } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { useAppEvents, useRealtimeStatus } from "@/hooks/use-app-events";
 import { ChatCallControls } from "@/components/chat/chat-call-controls";
+import { ChatComposerTools } from "@/components/chat/chat-composer-tools";
+import {
+  ChatMessageContent,
+  messagePreview,
+} from "@/components/chat/chat-message-content";
+import { ChatProfilePanel } from "@/components/chat/chat-profile-panel";
+import { GroupAvatar } from "@/components/chat/group-avatar";
+import { ChatStatusBar } from "@/components/chat/chat-status-bar";
+import {
+  presenceColor,
+  presenceLabel,
+  type ChatPresence,
+} from "@/components/chat/chat-presence";
+import {
+  compressChatImage,
+  uploadChatAttachment,
+} from "@/lib/chat-media-client";
 import { notify, readApiError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type {
   ChatConversationDTO,
   ChatMessageDTO,
+  ChatMessageKind,
+  ChatParticipantDTO,
+  ChatStatusDTO,
   ChatUserDTO,
 } from "@/lib/chat-types";
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
@@ -38,14 +61,6 @@ type ChatWorkspaceProps = {
 };
 
 type TypingEntry = { name: string; at: number };
-
-function presenceLabel(presence?: "ONLINE" | "AWAY" | "OFFLINE") {
-  return presence === "ONLINE" ? "Live" : presence === "AWAY" ? "Away" : "Offline";
-}
-
-function presenceColor(presence?: "ONLINE" | "AWAY" | "OFFLINE") {
-  return presence === "ONLINE" ? "bg-emerald-500" : presence === "AWAY" ? "bg-amber-400" : "bg-gray-400";
-}
 
 function splitPersonName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -72,6 +87,32 @@ function formatDayLabel(value: string) {
   if (isToday(date)) return "Today";
   if (isYesterday(date)) return "Yesterday";
   return format(date, "EEE, d MMM yyyy");
+}
+
+function optimisticKind(file: File): ChatMessageKind {
+  const mime = file.type.toLowerCase();
+  if (mime.startsWith("image/")) return "IMAGE";
+  if (mime.startsWith("video/")) return "VIDEO";
+  if (mime.startsWith("audio/")) return "AUDIO";
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "heic", "heif"].includes(extension)) {
+    return "IMAGE";
+  }
+  if (["mp4", "mov", "webm", "m4v", "ogv"].includes(extension)) return "VIDEO";
+  if (["mp3", "m4a", "wav", "ogg", "oga", "aac", "flac", "opus"].includes(extension)) {
+    return "AUDIO";
+  }
+  return "FILE";
+}
+
+function isMediaKind(kind: ChatMessageKind) {
+  return (
+    kind === "IMAGE" ||
+    kind === "VIDEO" ||
+    kind === "AUDIO" ||
+    kind === "FILE" ||
+    kind === "LOCATION"
+  );
 }
 
 function otherParticipant(
@@ -413,10 +454,24 @@ export function ChatWorkspace({
   const [threadError, setThreadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
+  const [replyingTo, setReplyingTo] = useState<ChatMessageDTO | null>(null);
+  const [mentionIds, setMentionIds] = useState<string[]>([]);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newChatMode, setNewChatMode] = useState<"direct" | "group">("direct");
   const [typing, setTyping] = useState<Record<string, TypingEntry>>({});
   const [isNearBottom, setIsNearBottom] = useState(true);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileMemberId, setProfileMemberId] = useState<string | null>(null);
+  const [onlineCount, setOnlineCount] = useState(0);
+  const [statuses, setStatuses] = useState<ChatStatusDTO[]>([]);
+  const [upload, setUpload] = useState<{ name: string; percent: number } | null>(
+    null
+  );
+  const [editing, setEditing] = useState<ChatMessageDTO | null>(null);
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ChatMessageDTO | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -443,12 +498,20 @@ export function ChatWorkspace({
       }
       const data = (await res.json()) as {
         conversations?: ChatConversationDTO[];
+        onlineCount?: number;
+        statuses?: ChatStatusDTO[];
       };
       setConversations(
         sortConversations(
           Array.isArray(data.conversations) ? data.conversations : []
         )
       );
+      if (typeof data.onlineCount === "number") {
+        setOnlineCount(data.onlineCount);
+      }
+      if (Array.isArray(data.statuses)) {
+        setStatuses(data.statuses);
+      }
       setConversationError(null);
     } catch (err) {
       if (!silent) {
@@ -519,6 +582,11 @@ export function ChatWorkspace({
       setThread(null);
       setThreadError(null);
       setTyping({});
+      setProfileOpen(false);
+      setProfileMemberId(null);
+      setEditing(null);
+      setActionMenuId(null);
+      setUpload(null);
       stickToBottom.current = true;
       try {
         const res = await fetch(
@@ -702,9 +770,51 @@ export function ChatWorkspace({
   }, [sendTyping]);
 
   useAppEvents({
-    types: ["chat_message", "chat_read", "chat_typing", "chat_updated", "chat_presence"],
+    types: [
+      "chat_message",
+      "chat_reaction",
+      "chat_mention",
+      "chat_message_updated",
+      "chat_message_deleted",
+      "chat_read",
+      "chat_typing",
+      "chat_updated",
+      "chat_presence",
+      "chat_status",
+      "chat_profile",
+    ],
     onEvent: (type, data) => {
       if (!type || !data) return;
+
+      if (type === "chat_mention") {
+        const message = data.message as ChatMessageDTO | undefined;
+        if (!message || message.senderId === currentUserId) return;
+        const conversationId =
+          typeof data.conversationId === "string" ? data.conversationId : null;
+        const title = conversations.find(
+          (conversation) => conversation.id === conversationId
+        )?.title;
+        notify.info(
+          `${message.senderName} mentioned you${title ? ` in ${title}` : ""}.`
+        );
+        return;
+      }
+
+      if (type === "chat_reaction") {
+        const message = data.message as ChatMessageDTO | undefined;
+        if (!message) return;
+        setThread((current) =>
+          current && current.conversation.id === message.conversationId
+            ? {
+                ...current,
+                messages: current.messages.map((item) =>
+                  item.id === message.id ? message : item
+                ),
+              }
+            : current
+        );
+        return;
+      }
 
       if (type === "chat_message") {
         const conversationId =
@@ -717,6 +827,22 @@ export function ChatWorkspace({
         if (!message || typeof message.id !== "string") {
           void loadConversations(true);
           return;
+        }
+
+        const replyToId = message.replyTo?.id;
+        if (replyToId) {
+          setThread((current) =>
+            current && current.conversation.id === conversationId
+              ? {
+                  ...current,
+                  messages: current.messages.map((item) =>
+                    item.id === replyToId
+                      ? { ...item, replyCount: item.replyCount + 1 }
+                      : item
+                  ),
+                }
+              : current
+          );
         }
 
         setConversations((current) =>
@@ -754,6 +880,100 @@ export function ChatWorkspace({
         }
 
         void loadConversations(true);
+        return;
+      }
+
+      if (type === "chat_message_updated") {
+        const message = data.message as ChatMessageDTO | undefined;
+        if (!message || typeof message.id !== "string") return;
+        setThread((current) =>
+          current && current.conversation.id === message.conversationId
+            ? {
+                ...current,
+                messages: current.messages.map((item) =>
+                  item.id === message.id ? message : item
+                ),
+              }
+            : current
+        );
+        setConversations((current) =>
+          current.map((conversation) =>
+            conversation.lastMessage?.id === message.id
+              ? { ...conversation, lastMessage: message }
+              : conversation
+          )
+        );
+        return;
+      }
+
+      if (type === "chat_message_deleted") {
+        const conversationId =
+          typeof data.conversationId === "string" ? data.conversationId : null;
+        const messageId =
+          typeof data.messageId === "string" ? data.messageId : null;
+        if (!conversationId || !messageId) return;
+        const scope = data.scope === "everyone" ? "everyone" : "me";
+        const message = data.message as ChatMessageDTO | undefined;
+
+        setThread((current) => {
+          if (!current || current.conversation.id !== conversationId) {
+            return current;
+          }
+          if (scope === "everyone" && message) {
+            return {
+              ...current,
+              messages: current.messages.map((item) =>
+                item.id === messageId ? message : item
+              ),
+            };
+          }
+          return {
+            ...current,
+            messages: current.messages.filter((item) => item.id !== messageId),
+          };
+        });
+
+        void loadConversations(true);
+        return;
+      }
+
+      if (type === "chat_status") {
+        const userId = typeof data.userId === "string" ? data.userId : null;
+        if (!userId) return;
+        if (data.cleared === true) {
+          setStatuses((current) =>
+            current.filter((status) => status.userId !== userId)
+          );
+          return;
+        }
+        const status = data.status as ChatStatusDTO | undefined;
+        if (!status) return;
+        setStatuses((current) => {
+          const without = current.filter((item) => item.userId !== status.userId);
+          return [status, ...without].sort((a, b) =>
+            b.updatedAt.localeCompare(a.updatedAt)
+          );
+        });
+        return;
+      }
+
+      if (type === "chat_profile") {
+        const userId = typeof data.userId === "string" ? data.userId : null;
+        if (!userId) return;
+        const about =
+          typeof data.about === "string" && data.about.trim()
+            ? data.about.trim()
+            : null;
+        const applyAbout = (conversation: ChatConversationDTO) => ({
+          ...conversation,
+          participants: conversation.participants.map((participant) =>
+            participant.userId === userId ? { ...participant, about } : participant
+          ),
+        });
+        setThread((current) =>
+          current ? { ...current, conversation: applyAbout(current.conversation) } : current
+        );
+        setConversations((current) => current.map(applyAbout));
         return;
       }
 
@@ -831,24 +1051,89 @@ export function ChatWorkspace({
       }
 
       if (type === "chat_updated") {
+        const conversation = data.conversation as ChatConversationDTO | undefined;
+        const conversationId =
+          typeof data.conversationId === "string" ? data.conversationId : null;
+        const deleted = data.deleted === true;
+        const removedUserId =
+          typeof data.removedUserId === "string" ? data.removedUserId : null;
+
+        if (deleted && conversationId) {
+          setConversations((current) =>
+            current.filter((item) => item.id !== conversationId)
+          );
+          if (conversationId === activeId) {
+            setActiveId(null);
+            setThread(null);
+            setProfileOpen(false);
+            setProfileMemberId(null);
+          }
+          return;
+        }
+
+        if (removedUserId === currentUserId && conversationId) {
+          setConversations((current) =>
+            current.filter((item) => item.id !== conversationId)
+          );
+          if (conversationId === activeId) {
+            setActiveId(null);
+            setThread(null);
+            setProfileOpen(false);
+            setProfileMemberId(null);
+          }
+          return;
+        }
+
+        if (conversation) {
+          setConversations((current) =>
+            sortConversations(
+              current.some((item) => item.id === conversation.id)
+                ? current.map((item) =>
+                    item.id === conversation.id ? conversation : item
+                  )
+                : [conversation, ...current]
+            )
+          );
+          setThread((current) =>
+            current && current.conversation.id === conversation.id
+              ? { ...current, conversation }
+              : current
+          );
+        }
+
         void loadConversations(true);
         return;
       }
 
       if (type === "chat_presence") {
         const userId = typeof data.userId === "string" ? data.userId : null;
-        const presence = data.presence;
-        if (!userId || (presence !== "ONLINE" && presence !== "AWAY" && presence !== "OFFLINE")) return;
-        setThread((current) => current ? {
-          ...current,
-          conversation: {
-            ...current.conversation,
-            participants: current.conversation.participants.map((participant) =>
-              participant.userId === userId ? { ...participant, presence } : participant
-            ),
-          },
-        } : current);
-        void loadConversations(true);
+        const presence: ChatPresence | null =
+          data.presence === "ONLINE" ||
+          data.presence === "AWAY" ||
+          data.presence === "OFFLINE"
+            ? data.presence
+            : null;
+        if (!userId || !presence) return;
+
+        // Presence changes are frequent, so patch local state instead of
+        // re-fetching every conversation for each teammate heartbeat.
+        const applyPresence = (conversation: ChatConversationDTO) => ({
+          ...conversation,
+          participants: conversation.participants.map((participant) =>
+            participant.userId === userId
+              ? { ...participant, presence }
+              : participant
+          ),
+        });
+        setConversations((current) => current.map(applyPresence));
+        setThread((current) =>
+          current
+            ? { ...current, conversation: applyPresence(current.conversation) }
+            : current
+        );
+        if (typeof data.onlineCount === "number") {
+          setOnlineCount(data.onlineCount);
+        }
       }
     },
   });
@@ -880,6 +1165,8 @@ export function ChatWorkspace({
   const handleDraftChange = useCallback(
     (value: string) => {
       setDraft(value);
+      const match = value.match(/(?:^|\s)@([^\s@]*)$/);
+      setMentionQuery(match ? match[1] : null);
       if (!activeId) return;
 
       if (value.trim()) {
@@ -901,108 +1188,417 @@ export function ChatWorkspace({
     [activeId, sendTyping]
   );
 
-  const handleSend = useCallback(async () => {
-    const body = draft.trim();
-    if (!body || !activeId || sending) return;
-
-    const conversationId = activeId;
-    const clientId = `tmp-${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-    const optimistic: ChatMessageDTO = {
-      id: clientId,
-      clientId,
-      conversationId,
-      senderId: currentUserId,
-      senderName: currentUserName,
-      senderFirstName: ownFirstName,
-      senderLastName: ownLastName,
-      senderAvatar: currentUserAvatar ?? null,
-      body,
-      createdAt: new Date().toISOString(),
-    };
-
-    setDraft("");
-    setSending(true);
-    stickToBottom.current = true;
-    setThread((current) =>
-      current && current.conversation.id === conversationId
-        ? { ...current, messages: [...current.messages, optimistic] }
-        : current
-    );
-
-    if (typingActive.current) {
-      typingActive.current = false;
-      if (typingTimer.current) window.clearTimeout(typingTimer.current);
-      void sendTyping(false);
-    }
-
-    try {
-      const res = await fetch(
-        `/api/chat/conversations/${conversationId}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body }),
+  const saveEdit = useCallback(
+    async (message: ChatMessageDTO, body: string) => {
+      if (!activeId) return false;
+      try {
+        const res = await fetch(
+          `/api/chat/conversations/${activeId}/messages/${message.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ body }),
+          }
+        );
+        if (!res.ok) {
+          throw new Error(await readApiError(res, "Could not update that message."));
         }
-      );
-      if (!res.ok) {
-        throw new Error(await readApiError(res, "Message could not be sent."));
-      }
-      const data = (await res.json()) as { message?: ChatMessageDTO };
-      if (!data.message) throw new Error("Message could not be sent.");
-
-      const message = data.message;
-      setThread((current) =>
-        current && current.conversation.id === conversationId
-          ? {
-              ...current,
-              messages: mergeMessage(current.messages, message, clientId),
-            }
-          : current
-      );
-      setConversations((current) =>
-        sortConversations(
+        const data = (await res.json()) as { message?: ChatMessageDTO };
+        if (!data.message) throw new Error("Could not update that message.");
+        const updated = data.message;
+        setThread((current) =>
+          current
+            ? {
+                ...current,
+                messages: current.messages.map((item) =>
+                  item.id === updated.id ? updated : item
+                ),
+              }
+            : current
+        );
+        setConversations((current) =>
           current.map((conversation) =>
-            conversation.id === conversationId
-              ? {
-                  ...conversation,
-                  lastMessage: message,
-                  lastMessageAt: message.createdAt,
-                }
+            conversation.lastMessage?.id === updated.id
+              ? { ...conversation, lastMessage: updated }
               : conversation
           )
-        )
-      );
-    } catch (err) {
+        );
+        notify.success("Message updated.");
+        return true;
+      } catch (error) {
+        notify.error(
+          error instanceof Error
+            ? error.message
+            : "Could not update that message."
+        );
+        return false;
+      }
+    },
+    [activeId]
+  );
+
+  const sendPayload = useCallback(
+    async (
+      payload: Record<string, unknown>,
+      extras: {
+        body: string;
+        kind: ChatMessageKind;
+        attachment?: ChatMessageDTO["attachment"];
+        location?: ChatMessageDTO["location"];
+        sticker?: string | null;
+      }
+    ) => {
+      if (!activeId || sending) return false;
+      const conversationId = activeId;
+      const clientId = `tmp-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+      const optimistic: ChatMessageDTO = {
+        id: clientId,
+        clientId,
+        conversationId,
+        senderId: currentUserId,
+        senderName: currentUserName,
+        senderFirstName: ownFirstName,
+        senderLastName: ownLastName,
+        senderAvatar: currentUserAvatar ?? null,
+        body: extras.body,
+        kind: extras.kind,
+        attachment: extras.attachment ?? null,
+        location: extras.location ?? null,
+        sticker: extras.sticker ?? null,
+        editedAt: null,
+        deletedAt: null,
+        replyTo: null,
+        replyCount: 0,
+        mentionUserIds: [],
+        reactions: [],
+        createdAt: new Date().toISOString(),
+      };
+
+      setSending(true);
+      stickToBottom.current = true;
       setThread((current) =>
         current && current.conversation.id === conversationId
-          ? {
-              ...current,
-              messages: current.messages.filter(
-                (message) => message.clientId !== clientId
-              ),
-            }
+          ? { ...current, messages: [...current.messages, optimistic] }
           : current
       );
-      setDraft(body);
-      notify.error(
-        err instanceof Error ? err.message : "Message could not be sent."
-      );
-    } finally {
-      setSending(false);
+
+      if (typingActive.current) {
+        typingActive.current = false;
+        if (typingTimer.current) window.clearTimeout(typingTimer.current);
+        void sendTyping(false);
+      }
+
+      try {
+        const res = await fetch(
+          `/api/chat/conversations/${conversationId}/messages`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }
+        );
+        if (!res.ok) {
+          throw new Error(await readApiError(res, "Message could not be sent."));
+        }
+        const data = (await res.json()) as { message?: ChatMessageDTO };
+        if (!data.message) throw new Error("Message could not be sent.");
+
+        const message = data.message;
+        setThread((current) =>
+          current && current.conversation.id === conversationId
+            ? {
+                ...current,
+                messages: mergeMessage(current.messages, message, clientId),
+              }
+            : current
+        );
+        setConversations((current) =>
+          sortConversations(
+            current.map((conversation) =>
+              conversation.id === conversationId
+                ? {
+                    ...conversation,
+                    lastMessage: message,
+                    lastMessageAt: message.createdAt,
+                  }
+                : conversation
+            )
+          )
+        );
+        return true;
+      } catch (err) {
+        setThread((current) =>
+          current && current.conversation.id === conversationId
+            ? {
+                ...current,
+                messages: current.messages.filter(
+                  (message) => message.clientId !== clientId
+                ),
+              }
+            : current
+        );
+        notify.error(
+          err instanceof Error ? err.message : "Message could not be sent."
+        );
+        return false;
+      } finally {
+        setSending(false);
+      }
+    },
+    [
+      activeId,
+      currentUserAvatar,
+      currentUserId,
+      currentUserName,
+      ownFirstName,
+      ownLastName,
+      sendTyping,
+      sending,
+    ]
+  );
+
+  const handleSend = useCallback(async () => {
+    const body = draft.trim();
+    if (!body) return;
+
+    if (editing) {
+      const saved = await saveEdit(editing, body);
+      if (saved) {
+        setDraft("");
+        setEditing(null);
+      }
+      return;
     }
+
+    if (!activeId || sending) return;
+    setDraft("");
+    const sent = await sendPayload(
+      {
+        body,
+        replyToId: replyingTo?.id ?? null,
+        mentionUserIds: mentionIds,
+      },
+      { body, kind: "TEXT" }
+    );
+    if (!sent) {
+      setDraft(body);
+      return;
+    }
+    setReplyingTo(null);
+    setMentionIds([]);
   }, [
     activeId,
-    currentUserAvatar,
-    currentUserId,
-    currentUserName,
     draft,
-    ownFirstName,
-    ownLastName,
-    sendTyping,
+    editing,
+    mentionIds,
+    replyingTo,
+    saveEdit,
+    sendPayload,
     sending,
   ]);
+
+  const toggleReaction = useCallback(
+    async (message: ChatMessageDTO, emoji: string) => {
+      if (!activeId || message.clientId) return;
+      try {
+        const res = await fetch(
+          `/api/chat/conversations/${activeId}/messages/${message.id}/reactions`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emoji }),
+          }
+        );
+        if (!res.ok) {
+          throw new Error(await readApiError(res, "Could not add reaction."));
+        }
+        const data = (await res.json()) as { message?: ChatMessageDTO };
+        if (!data.message) return;
+        const updated = data.message;
+        setThread((current) =>
+          current
+            ? {
+                ...current,
+                messages: current.messages.map((item) =>
+                  item.id === updated.id ? updated : item
+                ),
+              }
+            : current
+        );
+      } catch (error) {
+        notify.error(
+          error instanceof Error ? error.message : "Could not add reaction."
+        );
+      }
+    },
+    [activeId]
+  );
+
+  const chooseMention = useCallback(
+    (user: ChatParticipantDTO) => {
+      const value = draft.replace(
+        /(?:^|\s)@[^\s@]*$/,
+        (match) => `${match.startsWith(" ") ? " " : ""}@${user.name} `
+      );
+      setDraft(value);
+      setMentionIds((ids) =>
+        ids.includes(user.userId) ? ids : [...ids, user.userId]
+      );
+      setMentionQuery(null);
+      window.setTimeout(() => textareaRef.current?.focus(), 0);
+    },
+    [draft]
+  );
+
+  const handleSendSticker = useCallback(
+    (sticker: string) => {
+      void sendPayload(
+        { body: sticker, kind: "STICKER" },
+        { body: sticker, kind: "STICKER", sticker }
+      );
+    },
+    [sendPayload]
+  );
+
+  const handleShareLocation = useCallback(() => {
+    if (!activeId) return;
+    if (!navigator.geolocation) {
+      notify.error("Location sharing is not supported in this browser.");
+      return;
+    }
+    notify.info("Getting your current location…");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const location = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          label: null,
+        };
+        void sendPayload(
+          { kind: "LOCATION", body: "", location },
+          { body: "Shared location", kind: "LOCATION", location }
+        );
+      },
+      () => {
+        notify.error("Location access was blocked. Allow it and try again.");
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+    );
+  }, [activeId, sendPayload]);
+
+  const handlePickFile = useCallback(
+    async (file: File) => {
+      if (!activeId || sending || upload) return;
+      const conversationId = activeId;
+      let prepared = file;
+      if (file.type.startsWith("image/")) {
+        prepared = await compressChatImage(file);
+      }
+      setUpload({ name: prepared.name, percent: 0 });
+      try {
+        const result = await uploadChatAttachment({
+          conversationId,
+          file: prepared,
+          onProgress: (percent) =>
+            setUpload({ name: prepared.name, percent }),
+        });
+        setUpload(null);
+        const kind = optimisticKind(prepared);
+        await sendPayload(
+          {
+            body: "",
+            attachment: {
+              ticket: result.ticket,
+              secureUrl: result.secureUrl,
+              publicId: result.publicId,
+              resourceType: result.resourceType,
+              bytes: result.bytes,
+            },
+          },
+          {
+            body: prepared.name,
+            kind,
+            attachment: {
+              url: result.secureUrl,
+              name: prepared.name,
+              mime: prepared.type || "application/octet-stream",
+              size: prepared.size,
+              publicId: result.publicId,
+            },
+          }
+        );
+      } catch (error) {
+        notify.error(
+          error instanceof Error ? error.message : "Could not share that file."
+        );
+      } finally {
+        setUpload(null);
+      }
+    },
+    [activeId, sendPayload, sending, upload]
+  );
+
+  const startEdit = useCallback((message: ChatMessageDTO) => {
+    if (message.kind !== "TEXT" && message.kind !== "STICKER") {
+      notify.error("Only text and sticker messages can be edited.");
+      return;
+    }
+    setActionMenuId(null);
+    setEditing(message);
+    setDraft(message.body);
+    window.setTimeout(() => textareaRef.current?.focus(), 0);
+  }, []);
+
+  const performDelete = useCallback(
+    async (scope: "me" | "everyone") => {
+      if (!deleteTarget || !activeId) return;
+      const target = deleteTarget;
+      setDeleteBusy(true);
+      try {
+        const res = await fetch(
+          `/api/chat/conversations/${activeId}/messages/${target.id}?scope=${scope}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) {
+          throw new Error(await readApiError(res, "Could not delete that message."));
+        }
+        const data = (await res.json()) as { message?: ChatMessageDTO };
+        setThread((current) => {
+          if (!current) return current;
+          if (scope === "everyone" && data.message) {
+            return {
+              ...current,
+              messages: current.messages.map((item) =>
+                item.id === target.id ? data.message! : item
+              ),
+            };
+          }
+          return {
+            ...current,
+            messages: current.messages.filter((item) => item.id !== target.id),
+          };
+        });
+        setDeleteTarget(null);
+        void loadConversations(true);
+        notify.success(
+          scope === "everyone"
+            ? "Message deleted for everyone."
+            : "Message removed."
+        );
+      } catch (error) {
+        notify.error(
+          error instanceof Error
+            ? error.message
+            : "Could not delete that message."
+        );
+      } finally {
+        setDeleteBusy(false);
+      }
+    },
+    [activeId, deleteTarget, loadConversations]
+  );
 
   const handleLoadOlder = useCallback(async () => {
     if (
@@ -1069,6 +1665,113 @@ export function ChatWorkspace({
 
   const closeNewChat = useCallback(() => setNewChatOpen(false), []);
 
+  const closeProfile = useCallback(() => {
+    setProfileOpen(false);
+    setProfileMemberId(null);
+  }, []);
+
+  const openMemberProfile = useCallback((userId: string) => {
+    setProfileMemberId(userId);
+    setProfileOpen(true);
+  }, []);
+
+  const openConversationProfile = useCallback(() => {
+    if (!activeConversation) return;
+    const other =
+      activeConversation.type === "DIRECT"
+        ? activeConversation.participants.find(
+            (participant) => participant.userId !== currentUserId
+          )
+        : null;
+    setProfileMemberId(other?.userId ?? null);
+    setProfileOpen(true);
+  }, [activeConversation, currentUserId]);
+
+  const handleConversationUpdated = useCallback(
+    (conversation: ChatConversationDTO) => {
+      setConversations((current) =>
+        sortConversations(
+          current.some((item) => item.id === conversation.id)
+            ? current.map((item) =>
+                item.id === conversation.id ? conversation : item
+              )
+            : [conversation, ...current]
+        )
+      );
+      setThread((current) =>
+        current && current.conversation.id === conversation.id
+          ? { ...current, conversation }
+          : current
+      );
+    },
+    []
+  );
+
+  const handleConversationRemoved = useCallback(
+    (conversationId: string) => {
+      setConversations((current) =>
+        current.filter((item) => item.id !== conversationId)
+      );
+      setActiveId((current) => (current === conversationId ? null : current));
+      setThread((current) =>
+        current && current.conversation.id === conversationId ? null : current
+      );
+      setProfileOpen(false);
+      setProfileMemberId(null);
+    },
+    []
+  );
+
+  const handleAboutUpdated = useCallback(
+    (userId: string, about: string | null) => {
+      const applyAbout = (conversation: ChatConversationDTO) => ({
+        ...conversation,
+        participants: conversation.participants.map((participant) =>
+          participant.userId === userId ? { ...participant, about } : participant
+        ),
+      });
+      setConversations((current) => current.map(applyAbout));
+      setThread((current) =>
+        current
+          ? { ...current, conversation: applyAbout(current.conversation) }
+          : current
+      );
+    },
+    []
+  );
+
+  const focusComposer = useCallback(() => {
+    closeProfile();
+    window.setTimeout(() => textareaRef.current?.focus(), 0);
+  }, [closeProfile]);
+
+  const startDirectMessage = useCallback(
+    async (userId: string) => {
+      if (!userId || userId === currentUserId) return;
+      try {
+        const res = await fetch("/api/chat/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "DIRECT", userId }),
+        });
+        if (!res.ok) {
+          throw new Error(await readApiError(res, "Could not start that chat."));
+        }
+        const data = (await res.json()) as {
+          conversation?: ChatConversationDTO;
+        };
+        if (!data.conversation) throw new Error("Could not start that chat.");
+        closeProfile();
+        await handleCreated(data.conversation);
+      } catch (err) {
+        notify.error(
+          err instanceof Error ? err.message : "Could not start that chat."
+        );
+      }
+    },
+    [closeProfile, currentUserId, handleCreated]
+  );
+
   function handleBack() {
     setActiveId(null);
     setThread(null);
@@ -1076,6 +1779,12 @@ export function ChatWorkspace({
     setDraft("");
     setTyping({});
     setConversationError(null);
+    setProfileOpen(false);
+    setProfileMemberId(null);
+    setEditing(null);
+    setActionMenuId(null);
+    setUpload(null);
+    setDeleteTarget(null);
   }
 
   const lastOwnMessage = useMemo(() => {
@@ -1104,12 +1813,23 @@ export function ChatWorkspace({
         ).length
       : 0;
 
+  const canDeleteForEveryone = deleteTarget
+    ? deleteTarget.senderId === currentUserId ||
+      (activeConversation?.type === "GROUP" &&
+        activeConversation.myRole !== "MEMBER")
+    : false;
+
   const listPane = (
     <div className="flex h-full min-h-0 w-full flex-col bg-white">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
         <div>
           <p className="text-sm font-semibold text-gray-900">Chat</p>
           <p className="text-[11px] text-gray-400">
+            <span className="inline-flex items-center gap-1 font-medium text-emerald-600">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              {onlineCount} online
+            </span>
+            <span className="mx-1 text-gray-300">·</span>
             {conversations.reduce(
               (total, conversation) => total + conversation.unreadCount,
               0
@@ -1155,6 +1875,23 @@ export function ChatWorkspace({
           )}
         </div>
       </div>
+
+      <ChatStatusBar
+        statuses={statuses}
+        currentUserId={currentUserId}
+        currentUserName={currentUserName}
+        currentUserAvatar={currentUserAvatar}
+        onChange={(status) =>
+          setStatuses((current) =>
+            status
+              ? [
+                  status,
+                  ...current.filter((item) => item.userId !== status.userId),
+                ]
+              : current.filter((item) => item.userId !== currentUserId)
+          )
+        }
+      />
 
       <div className="shrink-0 px-3 py-2.5">
         <div className="relative">
@@ -1239,9 +1976,7 @@ export function ChatWorkspace({
                   )}
                 >
                   {conversation.type === "GROUP" ? (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 ring-2 ring-violet-50">
-                      <Users className="h-4 w-4" />
-                    </div>
+                    <GroupAvatar title={conversation.title} src={conversation.avatarUrl} size="md" />
                   ) : (
                     <span className="relative h-10 w-10 shrink-0">
                       <Avatar
@@ -1285,7 +2020,7 @@ export function ChatWorkspace({
                               conversation.lastMessage.senderId === currentUserId
                                 ? "You: "
                                 : ""
-                            }${conversation.lastMessage.body}`
+                            }${messagePreview(conversation.lastMessage)}`
                           : "No messages yet"}
                       </p>
                       {conversation.unreadCount > 0 && (
@@ -1322,33 +2057,47 @@ export function ChatWorkspace({
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
-            {activeConversation.type === "GROUP" ? (
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600">
-                <Users className="h-4 w-4" />
-              </div>
-            ) : (
-              <Avatar
-                firstName={
-                  otherParticipants[0]?.firstName ?? activeConversation.title
-                }
-                lastName={otherParticipants[0]?.lastName ?? ""}
-                src={otherParticipants[0]?.avatar}
-                size="sm"
-              />
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold text-gray-900">
-                {activeConversation.title}
-              </p>
+            <button
+              type="button"
+              onClick={openConversationProfile}
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-1 text-left transition-colors hover:bg-gray-50"
+              aria-label="View contact info"
+              title="View contact info"
+            >
               {activeConversation.type === "GROUP" ? (
-                <p className="truncate text-[10px] text-gray-400">{activeConversation.participants.length} members</p>
+                <GroupAvatar title={activeConversation.title} src={activeConversation.avatarUrl} size="sm" />
               ) : (
-                <p className={cn("flex items-center gap-1.5 text-[10px]", otherParticipants[0]?.presence === "ONLINE" ? "text-emerald-700" : otherParticipants[0]?.presence === "AWAY" ? "text-amber-700" : "text-gray-400")}>
-                  <span className={cn("h-1.5 w-1.5 rounded-full", presenceColor(otherParticipants[0]?.presence))} />
-                  {presenceLabel(otherParticipants[0]?.presence)}
-                </p>
+                <Avatar
+                  firstName={
+                    otherParticipants[0]?.firstName ?? activeConversation.title
+                  }
+                  lastName={otherParticipants[0]?.lastName ?? ""}
+                  src={otherParticipants[0]?.avatar}
+                  size="sm"
+                />
               )}
-            </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold text-gray-900">
+                  {activeConversation.title}
+                </p>
+                {activeConversation.type === "GROUP" ? (
+                  <p className="truncate text-[10px] text-gray-400">
+                    {activeConversation.participants.length} members ·{" "}
+                    {
+                      activeConversation.participants.filter(
+                        (participant) => participant.presence === "ONLINE"
+                      ).length
+                    }{" "}
+                    online
+                  </p>
+                ) : (
+                  <p className={cn("flex items-center gap-1.5 text-[10px]", otherParticipants[0]?.presence === "ONLINE" ? "text-emerald-700" : otherParticipants[0]?.presence === "AWAY" ? "text-amber-700" : "text-gray-400")}>
+                    <span className={cn("h-1.5 w-1.5 rounded-full", presenceColor(otherParticipants[0]?.presence))} />
+                    {presenceLabel(otherParticipants[0]?.presence)}
+                  </p>
+                )}
+              </div>
+            </button>
             {activeConversation.type === "DIRECT" && otherParticipants[0] && (
               <ChatCallControls
                 conversationId={activeConversation.id}
@@ -1479,12 +2228,22 @@ export function ChatWorkspace({
                         {!isOwn && (
                           <div className="w-8 shrink-0">
                             {showAvatar && (
-                              <Avatar
-                                firstName={message.senderFirstName}
-                                lastName={message.senderLastName}
-                                src={message.senderAvatar}
-                                size="sm"
-                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openMemberProfile(message.senderId)
+                                }
+                                className="rounded-full transition-opacity hover:opacity-80"
+                                aria-label={`View ${message.senderName}'s profile`}
+                                title={`View ${message.senderName}'s profile`}
+                              >
+                                <Avatar
+                                  firstName={message.senderFirstName}
+                                  lastName={message.senderLastName}
+                                  src={message.senderAvatar}
+                                  size="sm"
+                                />
+                              </button>
                             )}
                           </div>
                         )}
@@ -1497,22 +2256,139 @@ export function ChatWorkspace({
                           {!isOwn &&
                             activeConversation.type === "GROUP" &&
                             showAvatar && (
-                              <p className="mb-1 ml-1 text-[10px] font-semibold text-gray-500">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openMemberProfile(message.senderId)
+                                }
+                                className="mb-1 ml-1 text-left text-[10px] font-semibold text-gray-500 transition-colors hover:text-violet-700"
+                              >
                                 {message.senderName}
-                              </p>
+                              </button>
                             )}
-                          <div
-                            className={cn(
-                              "whitespace-pre-wrap break-words px-3 py-2 text-[13px] leading-relaxed shadow-sm",
-                              isOwn
-                                ? "rounded-2xl rounded-br-md bg-violet-600 text-white"
-                                : "rounded-2xl rounded-bl-md border border-gray-100 bg-white text-gray-800"
+                          <div className="group/bubble relative">
+                            <div
+                              className={cn(
+                                "break-words text-[13px] leading-relaxed",
+                                isMediaKind(message.kind)
+                                  ? "p-1.5"
+                                  : "px-3 py-2 shadow-sm",
+                                message.kind === "STICKER" &&
+                                  "!border-0 !bg-transparent !p-0 !shadow-none",
+                                isOwn
+                                  ? "rounded-2xl rounded-br-md bg-violet-600 text-white"
+                                  : "rounded-2xl rounded-bl-md border border-gray-100 bg-white text-gray-800"
+                              )}
+                            >
+                              {message.replyTo && message.kind !== "STICKER" && (
+                                <div
+                                  className={cn(
+                                    "mb-1.5 rounded-lg border-l-2 px-2 py-1 text-[10px] leading-snug",
+                                    isOwn
+                                      ? "border-white/60 bg-white/15 text-white/80"
+                                      : "border-violet-300 bg-gray-50 text-gray-500"
+                                  )}
+                                >
+                                  <span className="block font-semibold">
+                                    {message.replyTo.senderName}
+                                  </span>
+                                  <span className="line-clamp-2 break-words">
+                                    {message.replyTo.body || "Attachment"}
+                                  </span>
+                                </div>
+                              )}
+                              <ChatMessageContent
+                                message={message}
+                                isOwn={isOwn}
+                              />
+                            </div>
+                            {!message.deletedAt && !message.clientId && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setActionMenuId(
+                                    actionMenuId === message.id
+                                      ? null
+                                      : message.id
+                                  )
+                                }
+                                className={cn(
+                                  "absolute top-1 rounded-full bg-white/90 p-1 text-gray-500 opacity-0 shadow ring-1 ring-gray-200 transition-opacity hover:text-violet-700 focus:opacity-100 group-hover/bubble:opacity-100",
+                                  isOwn ? "-left-8" : "-right-8"
+                                )}
+                                aria-label="Message actions"
+                                title="Message actions"
+                              >
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              </button>
                             )}
-                          >
-                            {message.body}
+                            {actionMenuId === message.id &&
+                              !message.deletedAt && (
+                                <div
+                                  className={cn(
+                                    "absolute top-8 z-30 w-44 overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-xl",
+                                    isOwn ? "right-0" : "left-0"
+                                  )}
+                                >
+                                  {isOwn &&
+                                    (message.kind === "TEXT" ||
+                                      message.kind === "STICKER") && (
+                                      <button
+                                        type="button"
+                                        onClick={() => startEdit(message)}
+                                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+                                      >
+                                        <Pencil className="h-3.5 w-3.5 text-gray-400" />
+                                        Edit message
+                                      </button>
+                                    )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setReplyingTo(message);
+                                      setActionMenuId(null);
+                                      textareaRef.current?.focus();
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+                                  >
+                                    <MessageCircle className="h-3.5 w-3.5 text-gray-400" />
+                                    Reply
+                                  </button>
+                                  <div className="flex items-center justify-around border-y border-gray-50 px-2 py-1">
+                                    {["👍", "❤️", "😂", "🎉"].map((emoji) => (
+                                      <button
+                                        key={emoji}
+                                        type="button"
+                                        onClick={() => {
+                                          setActionMenuId(null);
+                                          void toggleReaction(message, emoji);
+                                        }}
+                                        className="rounded px-1 py-0.5 text-sm transition-colors hover:bg-violet-50"
+                                        aria-label={`React ${emoji}`}
+                                      >
+                                        {emoji}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActionMenuId(null);
+                                      setDeleteTarget(message);
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-rose-600 hover:bg-rose-50"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
                           </div>
                           <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-400">
                             <span>{formatMessageTime(message.createdAt)}</span>
+                            {message.editedAt && !message.deletedAt && (
+                              <span className="italic">· edited</span>
+                            )}
                             {isOwn && isLastOwn && (
                               <>
                                 <span className="text-gray-300">·</span>
@@ -1527,6 +2403,31 @@ export function ChatWorkspace({
                               </>
                             )}
                           </div>
+                          {message.reactions.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {message.reactions.map((reaction) => (
+                                <button
+                                  key={reaction.emoji}
+                                  type="button"
+                                  onClick={() =>
+                                    void toggleReaction(message, reaction.emoji)
+                                  }
+                                  className={cn(
+                                    "rounded-full border px-1.5 py-0.5 text-[11px] transition-colors",
+                                    reaction.userIds.includes(currentUserId)
+                                      ? "border-violet-200 bg-violet-50 text-violet-700"
+                                      : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                                  )}
+                                  aria-label={`React ${reaction.emoji}`}
+                                  title={`${reaction.count} reaction${
+                                    reaction.count === 1 ? "" : "s"
+                                  }`}
+                                >
+                                  {reaction.emoji} {reaction.count}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1537,33 +2438,130 @@ export function ChatWorkspace({
           </div>
 
           <div className="shrink-0 border-t border-gray-100 bg-white px-3 pb-3 pt-2">
-            <div className="mb-1.5 h-4 px-1 text-[11px] text-violet-600">
-              {typingText ?? ""}
+            <div className="mb-1.5 flex h-4 items-center justify-between px-1 text-[11px]">
+              <span className="truncate text-violet-600">{typingText ?? ""}</span>
+              {editing && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(null);
+                    setDraft("");
+                  }}
+                  className="inline-flex shrink-0 items-center gap-1 text-gray-500 hover:text-gray-800"
+                >
+                  <X className="h-3 w-3" />
+                  Cancel edit
+                </button>
+              )}
             </div>
-            <div className="flex items-end gap-2">
+            {editing && (
+              <div className="mb-2 flex items-start gap-2 rounded-lg border border-violet-100 bg-violet-50 px-2.5 py-1.5 text-[11px] text-violet-700">
+                <Pencil className="mt-0.5 h-3 w-3 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">
+                  Editing: {editing.body}
+                </span>
+              </div>
+            )}
+            {replyingTo && (
+              <div className="mb-2 flex items-center gap-2 rounded-lg border border-violet-100 bg-violet-50 px-2.5 py-1.5 text-[11px] text-violet-700">
+                <MessageCircle className="h-3 w-3 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">
+                  Replying to {replyingTo.senderName}:{" "}
+                  {replyingTo.body || "Attachment"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setReplyingTo(null)}
+                  className="rounded p-0.5 hover:bg-violet-100"
+                  aria-label="Cancel reply"
+                  title="Cancel reply"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+            {mentionQuery !== null && activeConversation && (
+              <div className="mb-2 max-h-36 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+                {activeConversation.participants
+                  .filter(
+                    (person) =>
+                      person.userId !== currentUserId &&
+                      person.name
+                        .toLowerCase()
+                        .includes(
+                          mentionQuery.replace(/_/g, " ").toLowerCase()
+                        )
+                  )
+                  .slice(0, 6)
+                  .map((person) => (
+                    <button
+                      key={person.userId}
+                      type="button"
+                      onClick={() => chooseMention(person)}
+                      className="block w-full px-3 py-2 text-left text-xs text-gray-700 transition-colors hover:bg-violet-50"
+                    >
+                      @{person.name}
+                    </button>
+                  ))}
+              </div>
+            )}
+            {upload && (
+              <div className="mb-2 rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1.5">
+                <div className="flex items-center justify-between text-[10px] text-gray-600">
+                  <span className="inline-flex min-w-0 items-center gap-1 truncate">
+                    <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+                    Uploading {upload.name}
+                  </span>
+                  <span className="shrink-0 pl-2">{upload.percent}%</span>
+                </div>
+                <div className="mt-1 h-1 overflow-hidden rounded-full bg-gray-200">
+                  <div
+                    className="h-full rounded-full bg-violet-500 transition-all"
+                    style={{ width: `${upload.percent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="flex items-end gap-1.5">
+              <ChatComposerTools
+                disabled={sending || Boolean(upload)}
+                onPickFile={(file) => void handlePickFile(file)}
+                onShareLocation={handleShareLocation}
+                onSendSticker={handleSendSticker}
+                onVoiceNote={(file) => void handlePickFile(file)}
+              />
               <textarea
                 ref={textareaRef}
                 value={draft}
                 onChange={(event) => handleDraftChange(event.target.value)}
                 onKeyDown={(event) => {
+                  if (event.key === "Escape" && editing) {
+                    event.preventDefault();
+                    setEditing(null);
+                    setDraft("");
+                    return;
+                  }
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
                     void handleSend();
                   }
                 }}
                 rows={1}
-                placeholder="Write a message..."
+                placeholder={editing ? "Edit your message..." : "Write a message..."}
                 className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-xl border border-gray-200 bg-gray-50/70 px-3 py-2.5 text-[13px] leading-relaxed placeholder:text-gray-400 focus:border-transparent focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/40"
               />
               <button
                 type="button"
                 onClick={() => void handleSend()}
-                disabled={!draft.trim() || sending}
+                disabled={!draft.trim() || sending || Boolean(upload)}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Send message"
+                aria-label={editing ? "Save message" : "Send message"}
+                title={editing ? "Save changes" : "Send"}
               >
                 {sending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
+                ) : editing ? (
+                  <CheckCheck className="h-4 w-4" />
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
@@ -1575,7 +2573,9 @@ export function ChatWorkspace({
                 isNearBottom ? "opacity-100" : "opacity-0"
               )}
             >
-              Enter to send · Shift + Enter for a new line
+              {editing
+                ? "Enter to save · Esc to cancel"
+                : "Enter to send · Shift + Enter for a new line"}
             </p>
           </div>
         </>
@@ -1593,22 +2593,46 @@ export function ChatWorkspace({
     </div>
   );
 
+  const profilePane =
+    activeConversation && profileOpen ? (
+      <div
+        className={cn(
+          "absolute inset-0 z-20 min-h-0 bg-white",
+          variant === "page" &&
+            "md:static md:z-auto md:w-[320px] md:shrink-0 md:border-l md:border-gray-100"
+        )}
+      >
+        <ChatProfilePanel
+          conversation={activeConversation}
+          currentUserId={currentUserId}
+          memberId={profileMemberId}
+          onSelectMember={openMemberProfile}
+          onBack={() => setProfileMemberId(null)}
+          onClose={closeProfile}
+          onMessage={focusComposer}
+          onDirectMessage={(userId) => void startDirectMessage(userId)}
+          onConversationUpdated={handleConversationUpdated}
+          onConversationRemoved={handleConversationRemoved}
+          onAboutUpdated={handleAboutUpdated}
+        />
+      </div>
+    ) : null;
+
   return (
     <>
       <div
         className={cn(
-          "flex min-h-0 overflow-hidden bg-white",
+          "relative flex min-h-0 overflow-hidden bg-white",
           variant === "docked"
             ? "h-full"
             : "h-[calc(100dvh-155px)] min-h-[520px] rounded-xl border border-gray-200 shadow-sm"
         )}
       >
         {variant === "docked" ? (
-          activeId ? (
-            threadPane
-          ) : (
-            listPane
-          )
+          <>
+            {activeId ? threadPane : listPane}
+            {profilePane}
+          </>
         ) : (
           <>
             <div
@@ -1627,6 +2651,7 @@ export function ChatWorkspace({
             >
               {threadPane}
             </div>
+            {profilePane}
           </>
         )}
       </div>
@@ -1637,6 +2662,49 @@ export function ChatWorkspace({
         onClose={closeNewChat}
         onCreated={handleCreated}
       />
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete message"
+        description="Choose who should stop seeing this message."
+        size="sm"
+      >
+        <div className="space-y-3">
+          <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-[12px] leading-relaxed text-gray-600">
+            {deleteTarget ? messagePreview(deleteTarget) : ""}
+          </p>
+          <div className="flex flex-col gap-2 border-t border-gray-100 pt-4">
+            {canDeleteForEveryone && (
+              <button
+                type="button"
+                onClick={() => void performDelete("everyone")}
+                disabled={deleteBusy}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-xs font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+              >
+                {deleteBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Delete for everyone
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => void performDelete("me")}
+              disabled={deleteBusy}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete for me
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeleteTarget(null)}
+              className="rounded-lg px-4 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Dialog>
     </>
   );
 }

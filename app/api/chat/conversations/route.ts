@@ -8,6 +8,8 @@ import {
   createGroupConversation,
   findOrCreateDirectConversation,
   getChatCompanyId,
+  getChatStatuses,
+  getCompanyOnlineCount,
   listChatConversations,
   sweepStaleChatPresence,
 } from "@/lib/chat";
@@ -27,8 +29,12 @@ export async function GET() {
 
   await sweepStaleChatPresence(companyId);
 
-  const conversations = await listChatConversations(session);
-  return NextResponse.json({ conversations });
+  const [conversations, onlineCount, statuses] = await Promise.all([
+    listChatConversations(session),
+    getCompanyOnlineCount(session),
+    getChatStatuses(session),
+  ]);
+  return NextResponse.json({ conversations, onlineCount, statuses });
 }
 
 export async function POST(request: NextRequest) {

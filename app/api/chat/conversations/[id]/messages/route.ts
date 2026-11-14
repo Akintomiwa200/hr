@@ -5,6 +5,7 @@ import { forbidden, notFound, unauthorized } from "@/lib/api-auth";
 import { broadcastChatEvent } from "@/lib/chat-events";
 import { chatErrorResponse } from "@/lib/chat-http";
 import { getChatCompanyId, getChatThread, postChatMessage } from "@/lib/chat";
+import type { PostChatMessageInput } from "@/lib/chat";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -46,10 +47,10 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const body = await request.json().catch(() => null);
-  const text = typeof body?.body === "string" ? body.body : "";
+  const payload = (body ?? {}) as PostChatMessageInput;
 
   try {
-    const result = await postChatMessage(session, id, text);
+    const result = await postChatMessage(session, id, payload);
     if (!result) return notFound();
 
     broadcastChatEvent(
@@ -61,6 +62,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       },
       result.recipientIds
     );
+    const mentionedIds = result.message.mentionUserIds.filter((userId) => userId !== session.id);
+    if (mentionedIds.length) {
+      broadcastChatEvent("chat_mention", { conversationId: id, message: result.message }, mentionedIds);
+    }
 
     return NextResponse.json({ message: result.message }, { status: 201 });
   } catch (error) {

@@ -206,6 +206,7 @@ model Company {
   bonusTypes        BonusType[]
   bonusAwards       BonusAward[]
   chatConversations ChatConversation[]
+  chatStatuses      ChatStatus[]
   learningCourses LearningCourse[]
   learningAssignments LearningAssignment[]
   learningModules LearningModule[]
@@ -322,6 +323,8 @@ model User {
   suspensionReason String?
   chatPresence String @default("OFFLINE")
   chatPresenceAt DateTime?
+  /** Short WhatsApp-style "about" line shown on the chat profile card. */
+  chatAbout    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -341,6 +344,8 @@ model User {
   chatConversationsCreated ChatConversation[] @relation("ChatConversationCreator")
   chatParticipants         ChatParticipant[]  @relation("ChatParticipants")
   chatMessages             ChatMessage[]      @relation("ChatMessages")
+  chatReactions            ChatReaction[]
+  chatStatuses             ChatStatus[]       @relation("ChatStatuses")
 }
 
 model PasswordResetToken {
@@ -2163,7 +2168,10 @@ model ChatConversation {
   companyId     String?
   type          String   @default("DIRECT") // DIRECT | GROUP
   title         String?
+  description   String?
+  avatarUrl     String?
   directKey     String?  @unique
+  inviteCode    String?  @unique
   createdById   String?
   lastMessageAt DateTime @default(now())
   createdAt     DateTime @default(now())
@@ -2182,6 +2190,8 @@ model ChatParticipant {
   id                String   @id @default(cuid())
   conversationId    String
   userId            String
+  /** OWNER | ADMIN | MEMBER — only meaningful for group conversations. */
+  role              String   @default("MEMBER")
   lastReadAt        DateTime @default(now())
   lastReadMessageId String?
   createdAt         DateTime @default(now())
@@ -2198,13 +2208,64 @@ model ChatMessage {
   conversationId String
   senderId       String
   body           String
+  /** TEXT | IMAGE | VIDEO | AUDIO | FILE | LOCATION | STICKER | SYSTEM */
+  kind           String    @default("TEXT")
+  attachmentUrl  String?
+  attachmentName String?
+  attachmentMime String?
+  attachmentSize Int?
+  attachmentPublicId String?
+  latitude       Float?
+  longitude      Float?
+  locationLabel  String?
+  /** Per-user "delete for me" list; keeps one row for everyone else. */
+  hiddenFor      String[]  @default([])
   createdAt      DateTime  @default(now())
   editedAt       DateTime?
   deletedAt      DateTime?
+  replyToId      String?
+  mentionUserIds String[]  @default([])
 
   conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User             @relation("ChatMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  replyTo      ChatMessage?     @relation("ChatMessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      ChatMessage[]    @relation("ChatMessageReplies")
+  reactions    ChatReaction[]
 
   @@index([conversationId, createdAt])
+  @@index([replyToId, createdAt])
+}
+
+model ChatReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+/** A WhatsApp-style status note that disappears after 24 hours. */
+model ChatStatus {
+  id        String   @id @default(cuid())
+  companyId String?
+  userId    String
+  text      String
+  emoji     String?
+  color     String   @default("violet")
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User     @relation("ChatStatuses", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId])
+  @@index([companyId, expiresAt])
 }
 

@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { forbidden, unauthorized } from "@/lib/api-auth";
 import { broadcastChatEvent } from "@/lib/chat-events";
-import { sweepStaleChatPresence } from "@/lib/chat";
+import { countCompanyOnline, sweepStaleChatPresence } from "@/lib/chat";
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -33,13 +33,16 @@ export async function POST(request: NextRequest) {
   const selfChanged = previous.chatPresence !== presence;
 
   if (selfChanged) {
-    const recipients = await prisma.user.findMany({
-      where: { companyId: session.companyId, isActive: true, archivedAt: null },
-      select: { id: true },
-    });
+    const [recipients, onlineCount] = await Promise.all([
+      prisma.user.findMany({
+        where: { companyId: session.companyId, isActive: true, archivedAt: null },
+        select: { id: true },
+      }),
+      countCompanyOnline(session.companyId),
+    ]);
     broadcastChatEvent(
       "chat_presence",
-      { userId: session.id, presence },
+      { userId: session.id, presence, onlineCount },
       recipients.map((user) => user.id)
     );
   }
