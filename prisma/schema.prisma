@@ -348,6 +348,8 @@ model User {
   chatPollVotes            ChatPollVote[]
   chatVoiceRoomMemberships ChatVoiceRoomMember[]
   chatStatuses             ChatStatus[]       @relation("ChatStatuses")
+  chatStatusViews          ChatStatusView[]   @relation("ChatStatusViewer")
+  chatStatusReactions      ChatStatusReaction[] @relation("ChatStatusReactor")
 }
 
 model PasswordResetToken {
@@ -2230,6 +2232,7 @@ model ChatMessage {
   deletedAt      DateTime?
   pinnedAt       DateTime?
   replyToId      String?
+  statusReplyToId String?
   mentionUserIds String[]  @default([])
 
   conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -2238,10 +2241,12 @@ model ChatMessage {
   replies      ChatMessage[]    @relation("ChatMessageReplies")
   reactions    ChatReaction[]
   poll          ChatPoll?
+  statusReplyTo ChatStatus? @relation("ChatStatusReplies", fields: [statusReplyToId], references: [id], onDelete: SetNull)
 
   @@index([conversationId, createdAt])
   @@index([conversationId, pinnedAt])
   @@index([replyToId, createdAt])
+  @@index([statusReplyToId])
 }
 
 model ChatPoll {
@@ -2330,16 +2335,58 @@ model ChatStatus {
   companyId String?
   userId    String
   text      String
+  kind      String   @default("TEXT")
+  mediaUrl  String?
+  mediaName String?
+  mediaMime String?
+  mediaSize Int?
+  mediaPublicId String?
   emoji     String?
   color     String   @default("violet")
+  font      String   @default("sans")
+  audienceMode String @default("ALL")
+  audienceUserIds String[] @default([])
   expiresAt DateTime
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user    User     @relation("ChatStatuses", fields: [userId], references: [id], onDelete: Cascade)
+  views ChatStatusView[]
+  reactions ChatStatusReaction[]
+  replies ChatMessage[] @relation("ChatStatusReplies")
+  reposts ChatStatus[] @relation("ChatStatusReposts")
+  repostedFromId String?
+  repostedFrom ChatStatus? @relation("ChatStatusReposts", fields: [repostedFromId], references: [id], onDelete: SetNull)
 
-  @@unique([userId])
-  @@index([companyId, expiresAt])
+  @@index([companyId, expiresAt, createdAt])
+  @@index([userId, createdAt])
+}
+
+model ChatStatusView {
+  id        String   @id @default(cuid())
+  statusId  String
+  viewerId  String
+  viewedAt  DateTime @default(now())
+
+  status ChatStatus @relation(fields: [statusId], references: [id], onDelete: Cascade)
+  viewer User @relation("ChatStatusViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+
+  @@unique([statusId, viewerId])
+  @@index([statusId, viewedAt])
+}
+
+model ChatStatusReaction {
+  id        String   @id @default(cuid())
+  statusId  String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  status ChatStatus @relation(fields: [statusId], references: [id], onDelete: Cascade)
+  user User @relation("ChatStatusReactor", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([statusId, userId, emoji])
+  @@index([statusId, createdAt])
 }
 

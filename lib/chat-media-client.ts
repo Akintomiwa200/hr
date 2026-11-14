@@ -112,6 +112,22 @@ export async function uploadChatAttachment(input: {
   };
 }
 
+export async function uploadChatStatusMedia(input: { file: File; onProgress?: ChatUploadProgress }) {
+  const signRes = await fetch("/api/chat/status/upload-sign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fileName: input.file.name, fileSize: input.file.size, mimeType: input.file.type || "application/octet-stream" }),
+  });
+  if (!signRes.ok) {
+    const data = await signRes.json().catch(() => null) as { error?: string } | null;
+    throw new Error(data?.error || "Could not prepare that status upload.");
+  }
+  const signed = await signRes.json() as { ticket?: string; uploadUrl?: string; params?: Record<string, string | number> };
+  if (!signed.ticket || !signed.uploadUrl || !signed.params) throw new Error("Could not prepare that status upload.");
+  const result = await uploadCloudinaryFile({ uploadUrl: signed.uploadUrl, params: signed.params, file: input.file, onProgress: input.onProgress });
+  return { ticket: signed.ticket, secureUrl: result.secure_url, publicId: result.public_id, resourceType: result.resource_type, bytes: result.bytes };
+}
+
 /** Record a short voice note with MediaRecorder when the browser supports it. */
 export function createVoiceRecorder() {
   if (typeof window === "undefined" || typeof MediaRecorder === "undefined") {

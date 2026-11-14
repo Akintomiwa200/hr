@@ -35,17 +35,28 @@ export type ChatLocationDTO = {
 };
 
 export type ChatStatusDTO = {
+  id: string;
   userId: string;
   name: string;
   firstName: string;
   lastName: string;
   avatar: string | null;
   text: string;
+  kind: "TEXT" | "IMAGE" | "VIDEO" | "AUDIO";
+  media: { url: string; name: string; mime: string; size: number } | null;
   emoji: string | null;
   color: string;
+  font: "sans" | "serif" | "rounded";
+  audienceMode: "ALL" | "EXCEPT" | "ONLY";
+  audienceUserIds: string[];
   expiresAt: string;
+  createdAt: string;
   updatedAt: string;
   isMine: boolean;
+  viewedByMe: boolean;
+  viewCount: number;
+  reactions: Array<{ emoji: string; count: number; reactedByMe: boolean }>;
+  repostedFrom: { userId: string; name: string } | null;
 };
 
 export type ChatUserDTO = {
@@ -99,6 +110,7 @@ export type ChatMessageDTO = {
   deletedAt: string | null;
   pinnedAt: string | null;
   poll: ChatPollDTO | null;
+  statusReply: { statusId: string; authorName: string; text: string; kind: ChatStatusDTO["kind"]; mediaUrl: string | null } | null;
   replyTo: { id: string; senderName: string; body: string } | null;
   replyCount: number;
   mentionUserIds: string[];

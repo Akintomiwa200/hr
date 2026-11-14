@@ -486,6 +486,13 @@ export function ChatWorkspace({
   const [profileMemberId, setProfileMemberId] = useState<string | null>(null);
   const [onlineCount, setOnlineCount] = useState(0);
   const [statuses, setStatuses] = useState<ChatStatusDTO[]>([]);
+  const updateStatus = useCallback((status: ChatStatusDTO | null, deletedStatusId?: string) => {
+    setStatuses((current) => status
+      ? [...current.filter((item) => item.id !== status.id), status].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      : deletedStatusId
+        ? current.filter((item) => item.id !== deletedStatusId)
+        : current.filter((item) => item.userId !== currentUserId));
+  }, [currentUserId]);
   const [upload, setUpload] = useState<{ name: string; percent: number } | null>(
     null
   );
@@ -1006,9 +1013,21 @@ export function ChatWorkspace({
       }
 
       if (type === "chat_status") {
+        const action = typeof data.action === "string" ? data.action : "created";
         const userId = typeof data.userId === "string" ? data.userId : null;
-        if (!userId) return;
-        if (data.cleared === true) {
+        if (action === "viewed") {
+          const statusId = typeof data.statusId === "string" ? data.statusId : null;
+          if (!statusId || typeof data.viewCount !== "number") return;
+          setStatuses((current) => current.map((item) => item.id === statusId ? { ...item, viewCount: data.viewCount as number } : item));
+          return;
+        }
+        if (action === "deleted") {
+          const statusId = typeof data.statusId === "string" ? data.statusId : null;
+          if (statusId) setStatuses((current) => current.filter((status) => status.id !== statusId));
+          return;
+        }
+        if (action === "cleared" || data.cleared === true) {
+          if (!userId) return;
           setStatuses((current) =>
             current.filter((status) => status.userId !== userId)
           );
@@ -1017,7 +1036,7 @@ export function ChatWorkspace({
         const status = data.status as ChatStatusDTO | undefined;
         if (!status) return;
         setStatuses((current) => {
-          const without = current.filter((item) => item.userId !== status.userId);
+          const without = current.filter((item) => item.id !== status.id);
           return [status, ...without].sort((a, b) =>
             b.updatedAt.localeCompare(a.updatedAt)
           );
@@ -1343,6 +1362,7 @@ export function ChatWorkspace({
         replyCount: 0,
         mentionUserIds: [],
         reactions: [],
+        statusReply: null,
         createdAt: new Date().toISOString(),
       };
 
@@ -2034,16 +2054,7 @@ export function ChatWorkspace({
         currentUserId={currentUserId}
         currentUserName={currentUserName}
         currentUserAvatar={currentUserAvatar}
-        onChange={(status) =>
-          setStatuses((current) =>
-            status
-              ? [
-                  status,
-                  ...current.filter((item) => item.userId !== status.userId),
-                ]
-              : current.filter((item) => item.userId !== currentUserId)
-          )
-        }
+        onChange={updateStatus}
       />
 
       <div className="shrink-0 px-3 py-2.5">

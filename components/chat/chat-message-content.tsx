@@ -267,9 +267,15 @@ export function ChatMessageContent({
   }
 
   return (
-    <p className="whitespace-pre-wrap break-words">
-      <LinkifiedText text={message.body} />
-    </p>
+    <div className="space-y-1.5">
+      {message.statusReply && (
+        <div className={cn("block max-w-[240px] rounded-lg border-l-2 px-2.5 py-1.5 text-[10px]", isOwn ? "border-white/70 bg-white/10" : "border-violet-500 bg-gray-50")}>
+          <span className="block font-semibold opacity-80">Status reply · {message.statusReply.authorName}</span>
+          <span className="block truncate opacity-70">{message.statusReply.kind !== "TEXT" ? `Shared ${message.statusReply.kind.toLowerCase()}` : message.statusReply.text || "Status"}</span>
+        </div>
+      )}
+      <p className="whitespace-pre-wrap break-words"><LinkifiedText text={message.body} /></p>
+    </div>
   );
 }
 

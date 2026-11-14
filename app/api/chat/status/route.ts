@@ -51,11 +51,22 @@ export async function POST(request: NextRequest) {
       text: typeof body?.text === "string" ? body.text : "",
       emoji: typeof body?.emoji === "string" ? body.emoji : null,
       color: typeof body?.color === "string" ? body.color : undefined,
+      kind: typeof body?.kind === "string" ? body.kind : "TEXT",
+      font: typeof body?.font === "string" ? body.font : undefined,
+      audienceMode: typeof body?.audienceMode === "string" ? body.audienceMode : "ALL",
+      audienceUserIds: Array.isArray(body?.audienceUserIds) ? body.audienceUserIds.filter((id: unknown): id is string => typeof id === "string") : [],
+      media: body?.media && typeof body.media === "object" ? {
+        ticket: typeof body.media.ticket === "string" ? body.media.ticket : undefined,
+        secureUrl: typeof body.media.secureUrl === "string" ? body.media.secureUrl : undefined,
+        publicId: typeof body.media.publicId === "string" ? body.media.publicId : undefined,
+        resourceType: typeof body.media.resourceType === "string" ? body.media.resourceType : undefined,
+        bytes: Number(body.media.bytes),
+      } : null,
     });
 
     broadcastChatEvent(
       "chat_status",
-      { userId: session.id, status: result.status },
+      { action: "created", userId: session.id, status: result.status },
       result.recipientIds
     );
 
@@ -65,7 +76,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   const session = await getSession();
   if (!session) return unauthorized();
   if (!isChatModelReady()) {
@@ -77,10 +88,11 @@ export async function DELETE() {
   if (!getChatCompanyId(session)) return forbidden();
 
   try {
-    const result = await clearChatStatus(session);
+    const statusId = request.nextUrl.searchParams.get("id");
+    const result = await clearChatStatus(session, statusId);
     broadcastChatEvent(
       "chat_status",
-      { userId: session.id, cleared: true },
+      { action: statusId ? "deleted" : "cleared", userId: session.id, statusId: statusId ?? undefined, cleared: true },
       result.recipientIds
     );
     return NextResponse.json({ cleared: true });

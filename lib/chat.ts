@@ -4,6 +4,7 @@ import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { broadcastChatEvent } from "@/lib/chat-events";
 import { getCloudinaryConfig } from "@/lib/cloudinary";
+import { readDirectUploadTicket } from "@/lib/cloudinary-direct-upload";
 import {
   chatAttachmentKind,
   chatUploadLimit,
@@ -79,6 +80,7 @@ export const chatConversationInclude = {
       replyTo: { select: { id: true, body: true, sender: { select: chatUserSelect } } },
       _count: { select: { replies: true } },
       poll: { include: { options: { include: { _count: { select: { votes: true } } } }, _count: { select: { votes: true } } } },
+      statusReplyTo: { select: { id: true, text: true, kind: true, mediaUrl: true, user: { select: chatUserSelect } } },
     },
   },
 } satisfies Prisma.ChatConversationInclude;
@@ -89,6 +91,7 @@ export const chatMessageInclude = {
   replyTo: { select: { id: true, body: true, sender: { select: chatUserSelect } } },
   _count: { select: { replies: true } },
   poll: { include: { options: { include: { _count: { select: { votes: true } } } }, _count: { select: { votes: true } } } },
+  statusReplyTo: { select: { id: true, text: true, kind: true, mediaUrl: true, user: { select: chatUserSelect } } },
 } satisfies Prisma.ChatMessageInclude;
 
 /**
@@ -110,6 +113,7 @@ export function chatConversationIncludeFor(userId: string) {
         },
         _count: { select: { replies: true } },
         poll: { include: { options: { include: { _count: { select: { votes: true } } } }, _count: { select: { votes: true } } } },
+        statusReplyTo: { select: { id: true, text: true, kind: true, mediaUrl: true, user: { select: chatUserSelect } } },
       },
     },
   } satisfies Prisma.ChatConversationInclude;
@@ -123,8 +127,14 @@ type ChatMessageRow = Prisma.ChatMessageGetPayload<{
   include: typeof chatMessageInclude;
 }>;
 type ChatStatusRow = Prisma.ChatStatusGetPayload<{
-  include: { user: { select: typeof chatUserSelect } };
+  include: typeof chatStatusInclude;
 }>;
+
+const chatStatusInclude = {
+  user: { select: chatUserSelect },
+  _count: { select: { views: true, reactions: true } },
+  repostedFrom: { include: { user: { select: chatUserSelect } } },
+} satisfies Prisma.ChatStatusInclude;
 
 export class ChatError extends Error {
   status: number;
@@ -302,6 +312,13 @@ export function serializeChatMessage(message: ChatMessageRow, viewerId?: string,
         votedByMe: Boolean(viewerOptionId && viewerOptionId === option.id),
       })),
     } : null,
+    statusReply: message.statusReplyTo ? {
+      statusId: message.statusReplyTo.id,
+      authorName: employeeName(message.statusReplyTo.user),
+      text: message.statusReplyTo.text,
+      kind: message.statusReplyTo.kind as ChatStatusDTO["kind"],
+      mediaUrl: message.statusReplyTo.mediaUrl,
+    } : null,
     replyTo: message.replyTo
       ? { id: message.replyTo.id, senderName: employeeName(message.replyTo.sender), body: message.replyTo.body }
       : null,
@@ -431,7 +448,8 @@ export async function getChatRecipientIds(conversationId: string): Promise<strin
 
 export async function listChatUsers(
   session: SessionUser,
-  query = ""
+  query = "",
+  take = 60
 ): Promise<ChatUserDTO[]> {
   const companyId = getChatCompanyId(session);
   if (!companyId) return [];
@@ -464,7 +482,7 @@ export async function listChatUsers(
     },
     select: chatUserSelect,
     orderBy: [{ employee: { firstName: "asc" } }, { email: "asc" }],
-    take: 60,
+    take: Math.min(Math.max(Math.trunc(take) || 60, 1), 300),
   });
 
   return users.map(serializeChatUser);
@@ -762,6 +780,7 @@ export type PostChatMessageInput = {
   replyToId?: string | null;
   mentionUserIds?: string[];
   poll?: { question?: string; options?: string[] };
+  statusReplyToId?: string | null;
 };
 
 export async function postChatMessage(
@@ -780,6 +799,13 @@ export async function postChatMessage(
   const myParticipant = conversation.participants.find((participant) => participant.userId === session.id);
   if (conversation.announcementOnly && normalizeMemberRole(myParticipant?.role) === "MEMBER") {
     throw new ChatError(403, "Only channel owners and admins can post here.");
+  }
+  const statusReplyToId = typeof payload.statusReplyToId === "string" ? payload.statusReplyToId : null;
+  if (statusReplyToId) {
+    const status = await prisma.chatStatus.findFirst({ where: { id: statusReplyToId, companyId, expiresAt: { gt: new Date() } }, select: { id: true, userId: true, audienceMode: true, audienceUserIds: true } });
+    if (!status || !canViewChatStatusAudience(status, session.id) || !conversation.participants.some((participant) => participant.userId === status.userId)) {
+      throw new ChatError(404, "That status is no longer available to reply to.");
+    }
   }
   const requestedKind = normalizeMessageKind(payload.kind);
   const rawBody = typeof payload.body === "string" ? payload.body.trim() : "";
@@ -946,6 +972,7 @@ export async function postChatMessage(
         locationLabel: location?.label ?? null,
         replyToId,
         mentionUserIds: mentions,
+        statusReplyToId,
         ...(poll ? { poll: { create: { conversation: { connect: { id: conversationId } }, question: poll.question, options: { create: poll.options.map((label) => ({ label })) } } } } : {}),
       },
       include: chatMessageInclude,
@@ -1645,82 +1672,183 @@ export async function joinGroupByInviteCode(
   };
 }
 
-function serializeStatus(
-  row: ChatStatusRow,
-  currentUserId: string
-): ChatStatusDTO {
+function canViewChatStatusAudience(status: { userId: string; audienceMode: string; audienceUserIds: string[] }, viewerId: string) {
+  if (status.userId === viewerId || status.audienceMode === "ALL") return true;
+  if (status.audienceMode === "ONLY") return status.audienceUserIds.includes(viewerId);
+  if (status.audienceMode === "EXCEPT") return !status.audienceUserIds.includes(viewerId);
+  return false;
+}
+
+function serializeStatus(row: ChatStatusRow, currentUserId: string, viewedByMe = false, reactions: Array<{ emoji: string; count: number; reactedByMe: boolean }> = []): ChatStatusDTO {
   const { firstName, lastName } = splitName(row.user);
+  const isMine = row.userId === currentUserId;
+  const kind = row.kind === "IMAGE" || row.kind === "VIDEO" || row.kind === "AUDIO" ? row.kind : "TEXT";
+  const font = row.font === "serif" || row.font === "rounded" ? row.font : "sans";
+  const audienceMode = row.audienceMode === "EXCEPT" || row.audienceMode === "ONLY" ? row.audienceMode : "ALL";
   return {
+    id: row.id,
     userId: row.userId,
     name: employeeName(row.user),
     firstName,
     lastName,
     avatar: row.user.employee?.avatar ?? null,
     text: row.text,
+    kind,
+    media: row.mediaUrl ? { url: row.mediaUrl, name: row.mediaName ?? "Status media", mime: row.mediaMime ?? "application/octet-stream", size: row.mediaSize ?? 0 } : null,
     emoji: row.emoji,
     color: row.color,
+    font,
+    audienceMode,
+    audienceUserIds: isMine ? row.audienceUserIds : [],
     expiresAt: row.expiresAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    isMine: row.userId === currentUserId,
+    isMine,
+    viewedByMe: isMine ? false : viewedByMe,
+    viewCount: row._count.views,
+    reactions,
+    repostedFrom: row.repostedFrom ? { userId: row.repostedFrom.userId, name: employeeName(row.repostedFrom.user) } : null,
   };
 }
 
-export async function getChatStatuses(
-  session: SessionUser
-): Promise<ChatStatusDTO[]> {
+function statusAudienceRecipients(userIds: string[], mode: string, selected: string[], ownerId: string) {
+  const visible = userIds.filter((userId) => userId === ownerId || mode === "ALL" || (mode === "ONLY" ? selected.includes(userId) : !selected.includes(userId)));
+  return Array.from(new Set([ownerId, ...visible]));
+}
+
+export async function getChatStatuses(session: SessionUser): Promise<ChatStatusDTO[]> {
   const companyId = getChatCompanyId(session);
   if (!companyId) return [];
   const now = new Date();
-  await prisma.chatStatus.deleteMany({
-    where: { companyId, expiresAt: { lt: now } },
-  });
+  await prisma.chatStatus.deleteMany({ where: { companyId, expiresAt: { lt: now } } });
   const rows = await prisma.chatStatus.findMany({
     where: { companyId, expiresAt: { gt: now } },
-    include: { user: { select: chatUserSelect } },
-    orderBy: { updatedAt: "desc" },
-    take: 60,
+    include: chatStatusInclude,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: 300,
   });
-  return rows.map((row) => serializeStatus(row, session.id));
+  const visible = rows.filter((row) => canViewChatStatusAudience(row, session.id));
+  const viewed = visible.length ? await prisma.chatStatusView.findMany({ where: { viewerId: session.id, statusId: { in: visible.map((row) => row.id) } }, select: { statusId: true } }) : [];
+  const viewedIds = new Set(viewed.map((entry) => entry.statusId));
+  return visible.map((row) => serializeStatus(row, session.id, viewedIds.has(row.id)));
 }
 
-export async function setChatStatus(
-  session: SessionUser,
-  input: { text?: string; emoji?: string | null; color?: string }
-) {
+type ChatStatusUploadTicket = {
+  kind: "chat-status";
+  companyId: string;
+  uploaderId: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  publicId: string;
+  resourceType: "image" | "video" | "raw";
+  uploadKind: "IMAGE" | "VIDEO" | "AUDIO";
+  expiresAt: number;
+};
+
+export async function setChatStatus(session: SessionUser, input: {
+  text?: string; kind?: string; emoji?: string | null; color?: string; font?: string;
+  audienceMode?: string; audienceUserIds?: string[];
+  media?: { ticket?: string; secureUrl?: string; publicId?: string; resourceType?: string; bytes?: number } | null;
+}) {
   const companyId = getChatCompanyId(session);
   if (!companyId) throw new ChatError(403, "Chat is only available inside a company.");
-
-  const text = typeof input.text === "string" ? input.text.trim() : "";
-  if (!text) throw new ChatError(400, "Write a short status.");
-  if (text.length > MAX_STATUS_LENGTH) {
-    throw new ChatError(400, "That status is too long.");
+  const kind = input.kind === "IMAGE" || input.kind === "VIDEO" || input.kind === "AUDIO" ? input.kind : "TEXT";
+  const text = typeof input.text === "string" ? input.text.trim().slice(0, MAX_STATUS_LENGTH) : "";
+  if (input.text && input.text.length > MAX_STATUS_LENGTH) throw new ChatError(400, "That status caption is too long.");
+  if (kind === "TEXT" && !text) throw new ChatError(400, "Write a short status.");
+  let media: { url: string; name: string; mime: string; size: number; publicId: string } | null = null;
+  if (kind !== "TEXT") {
+    const config = getCloudinaryConfig();
+    const token = typeof input.media?.ticket === "string" ? input.media.ticket : "";
+    const ticket = config && token ? readDirectUploadTicket<ChatStatusUploadTicket>(token, config.apiSecret) : null;
+    if (!config || !ticket || ticket.kind !== "chat-status" || ticket.companyId !== companyId || ticket.uploaderId !== session.id || ticket.uploadKind !== kind) throw new ChatError(400, "That status upload is invalid or expired.");
+    const secureUrl = typeof input.media?.secureUrl === "string" ? input.media.secureUrl : "";
+    let uploaded: URL;
+    try { uploaded = new URL(secureUrl); } catch { throw new ChatError(400, "The status media URL is invalid."); }
+    if (uploaded.protocol !== "https:" || uploaded.hostname !== "res.cloudinary.com" || uploaded.pathname.split("/")[1] !== config.cloudName || input.media?.publicId !== ticket.publicId || input.media?.resourceType !== ticket.resourceType || Number(input.media?.bytes) !== ticket.fileSize) throw new ChatError(400, "The uploaded status media did not match its upload ticket.");
+    media = { url: secureUrl, name: ticket.fileName, mime: ticket.mimeType, size: ticket.fileSize, publicId: ticket.publicId };
+  } else if (input.media) {
+    throw new ChatError(400, "Text statuses do not accept an attachment.");
   }
-  const emoji =
-    typeof input.emoji === "string" && input.emoji.trim()
-      ? input.emoji.trim().slice(0, 8)
-      : null;
-  const color =
-    input.color && CHAT_STATUS_COLORS.has(input.color) ? input.color : "violet";
+  const audienceMode = input.audienceMode === "EXCEPT" || input.audienceMode === "ONLY" ? input.audienceMode : "ALL";
+  const requestedAudience = Array.from(new Set((input.audienceUserIds ?? []).filter((id): id is string => typeof id === "string" && id !== session.id))).slice(0, 500);
+  if (audienceMode !== "ALL" && requestedAudience.length === 0) throw new ChatError(400, "Choose at least one teammate for this audience setting.");
+  if (requestedAudience.length) {
+    const audienceUsers = await prisma.user.findMany({ where: { id: { in: requestedAudience }, companyId, isActive: true, archivedAt: null }, select: { id: true } });
+    if (audienceUsers.length !== requestedAudience.length) throw new ChatError(400, "One or more selected teammates are unavailable.");
+  }
+  const emoji = typeof input.emoji === "string" && input.emoji.trim() ? input.emoji.trim().slice(0, 8) : null;
+  const color = input.color && CHAT_STATUS_COLORS.has(input.color) ? input.color : "violet";
+  const font = input.font === "serif" || input.font === "rounded" ? input.font : "sans";
   const expiresAt = new Date(Date.now() + CHAT_STATUS_TTL_MS);
-
-  const row = await prisma.chatStatus.upsert({
-    where: { userId: session.id },
-    create: { companyId, userId: session.id, text, emoji, color, expiresAt },
-    update: { companyId, text, emoji, color, expiresAt },
-    include: { user: { select: chatUserSelect } },
+  const row = await prisma.chatStatus.create({
+    data: {
+      companyId, userId: session.id, text, kind, emoji, color, font, audienceMode, audienceUserIds: requestedAudience,
+      mediaUrl: media?.url ?? null, mediaName: media?.name ?? null, mediaMime: media?.mime ?? null, mediaSize: media?.size ?? null, mediaPublicId: media?.publicId ?? null, expiresAt,
+    },
+    include: chatStatusInclude,
   });
-
-  return {
-    status: serializeStatus(row, session.id),
-    recipientIds: await companyAudience(companyId),
-  };
+  const allUsers = await companyAudience(companyId);
+  return { status: serializeStatus(row, session.id), recipientIds: statusAudienceRecipients(allUsers, audienceMode, requestedAudience, session.id) };
 }
 
-export async function clearChatStatus(session: SessionUser) {
+export async function clearChatStatus(session: SessionUser, statusId?: string | null) {
   const companyId = getChatCompanyId(session);
   if (!companyId) throw new ChatError(403, "Chat is only available inside a company.");
-  await prisma.chatStatus.deleteMany({ where: { userId: session.id } });
+  if (statusId) {
+    const status = await prisma.chatStatus.findFirst({ where: { id: statusId, companyId, userId: session.id }, select: { id: true, audienceMode: true, audienceUserIds: true } });
+    if (!status) throw new ChatError(404, "That status could not be found.");
+    await prisma.chatStatus.delete({ where: { id: status.id } });
+    return { userId: session.id, statusId, recipientIds: statusAudienceRecipients(await companyAudience(companyId), status.audienceMode, status.audienceUserIds, session.id) };
+  }
+  await prisma.chatStatus.deleteMany({ where: { userId: session.id, companyId } });
   return { userId: session.id, recipientIds: await companyAudience(companyId) };
+}
+
+export async function getChatStatusForViewer(session: SessionUser, statusId: string) {
+  const companyId = getChatCompanyId(session);
+  if (!companyId) return null;
+  const row = await prisma.chatStatus.findFirst({ where: { id: statusId, companyId, expiresAt: { gt: new Date() } }, include: chatStatusInclude });
+  if (!row || !canViewChatStatusAudience(row, session.id)) return null;
+  const isMine = row.userId === session.id;
+  const hasViewed = isMine ? true : Boolean(await prisma.chatStatusView.findUnique({ where: { statusId_viewerId: { statusId, viewerId: session.id } }, select: { id: true } }));
+  if (!isMine && !hasViewed) await prisma.chatStatusView.create({ data: { statusId, viewerId: session.id } });
+  const [groups, ownReactions, views] = await Promise.all([
+    prisma.chatStatusReaction.groupBy({ by: ["emoji"], where: { statusId }, _count: { _all: true } }),
+    prisma.chatStatusReaction.findMany({ where: { statusId, userId: session.id }, select: { emoji: true } }),
+    isMine ? prisma.chatStatusView.findMany({ where: { statusId }, include: { viewer: { select: chatUserSelect } }, orderBy: { viewedAt: "desc" }, take: 200 }) : Promise.resolve([]),
+  ]);
+  const ownEmoji = new Set(ownReactions.map((reaction) => reaction.emoji));
+  const reactions = groups.map((group) => ({ emoji: group.emoji, count: group._count._all, reactedByMe: ownEmoji.has(group.emoji) }));
+  const status = serializeStatus(row, session.id, !isMine, reactions);
+  const viewers = isMine ? views.map((view) => ({ userId: view.viewerId, name: employeeName(view.viewer), avatar: view.viewer.employee?.avatar ?? null, viewedAt: view.viewedAt.toISOString() })) : [];
+  return { status: { ...status, viewCount: row._count.views + (!isMine && !hasViewed ? 1 : 0) }, viewers, recipientIds: [row.userId] };
+}
+
+export async function reactToChatStatus(session: SessionUser, statusId: string, emoji: string) {
+  const status = await getChatStatusForViewer(session, statusId);
+  if (!status) return null;
+  if (!emoji || [...emoji].length > 8) throw new ChatError(400, "Choose a valid reaction.");
+  const existing = await prisma.chatStatusReaction.findUnique({ where: { statusId_userId_emoji: { statusId, userId: session.id, emoji } }, select: { id: true } });
+  if (existing) await prisma.chatStatusReaction.delete({ where: { id: existing.id } });
+  else await prisma.chatStatusReaction.create({ data: { statusId, userId: session.id, emoji } });
+  const refreshed = await getChatStatusForViewer(session, statusId);
+  return refreshed ? { ...refreshed, recipientIds: Array.from(new Set([...refreshed.recipientIds, session.id])) } : null;
+}
+
+export async function repostChatStatus(session: SessionUser, statusId: string) {
+  const source = await prisma.chatStatus.findFirst({ where: { id: statusId, companyId: getChatCompanyId(session), expiresAt: { gt: new Date() } }, include: chatStatusInclude });
+  if (!source || !canViewChatStatusAudience(source, session.id)) return null;
+  if (source.userId === session.id) throw new ChatError(400, "You already shared this status.");
+  const row = await prisma.chatStatus.create({ data: {
+    companyId: source.companyId, userId: session.id, text: source.text, kind: source.kind,
+    mediaUrl: source.mediaUrl, mediaName: source.mediaName, mediaMime: source.mediaMime, mediaSize: source.mediaSize, mediaPublicId: source.mediaPublicId,
+    emoji: source.emoji, color: source.color, font: source.font, audienceMode: source.audienceMode, audienceUserIds: source.audienceUserIds, repostedFromId: source.id,
+    expiresAt: new Date(Date.now() + CHAT_STATUS_TTL_MS),
+  }, include: chatStatusInclude });
+  const recipients = statusAudienceRecipients(await companyAudience(source.companyId ?? ""), row.audienceMode, row.audienceUserIds, session.id);
+  return { status: serializeStatus(row, session.id), recipientIds: recipients };
 }
 
 export async function updateChatAbout(session: SessionUser, rawAbout: string) {

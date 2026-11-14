@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const query = request.nextUrl.searchParams.get("q") ?? "";
   try {
-    const users = await listChatUsers(session, query);
+    const users = await listChatUsers(session, query, request.nextUrl.searchParams.get("scope") === "audience" ? 300 : 60);
     return NextResponse.json({ users });
   } catch (error) {
     console.error("[chat users] Could not load teammate list", error);
