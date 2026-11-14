@@ -345,6 +345,8 @@ model User {
   chatParticipants         ChatParticipant[]  @relation("ChatParticipants")
   chatMessages             ChatMessage[]      @relation("ChatMessages")
   chatReactions            ChatReaction[]
+  chatPollVotes            ChatPollVote[]
+  chatVoiceRoomMemberships ChatVoiceRoomMember[]
   chatStatuses             ChatStatus[]       @relation("ChatStatuses")
 }
 
@@ -2170,6 +2172,7 @@ model ChatConversation {
   title         String?
   description   String?
   avatarUrl     String?
+  announcementOnly Boolean @default(false)
   directKey     String?  @unique
   inviteCode    String?  @unique
   createdById   String?
@@ -2181,6 +2184,8 @@ model ChatConversation {
   createdBy   User?             @relation("ChatConversationCreator", fields: [createdById], references: [id], onDelete: SetNull)
   participants ChatParticipant[]
   messages     ChatMessage[]
+  polls        ChatPoll[]
+  voiceRoom    ChatVoiceRoom?
 
   @@index([companyId, lastMessageAt])
   @@index([lastMessageAt])
@@ -2223,6 +2228,7 @@ model ChatMessage {
   createdAt      DateTime  @default(now())
   editedAt       DateTime?
   deletedAt      DateTime?
+  pinnedAt       DateTime?
   replyToId      String?
   mentionUserIds String[]  @default([])
 
@@ -2231,9 +2237,77 @@ model ChatMessage {
   replyTo      ChatMessage?     @relation("ChatMessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies      ChatMessage[]    @relation("ChatMessageReplies")
   reactions    ChatReaction[]
+  poll          ChatPoll?
 
   @@index([conversationId, createdAt])
+  @@index([conversationId, pinnedAt])
   @@index([replyToId, createdAt])
+}
+
+model ChatPoll {
+  id        String   @id @default(cuid())
+  conversationId String
+  messageId String   @unique
+  question  String
+  createdAt DateTime @default(now())
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  options ChatPollOption[]
+  votes ChatPollVote[]
+
+  @@index([conversationId, createdAt])
+}
+
+model ChatPollOption {
+  id        String @id @default(cuid())
+  pollId    String
+  label     String
+
+  poll  ChatPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes ChatPollVote[]
+
+  @@index([pollId])
+}
+
+model ChatPollVote {
+  id        String   @id @default(cuid())
+  pollId    String
+  optionId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  option ChatPollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  poll ChatPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId])
+  @@index([userId])
+}
+
+model ChatVoiceRoom {
+  id             String   @id @default(cuid())
+  conversationId String   @unique
+  createdAt      DateTime @default(now())
+  endedAt        DateTime?
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  members ChatVoiceRoomMember[]
+}
+
+model ChatVoiceRoomMember {
+  id        String   @id @default(cuid())
+  roomId    String
+  userId    String
+  joinedAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  leftAt    DateTime?
+
+  room ChatVoiceRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([userId, leftAt])
 }
 
 model ChatReaction {

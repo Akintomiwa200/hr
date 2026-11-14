@@ -6,6 +6,7 @@ import { broadcastChatEvent } from "@/lib/chat-events";
 import { chatErrorResponse } from "@/lib/chat-http";
 import { getChatCompanyId, getChatThread, postChatMessage } from "@/lib/chat";
 import type { PostChatMessageInput } from "@/lib/chat";
+import { createNotification } from "@/lib/notifications";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,9 +24,11 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const before = request.nextUrl.searchParams.get("before");
+  const around = request.nextUrl.searchParams.get("around");
   const takeParam = Number(request.nextUrl.searchParams.get("take"));
   const thread = await getChatThread(session, id, {
     before,
+    around,
     take: Number.isFinite(takeParam) && takeParam > 0 ? takeParam : undefined,
   });
 
@@ -65,6 +68,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     const mentionedIds = result.message.mentionUserIds.filter((userId) => userId !== session.id);
     if (mentionedIds.length) {
       broadcastChatEvent("chat_mention", { conversationId: id, message: result.message }, mentionedIds);
+      const preview = result.message.body.trim().slice(0, 120) || "sent you a message";
+      await Promise.allSettled(mentionedIds.map((userId) => createNotification({
+        userId,
+        type: "chat",
+        title: `${result.message.senderName} mentioned you`,
+        message: preview,
+        href: `/chat?c=${encodeURIComponent(id)}`,
+      })));
     }
 
     return NextResponse.json({ message: result.message }, { status: 201 });

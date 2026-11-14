@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  BarChart3,
   CheckCheck,
   Loader2,
   Maximize2,
@@ -10,6 +11,7 @@ import {
   MessageSquarePlus,
   MoreVertical,
   Pencil,
+  Pin,
   Plus,
   Search,
   Send,
@@ -21,6 +23,7 @@ import { Avatar } from "@/components/ui";
 import { Dialog } from "@/components/ui/dialog";
 import { useAppEvents, useRealtimeStatus } from "@/hooks/use-app-events";
 import { ChatCallControls } from "@/components/chat/chat-call-controls";
+import { ChatVoiceRoomControls } from "@/components/chat/chat-voice-room-controls";
 import { ChatComposerTools } from "@/components/chat/chat-composer-tools";
 import {
   ChatMessageContent,
@@ -153,6 +156,18 @@ function mergeMessage(
   );
 }
 
+function preservePollSelection(message: ChatMessageDTO, previous?: ChatMessageDTO) {
+  if (!message.poll || !previous?.poll) return message;
+  const selectedOption = previous.poll.options.find((option) => option.votedByMe)?.id;
+  return {
+    ...message,
+    poll: {
+      ...message.poll,
+      options: message.poll.options.map((option) => ({ ...option, votedByMe: option.id === selectedOption })),
+    },
+  };
+}
+
 function NewChatDialog({
   open,
   initialMode,
@@ -172,6 +187,7 @@ function NewChatDialog({
   const [openingUserId, setOpeningUserId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [title, setTitle] = useState("");
+  const [announcementOnly, setAnnouncementOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -299,6 +315,10 @@ function NewChatDialog({
               placeholder="e.g. Project launch"
               className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-violet-500"
             />
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2.5 text-xs text-gray-600">
+              <input type="checkbox" checked={announcementOnly} onChange={(event) => setAnnouncementOnly(event.target.checked)} className="mt-0.5 accent-violet-600" />
+              <span><span className="block font-medium text-gray-800">Announcement channel</span><span className="mt-0.5 block text-[11px]">Only owners and admins can post. Everyone can read and react.</span></span>
+            </label>
           </div>
         )}
 
@@ -408,6 +428,7 @@ function NewChatDialog({
                   type: "GROUP",
                   title,
                   userIds: selected,
+                  announcementOnly,
                 })
               }
               className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -417,7 +438,7 @@ function NewChatDialog({
               ) : (
                 <Users className="h-4 w-4" />
               )}
-              Create group
+              {announcementOnly ? "Create channel" : "Create group"}
             </button>
           </div>
         )}
@@ -472,14 +493,36 @@ export function ChatWorkspace({
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ChatMessageDTO | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [pinsOpen, setPinsOpen] = useState(false);
+  const [messageSearchOpen, setMessageSearchOpen] = useState(false);
+  const [messageSearchQuery, setMessageSearchQuery] = useState("");
+  const [messageSearchResults, setMessageSearchResults] = useState<ChatMessageDTO[]>([]);
+  const [messageSearchLoading, setMessageSearchLoading] = useState(false);
+  const [pinnedMessages, setPinnedMessages] = useState<ChatMessageDTO[]>([]);
+  const [pinsLoading, setPinsLoading] = useState(false);
+  const [pollOpen, setPollOpen] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollChoices, setPollChoices] = useState(["", ""]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimer = useRef<number | null>(null);
   const typingActive = useRef(false);
+  const longPressTimer = useRef<number | null>(null);
   const stickToBottom = useRef(true);
   const refreshInFlight = useRef(false);
   const connectedBefore = useRef(false);
+
+  const clearLongPress = useCallback(() => {
+    if (longPressTimer.current !== null) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => {
+    if (longPressTimer.current !== null) window.clearTimeout(longPressTimer.current);
+  }, []);
 
   const { firstName: ownFirstName, lastName: ownLastName } =
     splitPersonName(currentUserName);
@@ -488,6 +531,7 @@ export function ChatWorkspace({
     thread?.conversation ??
     conversations.find((conversation) => conversation.id === activeId) ??
     null;
+  const canPost = !activeConversation?.announcementOnly || activeConversation.myRole !== "MEMBER";
 
   const loadConversations = useCallback(async (silent = false) => {
     if (!silent) setLoadingConversations(true);
@@ -523,6 +567,29 @@ export function ChatWorkspace({
       if (!silent) setLoadingConversations(false);
     }
   }, []);
+
+  useEffect(() => {
+    const term = messageSearchQuery.trim();
+    if (!messageSearchOpen || term.length < 2 || !activeId) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setMessageSearchLoading(true);
+      try {
+        const response = await fetch(`/api/chat/conversations/${activeId}/search?q=${encodeURIComponent(term)}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(await readApiError(response, "Could not search messages."));
+        const data = await response.json() as { messages?: ChatMessageDTO[] };
+        if (!cancelled) setMessageSearchResults(Array.isArray(data.messages) ? data.messages : []);
+      } catch (error) {
+        if (!cancelled) {
+          setMessageSearchResults([]);
+          notify.error(error instanceof Error ? error.message : "Could not search messages.");
+        }
+      } finally {
+        if (!cancelled) setMessageSearchLoading(false);
+      }
+    }, 240);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [activeId, messageSearchOpen, messageSearchQuery]);
 
   const markRead = useCallback(
     async (conversationId: string) => {
@@ -886,16 +953,14 @@ export function ChatWorkspace({
       if (type === "chat_message_updated") {
         const message = data.message as ChatMessageDTO | undefined;
         if (!message || typeof message.id !== "string") return;
-        setThread((current) =>
-          current && current.conversation.id === message.conversationId
-            ? {
-                ...current,
-                messages: current.messages.map((item) =>
-                  item.id === message.id ? message : item
-                ),
-              }
-            : current
-        );
+        setThread((current) => current && current.conversation.id === message.conversationId
+          ? { ...current, messages: current.messages.map((item) => item.id === message.id ? preservePollSelection(message, item) : item) }
+          : current);
+        if (message.conversationId === activeId) {
+          setPinnedMessages((current) => message.pinnedAt
+            ? [preservePollSelection(message, current.find((item) => item.id === message.id)), ...current.filter((item) => item.id !== message.id)]
+            : current.filter((item) => item.id !== message.id));
+        }
         setConversations((current) =>
           current.map((conversation) =>
             conversation.lastMessage?.id === message.id
@@ -914,6 +979,9 @@ export function ChatWorkspace({
         if (!conversationId || !messageId) return;
         const scope = data.scope === "everyone" ? "everyone" : "me";
         const message = data.message as ChatMessageDTO | undefined;
+        if (scope === "everyone" || data.userId === currentUserId) {
+          setPinnedMessages((current) => current.filter((item) => item.id !== messageId));
+        }
 
         setThread((current) => {
           if (!current || current.conversation.id !== conversationId) {
@@ -1269,6 +1337,8 @@ export function ChatWorkspace({
         sticker: extras.sticker ?? null,
         editedAt: null,
         deletedAt: null,
+        pinnedAt: null,
+        poll: null,
         replyTo: null,
         replyCount: 0,
         mentionUserIds: [],
@@ -1435,6 +1505,89 @@ export function ChatWorkspace({
     },
     [activeId]
   );
+
+  const loadPinnedMessages = useCallback(async () => {
+    if (!activeId) return;
+    setPinsLoading(true);
+    try {
+      const response = await fetch(`/api/chat/conversations/${activeId}/pins`, { cache: "no-store" });
+      if (!response.ok) throw new Error(await readApiError(response, "Could not load pinned messages."));
+      const data = await response.json() as { messages?: ChatMessageDTO[] };
+      setPinnedMessages(Array.isArray(data.messages) ? data.messages : []);
+      setPinsOpen(true);
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Could not load pinned messages.");
+    } finally {
+      setPinsLoading(false);
+    }
+  }, [activeId]);
+
+  const togglePin = useCallback(async (message: ChatMessageDTO) => {
+    const conversationId = message.conversationId || activeId;
+    if (!conversationId || message.clientId) return;
+    try {
+      const response = await fetch(`/api/chat/conversations/${conversationId}/messages/${message.id}/pin`, { method: "POST" });
+      if (!response.ok) throw new Error(await readApiError(response, "Could not update the pin."));
+      const data = await response.json() as { message?: ChatMessageDTO };
+      if (!data.message) return;
+      setThread((current) => current?.conversation.id === conversationId ? { ...current, messages: current.messages.map((item) => item.id === message.id ? data.message! : item) } : current);
+      if (conversationId === activeId) {
+        if (data.message.pinnedAt) setPinnedMessages((current) => [data.message!, ...current.filter((item) => item.id !== message.id)]);
+        else setPinnedMessages((current) => current.filter((item) => item.id !== message.id));
+      }
+      notify.success(data.message.pinnedAt ? "Message pinned." : "Message unpinned.");
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Could not update the pin.");
+    }
+  }, [activeId]);
+
+  const openSearchResult = useCallback(async (message: ChatMessageDTO) => {
+    const conversationId = message.conversationId || activeId;
+    if (!conversationId) return;
+    setActiveId(conversationId);
+    setLoadingThread(true);
+    try {
+      const response = await fetch(`/api/chat/conversations/${conversationId}/messages?around=${encodeURIComponent(message.id)}`, { cache: "no-store" });
+      if (!response.ok) throw new Error(await readApiError(response, "Could not open this message."));
+      const data = await response.json() as { conversation: ChatConversationDTO; messages?: ChatMessageDTO[]; hasMore?: boolean };
+      setThread({ conversation: data.conversation, messages: Array.isArray(data.messages) ? data.messages : [], hasMore: Boolean(data.hasMore) });
+      setMessageSearchOpen(false);
+      window.setTimeout(() => document.getElementById(`chat-message-${message.id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 60);
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Could not open this message.");
+    } finally {
+      setLoadingThread(false);
+    }
+  }, [activeId]);
+
+  const votePoll = useCallback(async (conversationId: string, pollId: string, optionId: string) => {
+    try {
+      const response = await fetch(`/api/chat/conversations/${conversationId}/polls/${pollId}/votes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ optionId }) });
+      if (!response.ok) throw new Error(await readApiError(response, "Could not record your vote."));
+      const data = await response.json() as { message?: ChatMessageDTO };
+      if (data.message) {
+        setThread((current) => current?.conversation.id === conversationId ? { ...current, messages: current.messages.map((message) => message.id === data.message!.id ? data.message! : message) } : current);
+        setPinnedMessages((current) => current.map((message) => message.id === data.message!.id ? data.message! : message));
+      }
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Could not record your vote.");
+    }
+  }, []);
+
+  const createPoll = useCallback(async () => {
+    const question = pollQuestion.trim();
+    const options = pollChoices.map((choice) => choice.trim()).filter(Boolean);
+    if (question.length < 3 || options.length < 2) {
+      notify.error("Add a question and at least two choices.");
+      return;
+    }
+    const sent = await sendPayload({ kind: "POLL", body: question, poll: { question, options } }, { body: question, kind: "POLL" });
+    if (sent) {
+      setPollOpen(false);
+      setPollQuestion("");
+      setPollChoices(["", ""]);
+    }
+  }, [pollChoices, pollQuestion, sendPayload]);
 
   const chooseMention = useCallback(
     (user: ChatParticipantDTO) => {
@@ -2000,6 +2153,7 @@ export function ChatWorkspace({
                       >
                         {conversation.title}
                       </p>
+                      {conversation.announcementOnly && <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-700">Channel</span>}
                       <span className="shrink-0 text-[10px] text-gray-400">
                         {conversation.lastMessage
                           ? formatListTime(conversation.lastMessage.createdAt)
@@ -2082,7 +2236,7 @@ export function ChatWorkspace({
                 </p>
                 {activeConversation.type === "GROUP" ? (
                   <p className="truncate text-[10px] text-gray-400">
-                    {activeConversation.participants.length} members ·{" "}
+                    {activeConversation.announcementOnly ? "Announcement channel · " : ""}{activeConversation.participants.length} members ·{" "}
                     {
                       activeConversation.participants.filter(
                         (participant) => participant.presence === "ONLINE"
@@ -2098,6 +2252,25 @@ export function ChatWorkspace({
                 )}
               </div>
             </button>
+            <button
+              type="button"
+              onClick={() => { setMessageSearchOpen((open) => !open); setMessageSearchQuery(""); setMessageSearchResults([]); }}
+              className={cn("rounded-lg p-1.5 transition-colors hover:bg-violet-50 hover:text-violet-700", messageSearchOpen ? "text-violet-700 bg-violet-50" : "text-gray-400")}
+              aria-label="Search messages"
+              title="Search messages"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadPinnedMessages()}
+              disabled={pinsLoading}
+              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50"
+              aria-label="View pinned messages"
+              title="Pinned messages"
+            >
+              {pinsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pin className="h-4 w-4" />}
+            </button>
             {activeConversation.type === "DIRECT" && otherParticipants[0] && (
               <ChatCallControls
                 conversationId={activeConversation.id}
@@ -2105,6 +2278,7 @@ export function ChatWorkspace({
                 peerPresence={otherParticipants[0].presence}
               />
             )}
+            {activeConversation.type === "GROUP" && <ChatVoiceRoomControls conversationId={activeConversation.id} title={activeConversation.title} />}
             {onExpand && (
               <button
                 type="button"
@@ -2127,6 +2301,25 @@ export function ChatWorkspace({
               </button>
             )}
           </div>
+
+          {messageSearchOpen && (
+            <div className="z-10 shrink-0 border-b border-gray-100 bg-white px-3 py-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                <input autoFocus value={messageSearchQuery} onChange={(event) => setMessageSearchQuery(event.target.value)} placeholder="Search this conversation…" className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-xs outline-none focus:border-violet-300 focus:bg-white" />
+              </div>
+              {messageSearchQuery.trim().length >= 2 && (
+                <div className="mt-2 max-h-52 space-y-1 overflow-y-auto">
+                  {messageSearchLoading ? <p className="px-2 py-2 text-[11px] text-gray-400">Searching…</p> : messageSearchResults.length === 0 ? <p className="px-2 py-2 text-[11px] text-gray-400">No matching messages.</p> : messageSearchResults.map((result) => (
+                    <button key={result.id} type="button" onClick={() => void openSearchResult(result)} className="w-full rounded-lg px-2 py-2 text-left hover:bg-violet-50">
+                      <span className="block text-[10px] font-semibold text-gray-600">{result.senderName} · {formatMessageTime(result.createdAt)}</span>
+                      <span className="mt-0.5 block truncate text-[11px] text-gray-700">{messagePreview(result)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div
             ref={scrollRef}
@@ -2208,7 +2401,7 @@ export function ChatWorkspace({
                   const isLastOwn = lastOwnMessage?.id === message.id;
 
                   return (
-                    <div key={message.id}>
+                    <div key={message.id} id={`chat-message-${message.id}`}>
                       {showDay && (
                         <div className="my-4 flex items-center gap-3">
                           <span className="h-px flex-1 bg-gray-200/70" />
@@ -2266,7 +2459,23 @@ export function ChatWorkspace({
                                 {message.senderName}
                               </button>
                             )}
-                          <div className="group/bubble relative">
+                          <div
+                            className="group/bubble relative"
+                            onPointerDown={(event) => {
+                              clearLongPress();
+                              if (event.pointerType !== "touch" || message.deletedAt || message.clientId) return;
+                              longPressTimer.current = window.setTimeout(() => setActionMenuId(message.id), 520);
+                            }}
+                            onPointerUp={clearLongPress}
+                            onPointerCancel={clearLongPress}
+                            onPointerLeave={clearLongPress}
+                            onContextMenu={(event) => {
+                              if (!message.deletedAt && !message.clientId) {
+                                event.preventDefault();
+                                setActionMenuId(message.id);
+                              }
+                            }}
+                          >
                             <div
                               className={cn(
                                 "break-words text-[13px] leading-relaxed",
@@ -2300,6 +2509,7 @@ export function ChatWorkspace({
                               <ChatMessageContent
                                 message={message}
                                 isOwn={isOwn}
+                                onVote={(pollId, optionId) => void votePoll(message.conversationId, pollId, optionId)}
                               />
                             </div>
                             {!message.deletedAt && !message.clientId && (
@@ -2372,6 +2582,14 @@ export function ChatWorkspace({
                                   </div>
                                   <button
                                     type="button"
+                                    onClick={() => { setActionMenuId(null); void togglePin(message); }}
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+                                  >
+                                    <Pin className="h-3.5 w-3.5 text-gray-400" />
+                                    {message.pinnedAt ? "Unpin message" : "Pin message"}
+                                  </button>
+                                  <button
+                                    type="button"
                                     onClick={() => {
                                       setActionMenuId(null);
                                       setDeleteTarget(message);
@@ -2386,6 +2604,7 @@ export function ChatWorkspace({
                           </div>
                           <div className="mt-1 flex items-center gap-1 text-[10px] text-gray-400">
                             <span>{formatMessageTime(message.createdAt)}</span>
+                            {message.pinnedAt && <span className="inline-flex items-center gap-0.5 text-violet-600"><Pin className="h-2.5 w-2.5" />Pinned</span>}
                             {message.editedAt && !message.deletedAt && (
                               <span className="italic">· edited</span>
                             )}
@@ -2523,16 +2742,20 @@ export function ChatWorkspace({
               </div>
             )}
             <div className="flex items-end gap-1.5">
-              <ChatComposerTools
+              {canPost ? <ChatComposerTools
                 disabled={sending || Boolean(upload)}
                 onPickFile={(file) => void handlePickFile(file)}
                 onShareLocation={handleShareLocation}
                 onSendSticker={handleSendSticker}
                 onVoiceNote={(file) => void handlePickFile(file)}
-              />
+              /> : <p className="flex-1 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">Only channel owners and admins can post announcements.</p>}
+              {canPost && activeConversation.type === "GROUP" && (
+                <button type="button" onClick={() => setPollOpen(true)} disabled={sending} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition-colors hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50" aria-label="Create poll" title="Create poll"><BarChart3 className="h-4 w-4" /></button>
+              )}
               <textarea
                 ref={textareaRef}
                 value={draft}
+                disabled={!canPost}
                 onChange={(event) => handleDraftChange(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Escape" && editing) {
@@ -2553,7 +2776,7 @@ export function ChatWorkspace({
               <button
                 type="button"
                 onClick={() => void handleSend()}
-                disabled={!draft.trim() || sending || Boolean(upload)}
+                disabled={!draft.trim() || sending || Boolean(upload) || !canPost}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label={editing ? "Save message" : "Send message"}
                 title={editing ? "Save changes" : "Send"}
@@ -2662,6 +2885,47 @@ export function ChatWorkspace({
         onClose={closeNewChat}
         onCreated={handleCreated}
       />
+
+      <Dialog open={pollOpen} onClose={() => setPollOpen(false)} title="Create a poll" description={activeConversation?.title ?? "Group chat"} size="sm">
+        <div className="space-y-3">
+          <label className="block text-xs font-medium text-gray-700">Question
+            <input value={pollQuestion} onChange={(event) => setPollQuestion(event.target.value)} maxLength={240} placeholder="What should we decide?" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-violet-400" />
+          </label>
+          <div className="space-y-2">
+            {pollChoices.map((choice, index) => <input key={index} value={choice} onChange={(event) => setPollChoices((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} maxLength={100} placeholder={`Choice ${index + 1}`} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-violet-400" />)}
+            {pollChoices.length < 8 && <button type="button" onClick={() => setPollChoices((current) => [...current, ""])} className="text-xs font-medium text-violet-700 hover:text-violet-900">+ Add a choice</button>}
+          </div>
+          <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
+            <button type="button" onClick={() => setPollOpen(false)} className="rounded-lg px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100">Cancel</button>
+            <button type="button" onClick={() => void createPoll()} disabled={sending} className="rounded-lg bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50">{sending ? "Sending…" : "Create poll"}</button>
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={pinsOpen}
+        onClose={() => setPinsOpen(false)}
+        title="Pinned messages"
+        description={activeConversation?.title ?? "Conversation"}
+        size="md"
+      >
+        <div className="max-h-[60vh] space-y-2 overflow-y-auto p-1">
+          {pinnedMessages.length === 0 ? (
+            <p className="py-8 text-center text-xs text-gray-500">No pinned messages in this conversation yet.</p>
+          ) : pinnedMessages.map((message) => (
+            <article key={message.id} className="rounded-xl border border-gray-100 bg-gray-50/70 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2 text-[10px] text-gray-500">
+                <span className="truncate font-semibold text-gray-700">{message.senderName}</span>
+                <time>{formatMessageTime(message.createdAt)}</time>
+              </div>
+              <ChatMessageContent message={message} isOwn={message.senderId === currentUserId} onVote={(pollId, optionId) => void votePoll(message.conversationId, pollId, optionId)} />
+              <button type="button" onClick={() => void togglePin(message)} className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium text-gray-500 hover:text-violet-700">
+                <Pin className="h-3 w-3" /> Unpin
+              </button>
+            </article>
+          ))}
+        </div>
+      </Dialog>
 
       <Dialog
         open={Boolean(deleteTarget)}

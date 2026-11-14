@@ -44,6 +44,7 @@ export type RealtimeEventType =
   | "chat_typing"
   | "chat_updated"
   | "chat_call_signal"
+  | "chat_voice_room"
   | "chat_presence"
   | "chat_status"
   | "chat_profile"

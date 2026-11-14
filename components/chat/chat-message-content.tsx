@@ -124,9 +124,11 @@ function FileCard({
 export function ChatMessageContent({
   message,
   isOwn,
+  onVote,
 }: {
   message: ChatMessageDTO;
   isOwn: boolean;
+  onVote?: (pollId: string, optionId: string) => void;
 }) {
   if (message.deletedAt) {
     return (
@@ -150,6 +152,24 @@ export function ChatMessageContent({
       >
         {message.body}
       </div>
+    );
+  }
+
+  if (message.kind === "POLL" && message.poll) {
+    const maxVotes = Math.max(1, ...message.poll.options.map((option) => option.votes));
+    return (
+      <section className={cn("w-[min(300px,70vw)] space-y-2 rounded-xl p-1", isOwn ? "text-white" : "text-gray-800")}>
+        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide opacity-70"><span>Poll</span><span>·</span><span>{message.poll.totalVotes} votes</span></div>
+        <p className="text-[13px] font-semibold leading-snug">{message.poll.question}</p>
+        <div className="space-y-1.5">
+          {message.poll.options.map((option) => (
+            <button key={option.id} type="button" onClick={() => onVote?.(message.poll!.id, option.id)} className={cn("relative w-full overflow-hidden rounded-lg border px-2.5 py-2 text-left text-[11px] transition-colors", isOwn ? "border-white/25 hover:bg-white/10" : "border-gray-200 hover:border-violet-300 hover:bg-violet-50")}>
+              <span className={cn("absolute inset-y-0 left-0 opacity-20", isOwn ? "bg-white" : "bg-violet-400")} style={{ width: `${(option.votes / maxVotes) * 100}%` }} />
+              <span className="relative flex items-center justify-between gap-2"><span className="truncate">{option.label}{option.votedByMe ? " ✓" : ""}</span><span className="shrink-0 tabular-nums opacity-70">{option.votes}</span></span>
+            </button>
+          ))}
+        </div>
+      </section>
     );
   }
 
@@ -274,6 +294,8 @@ export function messagePreview(message: ChatMessageDTO | null) {
       return "📍 Location";
     case "STICKER":
       return `${message.body} Sticker`;
+    case "POLL":
+      return `📊 Poll: ${message.poll?.question ?? message.body}`;
     default:
       return message.body;
   }

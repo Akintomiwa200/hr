@@ -2,6 +2,7 @@
 
 import { Phone, Video } from "lucide-react";
 import { useChatCall } from "@/components/chat/chat-call-provider";
+import { useChatVoiceRoom } from "@/components/chat/chat-voice-room-provider";
 
 /** Per-conversation launch buttons; the call UI lives in the global provider. */
 export function ChatCallControls({
@@ -14,13 +15,14 @@ export function ChatCallControls({
   peerPresence: "ONLINE" | "AWAY" | "OFFLINE";
 }) {
   const { call, startCall } = useChatCall();
-  const busy = Boolean(call);
+  const { room } = useChatVoiceRoom();
+  const busy = Boolean(call || room);
   const offline = peerPresence === "OFFLINE";
   const disabled = busy || offline;
   const title = offline
     ? "Teammate is offline"
     : busy
-      ? "You are already in a call"
+      ? "Leave your current call or voice room first"
       : undefined;
 
   return (

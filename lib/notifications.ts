@@ -13,6 +13,7 @@ export type NotificationType =
   | "checklist"
 
   | "general"
+  | "chat"
 
   | "resignation"
 
@@ -48,6 +49,7 @@ subscription: "announcements",
   integration: "announcements",
   checklist: "checklist",
   general: "announcements",
+  chat: "chat",
   resignation: "announcements",
   birthday: "announcements",
   loan: "payroll",

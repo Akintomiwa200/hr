@@ -12,6 +12,7 @@ import { Loader2, Phone, PhoneOff, Video, X } from "lucide-react";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { notify, readApiError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { ChatVoiceRoomProvider } from "@/components/chat/chat-voice-room-provider";
 
 type CallMode = "audio" | "video";
 type CallDirection = "incoming" | "outgoing" | "active";
@@ -118,9 +119,11 @@ function callDescription(call: ActiveCall) {
  */
 export function ChatCallProvider({
   enabled = true,
+  currentUserId,
   children,
 }: {
   enabled?: boolean;
+  currentUserId: string;
   children: React.ReactNode;
 }) {
   const [call, setCall] = useState<ActiveCall | null>(null);
@@ -499,7 +502,7 @@ export function ChatCallProvider({
 
   return (
     <ChatCallContext.Provider value={contextValue}>
-      {children}
+      <ChatVoiceRoomProvider enabled={enabled} currentUserId={currentUserId}>{children}</ChatVoiceRoomProvider>
       {call && (
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4"

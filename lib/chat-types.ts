@@ -8,7 +8,15 @@ export type ChatMessageKind =
   | "FILE"
   | "LOCATION"
   | "STICKER"
+  | "POLL"
   | "SYSTEM";
+
+export type ChatPollDTO = {
+  id: string;
+  question: string;
+  options: Array<{ id: string; label: string; votes: number; votedByMe: boolean }>;
+  totalVotes: number;
+};
 
 export type ChatGroupMemberRole = "OWNER" | "ADMIN" | "MEMBER";
 
@@ -89,6 +97,8 @@ export type ChatMessageDTO = {
   editedAt: string | null;
   /** Present when the message was deleted for everyone. */
   deletedAt: string | null;
+  pinnedAt: string | null;
+  poll: ChatPollDTO | null;
   replyTo: { id: string; senderName: string; body: string } | null;
   replyCount: number;
   mentionUserIds: string[];
@@ -103,6 +113,7 @@ export type ChatConversationDTO = {
   title: string;
   description: string | null;
   avatarUrl: string | null;
+  announcementOnly: boolean;
   participantNames: string;
   participants: ChatParticipantDTO[];
   lastMessage: ChatMessageDTO | null;

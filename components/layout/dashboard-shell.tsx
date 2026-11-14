@@ -99,7 +99,7 @@ export function DashboardShell({
 
   return (
     <RealtimeProvider>
-      <ChatCallProvider enabled={chatEnabled}>
+      <ChatCallProvider enabled={chatEnabled} currentUserId={userId}>
         <div className="h-screen overflow-hidden bg-surface">
           {isMobile && mobileOpen && (
             <button

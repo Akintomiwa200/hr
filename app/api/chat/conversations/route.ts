@@ -57,7 +57,8 @@ export async function POST(request: NextRequest) {
         ? await createGroupConversation(
             session,
             typeof body?.title === "string" ? body.title : "",
-            Array.isArray(body?.userIds) ? body.userIds : []
+            Array.isArray(body?.userIds) ? body.userIds : [],
+            body?.announcementOnly === true
           )
         : await findOrCreateDirectConversation(
             session,

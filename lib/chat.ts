@@ -78,6 +78,7 @@ export const chatConversationInclude = {
       reactions: { select: { emoji: true, userId: true } },
       replyTo: { select: { id: true, body: true, sender: { select: chatUserSelect } } },
       _count: { select: { replies: true } },
+      poll: { include: { options: { include: { _count: { select: { votes: true } } } }, _count: { select: { votes: true } } } },
     },
   },
 } satisfies Prisma.ChatConversationInclude;
@@ -87,6 +88,7 @@ export const chatMessageInclude = {
   reactions: { select: { emoji: true, userId: true } },
   replyTo: { select: { id: true, body: true, sender: { select: chatUserSelect } } },
   _count: { select: { replies: true } },
+  poll: { include: { options: { include: { _count: { select: { votes: true } } } }, _count: { select: { votes: true } } } },
 } satisfies Prisma.ChatMessageInclude;
 
 /**
@@ -107,6 +109,7 @@ export function chatConversationIncludeFor(userId: string) {
           select: { id: true, body: true, sender: { select: chatUserSelect } },
         },
         _count: { select: { replies: true } },
+        poll: { include: { options: { include: { _count: { select: { votes: true } } } }, _count: { select: { votes: true } } } },
       },
     },
   } satisfies Prisma.ChatConversationInclude;
@@ -238,6 +241,7 @@ function normalizeMessageKind(kind: string | null | undefined): ChatMessageKind 
     case "FILE":
     case "LOCATION":
     case "STICKER":
+    case "POLL":
     case "SYSTEM":
       return kind;
     default:
@@ -250,7 +254,7 @@ function normalizeMemberRole(role: string | null | undefined): ChatGroupMemberRo
   return "MEMBER";
 }
 
-export function serializeChatMessage(message: ChatMessageRow): ChatMessageDTO {
+export function serializeChatMessage(message: ChatMessageRow, viewerId?: string, viewerOptionId?: string | null): ChatMessageDTO {
   const { firstName, lastName } = splitName(message.sender);
   const kind = normalizeMessageKind(message.kind);
   const deleted = Boolean(message.deletedAt);
@@ -286,6 +290,18 @@ export function serializeChatMessage(message: ChatMessageRow): ChatMessageDTO {
     createdAt: message.createdAt.toISOString(),
     editedAt: message.editedAt?.toISOString() ?? null,
     deletedAt: message.deletedAt?.toISOString() ?? null,
+    pinnedAt: message.pinnedAt?.toISOString() ?? null,
+    poll: message.poll ? {
+      id: message.poll.id,
+      question: message.poll.question,
+      totalVotes: message.poll._count.votes,
+      options: message.poll.options.map((option) => ({
+        id: option.id,
+        label: option.label,
+        votes: option._count.votes,
+        votedByMe: Boolean(viewerOptionId && viewerOptionId === option.id),
+      })),
+    } : null,
     replyTo: message.replyTo
       ? { id: message.replyTo.id, senderName: employeeName(message.replyTo.sender), body: message.replyTo.body }
       : null,
@@ -300,6 +316,25 @@ export function serializeChatMessage(message: ChatMessageRow): ChatMessageDTO {
       }, new Map<string, string[]>()).entries()
     ).map(([emoji, userIds]) => ({ emoji, count: userIds.length, userIds })),
   };
+}
+
+async function serializeChatMessageForViewer(message: ChatMessageRow, viewerId: string) {
+  if (!message.poll) return serializeChatMessage(message, viewerId);
+  const vote = await prisma.chatPollVote.findUnique({
+    where: { pollId_userId: { pollId: message.poll.id, userId: viewerId } },
+    select: { optionId: true },
+  });
+  return serializeChatMessage(message, viewerId, vote?.optionId);
+}
+
+async function serializeChatMessagesForViewer(messages: ChatMessageRow[], viewerId: string) {
+  const pollIds = messages.flatMap((message) => message.poll ? [message.poll.id] : []);
+  const votes = pollIds.length ? await prisma.chatPollVote.findMany({
+    where: { pollId: { in: pollIds }, userId: viewerId },
+    select: { pollId: true, optionId: true },
+  }) : [];
+  const selected = new Map(votes.map((vote) => [vote.pollId, vote.optionId]));
+  return messages.map((message) => serializeChatMessage(message, viewerId, message.poll ? selected.get(message.poll.id) : null));
 }
 
 function serializeParticipant(
@@ -344,7 +379,7 @@ export function serializeChatConversation(
 ): ChatConversationDTO {
   const participants = row.participants.map(serializeParticipant);
   const title = conversationTitle(row, currentUserId, participants);
-  const lastMessage = row.messages[0] ? serializeChatMessage(row.messages[0]) : null;
+  const lastMessage = row.messages[0] ? serializeChatMessage(row.messages[0], currentUserId) : null;
   const me = participants.find((participant) => participant.userId === currentUserId);
   const myRole: ChatGroupMemberRole =
     row.type === "GROUP"
@@ -357,6 +392,7 @@ export function serializeChatConversation(
     title,
     description: row.description?.trim() || null,
     avatarUrl: row.avatarUrl,
+    announcementOnly: row.announcementOnly,
     participantNames: participants.map((participant) => participant.name).join(", "),
     participants,
     lastMessage,
@@ -568,7 +604,8 @@ export async function findOrCreateDirectConversation(
 export async function createGroupConversation(
   session: SessionUser,
   title: string,
-  userIds: string[]
+  userIds: string[],
+  announcementOnly = false
 ): Promise<ChatConversationDTO> {
   const companyId = getChatCompanyId(session);
   if (!companyId) throw new ChatError(403, "Chat is only available inside a company.");
@@ -606,6 +643,7 @@ export async function createGroupConversation(
       companyId,
       type: "GROUP",
       title: cleanTitle,
+      announcementOnly,
       createdById: session.id,
       inviteCode: randomUUID().replace(/-/g, "").slice(0, 12),
       participants: {
@@ -624,12 +662,39 @@ export async function createGroupConversation(
 export async function getChatThread(
   session: SessionUser,
   conversationId: string,
-  options: { before?: string | null; take?: number } = {}
+  options: { before?: string | null; around?: string | null; take?: number } = {}
 ): Promise<ChatThreadDTO | null> {
   const conversation = await getConversationForUser(session, conversationId);
   if (!conversation) return null;
 
   const take = Math.min(Math.max(options.take ?? 50, 1), 100);
+  if (options.around) {
+    const anchor = await prisma.chatMessage.findFirst({
+      where: { id: options.around, conversationId, NOT: { hiddenFor: { has: session.id } } },
+      select: { createdAt: true },
+    });
+    if (!anchor) return { conversation: serializeChatConversation(conversation, session.id), messages: [], hasMore: false };
+    const sideTake = Math.floor(take / 2);
+    const [older, newer] = await Promise.all([
+      prisma.chatMessage.findMany({
+        where: { conversationId, NOT: { hiddenFor: { has: session.id } }, createdAt: { lt: anchor.createdAt } },
+        include: chatMessageInclude,
+        orderBy: { createdAt: "desc" },
+        take: sideTake,
+      }),
+      prisma.chatMessage.findMany({
+        where: { conversationId, NOT: { hiddenFor: { has: session.id } }, createdAt: { gte: anchor.createdAt } },
+        include: chatMessageInclude,
+        orderBy: { createdAt: "asc" },
+        take: take - sideTake,
+      }),
+    ]);
+    return {
+      conversation: serializeChatConversation(conversation, session.id),
+      messages: await serializeChatMessagesForViewer([...older.reverse(), ...newer], session.id),
+      hasMore: older.length === sideTake,
+    };
+  }
   const before =
     options.before && !Number.isNaN(new Date(options.before).getTime())
       ? new Date(options.before)
@@ -651,9 +716,32 @@ export async function getChatThread(
 
   return {
     conversation: serializeChatConversation(conversation, session.id),
-    messages: page.reverse().map(serializeChatMessage),
+    messages: await serializeChatMessagesForViewer(page.reverse(), session.id),
     hasMore,
   };
+}
+
+export async function searchChatMessages(
+  session: SessionUser,
+  conversationId: string,
+  rawQuery: string
+) {
+  const conversation = await getConversationForUser(session, conversationId);
+  if (!conversation) return null;
+  const query = rawQuery.trim().slice(0, 100);
+  if (query.length < 2) return [];
+  const messages = await prisma.chatMessage.findMany({
+    where: {
+      conversationId,
+      body: { contains: query, mode: "insensitive" },
+      deletedAt: null,
+      NOT: { hiddenFor: { has: session.id } },
+    },
+    include: chatMessageInclude,
+    orderBy: { createdAt: "desc" },
+    take: 30,
+  });
+  return serializeChatMessagesForViewer(messages, session.id);
 }
 
 export type PostChatMessageInput = {
@@ -673,6 +761,7 @@ export type PostChatMessageInput = {
   } | null;
   replyToId?: string | null;
   mentionUserIds?: string[];
+  poll?: { question?: string; options?: string[] };
 };
 
 export async function postChatMessage(
@@ -688,8 +777,13 @@ export async function postChatMessage(
 
   const payload: PostChatMessageInput =
     typeof input === "string" ? { body: input } : input;
+  const myParticipant = conversation.participants.find((participant) => participant.userId === session.id);
+  if (conversation.announcementOnly && normalizeMemberRole(myParticipant?.role) === "MEMBER") {
+    throw new ChatError(403, "Only channel owners and admins can post here.");
+  }
   const requestedKind = normalizeMessageKind(payload.kind);
   const rawBody = typeof payload.body === "string" ? payload.body.trim() : "";
+  let poll: { question: string; options: string[] } | null = null;
 
   let kind: ChatMessageKind = "TEXT";
   let body = rawBody;
@@ -706,7 +800,17 @@ export async function postChatMessage(
     label: string | null;
   } | null = null;
 
-  if (requestedKind === "LOCATION" || payload.location) {
+  if (requestedKind === "POLL") {
+    if (conversation.type !== "GROUP") throw new ChatError(400, "Polls are available in group chats.");
+    const question = (payload.poll?.question ?? rawBody).trim().slice(0, 240);
+    const options = Array.isArray(payload.poll?.options)
+      ? Array.from(new Set(payload.poll.options.map((option) => typeof option === "string" ? option.trim().slice(0, 100) : "").filter(Boolean))).slice(0, 8)
+      : [];
+    if (question.length < 3 || options.length < 2) throw new ChatError(400, "A poll needs a question and at least two choices.");
+    poll = { question, options };
+    kind = "POLL";
+    body = question;
+  } else if (requestedKind === "LOCATION" || payload.location) {
     const latitude = Number(payload.location?.latitude);
     const longitude = Number(payload.location?.longitude);
     if (
@@ -842,6 +946,7 @@ export async function postChatMessage(
         locationLabel: location?.label ?? null,
         replyToId,
         mentionUserIds: mentions,
+        ...(poll ? { poll: { create: { conversation: { connect: { id: conversationId } }, question: poll.question, options: { create: poll.options.map((label) => ({ label })) } } } } : {}),
       },
       include: chatMessageInclude,
     }),
@@ -858,7 +963,7 @@ export async function postChatMessage(
   });
 
   return {
-    message: serializeChatMessage(message),
+    message: await serializeChatMessageForViewer(message, session.id),
     recipientIds: conversation.participants.map((participant) => participant.userId),
   };
 }
@@ -902,7 +1007,31 @@ export async function editChatMessage(
   });
 
   return {
-    message: serializeChatMessage(updated),
+    message: await serializeChatMessageForViewer(updated, session.id),
+    recipientIds: conversation.participants.map((participant) => participant.userId),
+  };
+}
+
+export async function voteChatPoll(session: SessionUser, conversationId: string, pollId: string, optionId: string) {
+  const conversation = await getConversationForUser(session, conversationId);
+  if (!conversation) return null;
+  const poll = await prisma.chatPoll.findFirst({
+    where: { id: pollId, conversationId },
+    select: { id: true, message: { select: { deletedAt: true } }, options: { select: { id: true } } },
+  });
+  if (!poll || poll.message.deletedAt) throw new ChatError(404, "This poll is no longer available.");
+  if (!poll.options.some((option) => option.id === optionId)) throw new ChatError(400, "Choose a valid poll option.");
+  await prisma.$transaction([
+    prisma.chatPollVote.deleteMany({ where: { pollId, userId: session.id } }),
+    prisma.chatPollVote.create({ data: { pollId, optionId, userId: session.id } }),
+  ]);
+  const message = await prisma.chatMessage.findFirst({
+    where: { poll: { id: pollId } },
+    include: chatMessageInclude,
+  });
+  if (!message) throw new ChatError(404, "This poll is no longer available.");
+  return {
+    message: serializeChatMessage(message, session.id, optionId),
     recipientIds: conversation.participants.map((participant) => participant.userId),
   };
 }
@@ -934,10 +1063,45 @@ export async function toggleChatReaction(
     where: { id: messageId }, include: chatMessageInclude,
   });
   return {
-    message: serializeChatMessage(fresh),
+    message: await serializeChatMessageForViewer(fresh, session.id),
     changed,
     recipientIds: conversation.participants.map((participant) => participant.userId),
   };
+}
+
+export async function toggleChatMessagePin(
+  session: SessionUser,
+  conversationId: string,
+  messageId: string
+) {
+  const conversation = await getConversationForUser(session, conversationId);
+  if (!conversation) return null;
+  const existing = await prisma.chatMessage.findFirst({
+    where: { id: messageId, conversationId, deletedAt: null },
+    select: { id: true, pinnedAt: true },
+  });
+  if (!existing) throw new ChatError(404, "That message is no longer available.");
+  const updated = await prisma.chatMessage.update({
+    where: { id: existing.id },
+    data: { pinnedAt: existing.pinnedAt ? null : new Date() },
+    include: chatMessageInclude,
+  });
+  return {
+    message: await serializeChatMessageForViewer(updated, session.id),
+    recipientIds: conversation.participants.map((participant) => participant.userId),
+  };
+}
+
+export async function listPinnedChatMessages(session: SessionUser, conversationId: string) {
+  const conversation = await getConversationForUser(session, conversationId);
+  if (!conversation) return null;
+  const messages = await prisma.chatMessage.findMany({
+    where: { conversationId, pinnedAt: { not: null }, deletedAt: null, NOT: { hiddenFor: { has: session.id } } },
+    include: chatMessageInclude,
+    orderBy: { pinnedAt: "desc" },
+    take: 100,
+  });
+  return serializeChatMessagesForViewer(messages, session.id);
 }
 
 export async function deleteChatMessage(
@@ -990,7 +1154,7 @@ export async function deleteChatMessage(
       include: chatMessageInclude,
     });
     return {
-      message: serializeChatMessage(fresh),
+      message: await serializeChatMessageForViewer(fresh, session.id),
       scope,
       recipientIds: conversation.participants.map((participant) => participant.userId),
     };
@@ -1064,6 +1228,86 @@ export async function getCallSignalRecipients(session: SessionUser, conversation
   return conversation.participants
     .map((participant) => participant.userId)
     .filter((userId) => userId !== session.id);
+}
+
+async function chatVoiceRoomSnapshot(conversation: ChatConversationRow, roomId: string, active: boolean) {
+  const activeSince = new Date(Date.now() - 60_000);
+  const members = active ? await prisma.chatVoiceRoomMember.findMany({
+    where: { roomId, leftAt: null, lastSeenAt: { gt: activeSince }, userId: { in: conversation.participants.map((participant) => participant.userId) } },
+    include: { user: { select: chatUserSelect } },
+    orderBy: { joinedAt: "asc" },
+  }) : [];
+  return {
+    room: active ? { id: roomId, conversationId: conversation.id, members: members.map((member) => ({ userId: member.userId, name: employeeName(member.user) })) } : null,
+    recipientIds: conversation.participants.map((participant) => participant.userId),
+  };
+}
+
+export async function getChatVoiceRoom(session: SessionUser, conversationId: string) {
+  const conversation = await getConversationForUser(session, conversationId);
+  if (!conversation) return null;
+  if (conversation.type !== "GROUP") throw new ChatError(400, "Voice rooms are available in group chats.");
+  const room = await prisma.chatVoiceRoom.findUnique({ where: { conversationId }, select: { id: true, endedAt: true } });
+  if (!room || room.endedAt) return { room: null, recipientIds: conversation.participants.map((participant) => participant.userId) };
+  return chatVoiceRoomSnapshot(conversation, room.id, true);
+}
+
+export async function joinChatVoiceRoom(session: SessionUser, conversationId: string) {
+  const conversation = await getConversationForUser(session, conversationId);
+  if (!conversation) return null;
+  if (conversation.type !== "GROUP") throw new ChatError(400, "Voice rooms are available in group chats.");
+  const room = await prisma.chatVoiceRoom.upsert({
+    where: { conversationId },
+    create: { conversationId },
+    update: { endedAt: null },
+    select: { id: true },
+  });
+  const activeSince = new Date(Date.now() - 60_000);
+  const membersBefore = await prisma.chatVoiceRoomMember.count({ where: { roomId: room.id, leftAt: null, lastSeenAt: { gt: activeSince } } });
+  const alreadyJoined = await prisma.chatVoiceRoomMember.findUnique({ where: { roomId_userId: { roomId: room.id, userId: session.id } }, select: { leftAt: true } });
+  if (membersBefore >= 6 && alreadyJoined?.leftAt) throw new ChatError(409, "This voice room is full (6 people max).");
+  await prisma.chatVoiceRoomMember.upsert({
+    where: { roomId_userId: { roomId: room.id, userId: session.id } },
+    create: { roomId: room.id, userId: session.id },
+    update: { joinedAt: new Date(), lastSeenAt: new Date(), leftAt: null },
+  });
+  return { ...(await chatVoiceRoomSnapshot(conversation, room.id, true)), joinedUserId: session.id };
+}
+
+export async function leaveChatVoiceRoom(session: SessionUser, conversationId: string) {
+  const conversation = await getConversationForUser(session, conversationId);
+  if (!conversation) return null;
+  const room = await prisma.chatVoiceRoom.findUnique({ where: { conversationId }, select: { id: true, endedAt: true } });
+  if (!room || room.endedAt) return { room: null, recipientIds: conversation.participants.map((participant) => participant.userId), joinedUserId: session.id };
+  await prisma.chatVoiceRoomMember.updateMany({ where: { roomId: room.id, userId: session.id, leftAt: null }, data: { leftAt: new Date() } });
+  const activeCount = await prisma.chatVoiceRoomMember.count({ where: { roomId: room.id, leftAt: null, lastSeenAt: { gt: new Date(Date.now() - 60_000) } } });
+  if (activeCount === 0) {
+    await prisma.chatVoiceRoom.update({ where: { id: room.id }, data: { endedAt: new Date() } });
+    return { ...(await chatVoiceRoomSnapshot(conversation, room.id, false)), joinedUserId: session.id };
+  }
+  return { ...(await chatVoiceRoomSnapshot(conversation, room.id, true)), joinedUserId: session.id };
+}
+
+export async function heartbeatChatVoiceRoom(session: SessionUser, conversationId: string) {
+  const conversation = await getConversationForUser(session, conversationId);
+  if (!conversation) return null;
+  const room = await prisma.chatVoiceRoom.findUnique({ where: { conversationId }, select: { id: true, endedAt: true } });
+  if (!room || room.endedAt) return { room: null, recipientIds: conversation.participants.map((participant) => participant.userId) };
+  const result = await prisma.chatVoiceRoomMember.updateMany({ where: { roomId: room.id, userId: session.id, leftAt: null }, data: { lastSeenAt: new Date() } });
+  if (!result.count) return { room: null, recipientIds: conversation.participants.map((participant) => participant.userId) };
+  return chatVoiceRoomSnapshot(conversation, room.id, true);
+}
+
+export async function getVoiceRoomSignalRecipients(session: SessionUser, conversationId: string, roomId: string, targetUserId: string) {
+  const conversation = await getConversationForUser(session, conversationId);
+  if (!conversation) return null;
+  if (!conversation.participants.some((participant) => participant.userId === targetUserId)) throw new ChatError(403, "That teammate is no longer in this conversation.");
+  const room = await prisma.chatVoiceRoom.findFirst({
+    where: { id: roomId, conversationId, endedAt: null, members: { some: { userId: session.id, leftAt: null, lastSeenAt: { gt: new Date(Date.now() - 60_000) } } } },
+    select: { id: true, members: { where: { userId: targetUserId, leftAt: null, lastSeenAt: { gt: new Date(Date.now() - 60_000) } }, select: { userId: true } } },
+  });
+  if (!room || room.members.length === 0) throw new ChatError(403, "Both people must be in the active voice room.");
+  return [targetUserId];
 }
 
 async function companyAudience(companyId: string) {
