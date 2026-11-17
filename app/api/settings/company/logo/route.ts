@@ -64,6 +64,8 @@ export async function POST(request: NextRequest) {
 
   const publicId = ["smarthr", "company", session.companyId, "logo"].join("/");
 
+  // Logos live in Cloudinary. Inline base64 logos would be written to the
+  // company row and can exhaust the database storage quota.
   let url: string;
   try {
     const uploaded = await uploadToCloudinary({
@@ -74,10 +76,12 @@ export async function POST(request: NextRequest) {
       resourceType: "image",
     });
     url = uploaded.url;
-  } catch {
-    // If Cloudinary is not configured or fails, store the logo as a data URI so
-    // the upload still succeeds (same fallback used for profile photos).
-    url = `data:${mimeType};base64,${buffer.toString("base64")}`;
+  } catch (error) {
+    console.error("Company logo upload to Cloudinary failed", error);
+    return NextResponse.json(
+      { error: "Image storage is unavailable right now. Please try again." },
+      { status: 502 }
+    );
   }
 
   await prisma.company.update({

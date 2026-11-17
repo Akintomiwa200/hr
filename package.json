@@ -21,6 +21,8 @@
     "db:push": "prisma db push",
     "db:import-zkteco": "tsx scripts/import-zkteco-employees.ts",
     "db:purge-demo": "tsx scripts/purge-demo-data.mjs",
+    "db:storage-report": "tsx --env-file=.env scripts/db-storage-report.ts",
+    "db:images-to-cloudinary": "tsx --env-file=.env scripts/migrate-images-to-cloudinary.ts",
     "db:setup": "node scripts/db-sync.mjs && tsx prisma/seed.ts",
     "postinstall": "prisma generate"
   },

@@ -31,6 +31,8 @@ export async function POST(request: NextRequest) {
   const targetId = session.employeeId || session.id;
   const publicId = avatarPublicId(targetId);
 
+  // Photos belong in Cloudinary, never inline in Postgres. Storing base64
+  // images in the database bloats storage and can exhaust the database quota.
   let url: string;
   try {
     const uploaded = await uploadToCloudinary({
@@ -41,9 +43,12 @@ export async function POST(request: NextRequest) {
       resourceType: "image",
     });
     url = uploaded.url;
-  } catch {
-    // If Cloudinary is not configured or fails, store as base64 data URI so avatars always work
-    url = `data:${file.type};base64,${buffer.toString("base64")}`;
+  } catch (error) {
+    console.error("Avatar upload to Cloudinary failed", error);
+    return NextResponse.json(
+      { error: "Photo storage is unavailable right now. Please try again." },
+      { status: 502 }
+    );
   }
 
   // Update employee avatar if account is linked to an employee
